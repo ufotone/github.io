@@ -1,0 +1,13 @@
+theme: just-the-docs
+title: EM-224 HONODORI
+description: Multi-sound-source music sequencer with PATTERN / SONG / MML modes.
+logo: /assets/logo.png
+color_scheme: dark
+
+# ナビゲーション
+nav_order: 1
+search_enabled: true
+
+# URL
+baseurl: ""
+url: "https://YOUR_NAME.github.io/EM-224"
