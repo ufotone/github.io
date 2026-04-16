@@ -1113,37 +1113,57 @@ function _playHH(open, when, vol) {
 function playOpenHH(when, vol)  { _playHH(true,  when, vol); }
 function playCloseHH(when, vol) { _playHH(false, when, vol); }
 
-function tickLoop() {
-  if (!state.playing) return;
+// =============================================
+// Lookahead Scheduler
+// =============================================
+// setTimeoutの誤差を排除するため、AudioContext.currentTimeを絶対基準として
+// 先読み窓（SCHEDULE_AHEAD_TIME）内のステップを先にスケジュールする方式。
+const SCHEDULE_AHEAD_TIME = 0.12; // 秒: この先まで先読みしてスケジュール
+const TICK_INTERVAL_MS    = 25;   // ms: ポーリング間隔
+
+let nextStepTime  = 0;   // 次のステップのAudioContext絶対時刻
+let schedulerTimer = null;
+
+function scheduleStep() {
+  if (!state.playing || !audioCtx) return;
+
   const stepTime = (60 / state.bpm) / 4;
-  const when = audioCtx ? audioCtx.currentTime + 0.05 : 0;
-  const stepLen = getStepLen();
-  const step = (state.currentStep + 1) % stepLen;
-  state.currentStep = step;
 
-  // ソングモード: 最終ステップ再生後に次のバンクへ進む
-  if (state.mode === 'song' && step === 0) {
-    const nextCursor = state.song.cursor + 1;
-    if (nextCursor >= state.song.steps.length) {
-      if (state.song.loop && state.song.steps.length > 0) {
-        state.song.cursor = 0;
+  // 先読み窓内のステップをすべてスケジュール
+  while (nextStepTime < audioCtx.currentTime + SCHEDULE_AHEAD_TIME) {
+    const when  = nextStepTime;
+    const stepLen = getStepLen();
+    const step = (state.currentStep + 1) % stepLen;
+    state.currentStep = step;
+
+    // ソングモード: step==0 でバンク切替
+    if (state.mode === 'song' && step === 0) {
+      const nextCursor = state.song.cursor + 1;
+      if (nextCursor >= state.song.steps.length) {
+        if (state.song.loop && state.song.steps.length > 0) {
+          state.song.cursor = 0;
+        } else {
+          // 最後のステップが終わった後に停止
+          const stopDelay = Math.max(0, (nextStepTime - audioCtx.currentTime) * 1000 + stepTime * 1000);
+          setTimeout(() => stopPlay(), stopDelay);
+          return;
+        }
       } else {
-        stopPlay();
-        return;
+        state.song.cursor = nextCursor;
       }
-    } else {
-      state.song.cursor = nextCursor;
+      state.currentBank = state.song.steps[state.song.cursor];
+      // UI更新はメインスレッドで非同期に（音声タイミングには影響しない）
+      setTimeout(() => {
+        document.querySelectorAll('.bank-btn').forEach((b,j) => b.classList.toggle('active', j===state.currentBank));
+        renderSeq();
+        updateSongGrid();
+        updateStepIndicatorCount();
+      }, 0);
     }
-    state.currentBank = state.song.steps[state.song.cursor];
-    document.querySelectorAll('.bank-btn').forEach((b,j) => b.classList.toggle('active', j===state.currentBank));
-    renderSeq();
-    updateSongGrid();
-    updateStepIndicatorCount();
-  }
 
-  const seq = getSeqData();
-  if (audioCtx) {
-    // PAN：各チャンネルのseqData.panをstate.mixに反映
+    const seq = getSeqData();
+
+    // PAN反映（UIは後で更新）
     const panMap = [
       ['sub','panSub'],
       ['fm1','panFm1'],['fm2','panFm2'],['fm3','panFm3'],['fm4','panFm4'],['fm5','panFm5'],['fm6','panFm6'],
@@ -1151,16 +1171,11 @@ function tickLoop() {
     ];
     panMap.forEach(([ch, pk]) => {
       if (seq[ch] && seq[ch].pan && seq[ch].pan[step] !== undefined) {
-        const v = seq[ch].pan[step];
-        state.mix[pk] = v;
-        const uiCh = pk.slice(3);
-        const el  = document.getElementById('pan' + uiCh);
-        const vEl = document.getElementById('pan' + uiCh + 'V');
-        if (el) el.value = v;
-        if (vEl) vEl.textContent = v === 0 ? 'C' : (v < 0 ? 'L'+Math.abs(v) : 'R'+v);
+        state.mix[pk] = seq[ch].pan[step];
       }
     });
 
+    // 発音スケジュール（whenはAudioContext絶対時刻）
     if (seq.sub.on[step]  && seq.sub.notes[step])  playSubtractive(noteToHz(seq.sub.notes[step]),  seq.sub.vols[step]  ?? 80, when, seq.sub.tie[step]);
     if (seq.fm1.on[step]  && seq.fm1.notes[step])  playFM(0, noteToHz(seq.fm1.notes[step]),  seq.fm1.vols[step]  ?? 80, when, seq.fm1.tie[step]);
     if (seq.fm2.on[step]  && seq.fm2.notes[step])  playFM(1, noteToHz(seq.fm2.notes[step]),  seq.fm2.vols[step]  ?? 80, when, seq.fm2.tie[step]);
@@ -1188,12 +1203,40 @@ function tickLoop() {
       const applyFxParam = (key, audioFn) => {
         const ch = fx[key];
         if (!ch || !ch.on[step]) return;
-        const v = ch.vals[step];
-        audioFn(v);
-        // UIスライダーも同期
+        audioFn(ch.vals[step]);
+      };
+      applyFxParam('delayWet',    v => { if(delayWetGain) delayWetGain.gain.setValueAtTime(v/100, when); if(delayDryGain) delayDryGain.gain.setValueAtTime(1-(v/100)*0.5, when); state.fx.delayWet=v; });
+      applyFxParam('delayFb',     v => { if(delayFeedback) delayFeedback.gain.setValueAtTime(v/100, when); state.fx.delayFb=v; });
+      applyFxParam('chorusRate',  v => { if(chorusLFO) chorusLFO.frequency.setValueAtTime((v/100)*5, when); state.fx.chorusRate=v; });
+      applyFxParam('chorusDepth', v => { if(chorusLFOGain) chorusLFOGain.gain.setValueAtTime((v/100)*0.01, when); state.fx.chorusDepth=v; });
+      applyFxParam('chorusWet',   v => { if(chorusWetGain) chorusWetGain.gain.setValueAtTime(v/100, when); state.fx.chorusWet=v; });
+      applyFxParam('djFreq',      v => { if(masterFilter) masterFilter.frequency.setValueAtTime(v, when); state.fx.djFilterFreq=v; });
+      applyFxParam('djRes',       v => { if(masterFilter) masterFilter.Q.setValueAtTime(v, when); state.fx.djFilterRes=v; });
+    }
+
+    // ステップインジケーターUI更新（非同期）
+    const _step = step;
+    const delay = Math.max(0, (when - audioCtx.currentTime) * 1000);
+    setTimeout(() => {
+      updateStepIndicator(_step);
+      // PANのUI同期
+      panMap.forEach(([ch, pk]) => {
+        if (seq[ch] && seq[ch].pan && seq[ch].pan[_step] !== undefined) {
+          const v = seq[ch].pan[_step];
+          const uiCh = pk.slice(3);
+          const el  = document.getElementById('pan' + uiCh);
+          const vEl = document.getElementById('pan' + uiCh + 'V');
+          if (el) el.value = v;
+          if (vEl) vEl.textContent = v === 0 ? 'C' : (v < 0 ? 'L'+Math.abs(v) : 'R'+v);
+        }
+      });
+      // FX UI同期
+      if (fx) {
         const elMap = { delayWet:'delayWet', delayFb:'delayFb', chorusRate:'chorusRate', chorusDepth:'chorusDepth', chorusWet:'chorusWet', djFreq:'djFilterFreq', djRes:'djFilterRes' };
-        const elId = elMap[key];
-        if (elId) {
+        Object.entries(elMap).forEach(([key, elId]) => {
+          const ch = fx[key];
+          if (!ch || !ch.on[_step]) return;
+          const v = ch.vals[_step];
           const el = document.getElementById(elId);
           const vEl = document.getElementById(elId + 'Val');
           if (el) el.value = v;
@@ -1203,45 +1246,43 @@ function tickLoop() {
             else if (elId === 'djFilterRes') vEl.textContent = parseFloat(v).toFixed(1);
             else vEl.textContent = Math.round(v)+'%';
           }
-        }
-      };
-      applyFxParam('delayWet',    v => { if(delayWetGain) delayWetGain.gain.value=v/100; if(delayDryGain) delayDryGain.gain.value=1-(v/100)*0.5; state.fx.delayWet=v; });
-      applyFxParam('delayFb',     v => { if(delayFeedback) delayFeedback.gain.value=v/100; state.fx.delayFb=v; });
-      applyFxParam('chorusRate',  v => { if(chorusLFO) chorusLFO.frequency.value=(v/100)*5; state.fx.chorusRate=v; });
-      applyFxParam('chorusDepth', v => { if(chorusLFOGain) chorusLFOGain.gain.value=(v/100)*0.01; state.fx.chorusDepth=v; });
-      applyFxParam('chorusWet',   v => { if(chorusWetGain) chorusWetGain.gain.value=v/100; state.fx.chorusWet=v; });
-      applyFxParam('djFreq',      v => { if(masterFilter) masterFilter.frequency.value=v; state.fx.djFilterFreq=v; });
-      applyFxParam('djRes',       v => { if(masterFilter) masterFilter.Q.value=v; state.fx.djFilterRes=v; });
-    }
+        });
+      }
+    }, delay);
+
+    nextStepTime += stepTime;
   }
-  updateStepIndicator(step);
-  setTimeout(tickLoop, Math.round(stepTime * 1000));
+
+  schedulerTimer = setTimeout(scheduleStep, TICK_INTERVAL_MS);
 }
+
+function tickLoop() {} // 後方互換のため残す（未使用）
 
 function startPlay() {
   initAudio();
   if (state.playing) return;
   if (state.mode === 'song') {
     if (state.song.steps.length === 0) return;
-    // cursor=-1から始め、tickLoopの最初のstep==0でcursor=0にジャンプさせる
     state.song.cursor = -1;
     state.currentBank = state.song.steps[0];
     document.querySelectorAll('.bank-btn').forEach((b,j) => b.classList.toggle('active', j===state.currentBank));
     renderSeq();
   }
   state.playing = true;
-  document.getElementById('playBtn').style.opacity = '0.5';
   state.currentStep = -1;
-  tickLoop();
+  document.getElementById('playBtn').style.opacity = '0.5';
+  // 次ステップ時刻を少し先に設定してスタート
+  nextStepTime = audioCtx.currentTime + 0.05;
+  if (schedulerTimer) clearTimeout(schedulerTimer);
+  scheduleStep();
 }
 
 function stopPlay() {
   state.playing = false;
   state.currentStep = -1;
   state.song.cursor = -1;
-  // アクティブノードを全解放
+  if (schedulerTimer) { clearTimeout(schedulerTimer); schedulerTimer = null; }
   Object.keys(activeNodes).forEach(ch => releaseNode(ch));
-  // PCMソースを全停止
   activePcmSources.forEach(src => { try { src.stop(); } catch(e) {} });
   activePcmSources.clear();
   document.getElementById('playBtn').style.opacity = '1';
@@ -2971,7 +3012,7 @@ document.getElementById('saveConfigBtn').onclick = () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'koodori_config.json';
+  a.download = 'honodori_config.json';
   a.click();
   URL.revokeObjectURL(url);
 };
