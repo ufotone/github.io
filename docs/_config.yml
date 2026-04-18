@@ -1,12 +1,32 @@
-theme: 
-title: EM-224 HONODORI
-description: Multi-sound-source music sequencer with PATTERN / SONG / MML modes.
+title: "EM-224 HONODORI"
+description: "Multi-sound-source music sequencer with PATTERN / SONG / MML modes."
+theme: "just-the-docs"
+
+# カラースキーム
 color_scheme: dark
+
+# URL 設定
+url: "https://ufotone.github.io"
+baseurl: "/EM-224"
 
 # ナビゲーション
 nav_order: 1
 search_enabled: true
 
-# URL
-baseurl: ""
-url: "https://ufotone.github.io/EM-224"
+# Markdown エンジン（GitHub Pages 標準）
+markdown: kramdown
+kramdown:
+  input: GFM
+
+# プラグイン（GitHub Pages 公式対応）
+plugins:
+  - jekyll-seo-tag
+  - jekyll-sitemap
+  - jekyll-feed
+
+# Just the Docs 設定
+just_the_docs:
+  logo: "/assets/logo.png"
+  favicon: "/assets/favicon.png"
+  search:
+    enabled: true
