@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>honodori — Operation Manual</title>
+<style>
+:root {
+  --bg: #0e0e0e;
+  --bg2: #141414;
+  --bg3: #1a1a1a;
+  --panel: #1f1f1f;
+  --border: #2a2a2a;
+  --border2: #333;
+  --green: #4a7;
+  --green2: #5d5;
+  --green3: #2a4a2a;
+  --text: #ccc;
+  --text2: #888;
+  --text3: #555;
+  --blue: #68a;
+  --blue2: #9cf;
+  --orange: #e93;
+  --red: #c44;
+  --amber: #c96;
+  --accent: #3a6;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: monospace;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.wrapper { display: flex; min-height: 100vh; }
+nav {
+  width: 200px;
+  min-width: 200px;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  padding: 16px 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+nav .logo {
+  font-size: 18px;
+  color: var(--green2);
+  letter-spacing: 3px;
+  padding: 0 16px 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+nav .logo span { font-size: 9px; color: var(--text3); display: block; letter-spacing: 2px; }
+nav a {
+  display: block;
+  padding: 5px 16px;
+  color: var(--text2);
+  text-decoration: none;
+  font-size: 10px;
+  letter-spacing: 1px;
+  border-left: 2px solid transparent;
+  transition: all 0.1s;
+}
+nav a:hover { color: var(--green2); background: var(--bg3); }
+nav a.active { color: var(--green2); border-left-color: var(--green); background: var(--bg3); }
+nav .nav-sec {
+  font-size: 8px;
+  color: var(--text3);
+  letter-spacing: 2px;
+  padding: 12px 16px 4px;
+}
+main {
+  flex: 1;
+  padding: 32px 40px;
+  max-width: 860px;
+  overflow-x: hidden;
+}
+section { margin-bottom: 56px; }
+h1 { font-size: 20px; color: var(--green2); letter-spacing: 3px; margin-bottom: 4px; }
+h2 {
+  font-size: 14px;
+  color: var(--green);
+  letter-spacing: 2px;
+  margin: 28px 0 10px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+}
+h3 { font-size: 12px; color: var(--blue); letter-spacing: 2px; margin: 18px 0 8px; }
+p { color: var(--text); margin-bottom: 10px; font-size: 12px; }
+.lead { color: var(--text2); font-size: 11px; letter-spacing: 1px; margin-bottom: 20px; }
+.ui-mock {
+  background: #111;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 10px;
+  margin: 14px 0;
+  font-size: 10px;
+  position: relative;
+}
+.ui-mock-label {
+  position: absolute;
+  top: -8px;
+  left: 10px;
+  background: #111;
+  color: var(--text3);
+  font-size: 8px;
+  letter-spacing: 2px;
+  padding: 0 6px;
+}
+.mock-panel {
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+.mock-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.mock-btn {
+  display: inline-block;
+  background: #222;
+  border: 1px solid #444;
+  color: #aaa;
+  font-family: monospace;
+  font-size: 9px;
+  padding: 2px 7px;
+  border-radius: 2px;
+  letter-spacing: 1px;
+}
+.mock-btn.green { background: #1a3a1a; border-color: #4a6; color: #6d6; }
+.mock-btn.red { background: #3a1a1a; border-color: #733; color: #d55; }
+.mock-btn.active { background: #1a3a1a; border-color: var(--green); color: var(--green2); }
+.mock-btn.blue-a { background: #1a1a3a; border-color: #46a; color: #6af; }
+.mock-input {
+  background: #111;
+  border: 1px solid #444;
+  color: #ddd;
+  font-family: monospace;
+  font-size: 10px;
+  padding: 2px 4px;
+  width: 44px;
+  text-align: center;
+}
+.mock-slider {
+  width: 70px;
+  height: 4px;
+  background: #333;
+  border-radius: 2px;
+  display: inline-block;
+  vertical-align: middle;
+  position: relative;
+}
+.mock-slider::after {
+  content: '';
+  position: absolute;
+  left: 40%;
+  top: -4px;
+  width: 12px;
+  height: 12px;
+  background: var(--green);
+  border-radius: 50%;
+}
+.mock-label { font-size: 8px; color: var(--text3); letter-spacing: 1px; }
+.mock-title { font-size: 8px; color: var(--text3); letter-spacing: 2px; margin-bottom: 5px; }
+.mock-tab-bar { display: flex; gap: 0; margin-bottom: 6px; }
+.mock-tab {
+  background: #111;
+  border: 1px solid #333;
+  border-bottom: none;
+  color: #666;
+  font-family: monospace;
+  font-size: 9px;
+  padding: 3px 8px;
+  cursor: default;
+  letter-spacing: 1px;
+}
+.mock-tab.active { background: var(--panel); color: var(--green2); border-color: var(--green); }
+.mock-tab.blue { border-color: #446; color: #68a; }
+.mock-tab.orange { border-color: #553a1a; color: #a8824a; }
+.step-grid {
+  display: flex;
+  gap: 2px;
+  margin: 6px 0;
+  align-items: center;
+}
+.step-label { font-size: 8px; color: #555; width: 26px; flex-shrink: 0; }
+.step-cell {
+  width: 22px;
+  height: 16px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 2px;
+  display: inline-block;
+}
+.step-cell.on { background: #2a4a2a; border-color: #4a7; }
+.step-cell.play { border-color: #8f8 !important; box-shadow: 0 0 3px #4f4; }
+.step-cell.beat { border-left-color: #b85 !important; border-left-width: 2px !important; }
+.step-cell.beat-s { border-left-color: #e93 !important; border-left-width: 3px !important; }
+.step-cell.tie { background: #2a2a3a; border-color: #559; }
+.note-sel {
+  background: #111;
+  border: 1px solid #333;
+  color: #9d9;
+  font-family: monospace;
+  font-size: 8px;
+  padding: 1px;
+  width: 100%;
+  margin-top: 2px;
+}
+.step-col { display: flex; flex-direction: column; }
+.op-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.op-box {
+  background: #111;
+  border: 1px solid #2a3a2a;
+  border-radius: 3px;
+  padding: 6px;
+}
+.op-title { font-size: 8px; color: var(--green); letter-spacing: 1px; margin-bottom: 4px; }
+.param-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-bottom: 3px;
+  font-size: 9px;
+  color: var(--text2);
+}
+.param-val { color: var(--text); margin-left: 2px; }
+.algo-grid { display: grid; grid-template-columns: repeat(8,1fr); gap: 2px; margin-bottom: 6px; }
+.algo-btn {
+  background: #111;
+  border: 1px solid #333;
+  color: #555;
+  font-size: 8px;
+  padding: 2px;
+  text-align: center;
+  border-radius: 2px;
+}
+.algo-btn.active { background: #1a2a1a; border-color: var(--green); color: #8d8; }
+.psg-panel { display: flex; gap: 6px; flex-wrap: wrap; }
+.psg-ch {
+  background: #111;
+  border: 1px solid #2a2a3a;
+  border-radius: 3px;
+  padding: 6px;
+  flex: 1;
+  min-width: 100px;
+}
+.psg-title { font-size: 8px; color: var(--blue); letter-spacing: 1px; margin-bottom: 4px; }
+.wave-btns { display: flex; gap: 2px; margin-bottom: 4px; }
+.wave-btn {
+  background: #111;
+  border: 1px solid #444;
+  color: #666;
+  font-size: 8px;
+  padding: 2px 5px;
+  border-radius: 2px;
+}
+.wave-btn.active { background: #1a1a3a; border-color: var(--blue); color: var(--blue2); }
+.bank-grid { display: flex; flex-wrap: wrap; gap: 2px; max-width: 420px; }
+.bank-btn {
+  background: #111;
+  border: 1px solid #333;
+  color: #555;
+  font-size: 8px;
+  padding: 2px 0;
+  border-radius: 2px;
+  width: 24px;
+  text-align: center;
+}
+.bank-btn.active { background: #1a2a1a; border-color: var(--green); color: var(--green2); }
+.bank-btn.filled { background: #12202a; border-color: #356; color: #6af; }
+.callout {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  background: #141e14;
+  border: 1px solid #2a4a2a;
+  border-radius: 3px;
+  padding: 8px 10px;
+  margin: 8px 0;
+}
+.callout.info { background: #111a22; border-color: #2a3a5a; }
+.callout.warn { background: #1e1800; border-color: #4a3a00; }
+.callout-icon { font-size: 14px; line-height: 1.4; flex-shrink: 0; }
+.callout-text { font-size: 11px; color: var(--text2); }
+.callout-text strong { color: var(--text); }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 11px; }
+th { background: var(--bg3); color: var(--text2); text-align: left; padding: 6px 10px; font-weight: normal; letter-spacing: 1px; border-bottom: 1px solid var(--border2); }
+td { padding: 5px 10px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: top; }
+td code { color: var(--green2); background: #1a1a1a; padding: 1px 4px; border-radius: 2px; font-size: 10px; }
+td:first-child { color: var(--amber); min-width: 120px; }
+pre {
+  background: #0a0a12;
+  border: 1px solid #334;
+  border-radius: 3px;
+  padding: 10px 14px;
+  margin: 10px 0;
+  overflow-x: auto;
+  font-size: 11px;
+  color: var(--blue2);
+  line-height: 1.8;
+}
+code { color: var(--green2); font-family: monospace; }
+.badge {
+  display: inline-block;
+  font-size: 8px;
+  letter-spacing: 1px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  border: 1px solid;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+.badge-g { color: var(--green2); border-color: var(--green3); background: #0e1e0e; }
+.badge-b { color: var(--blue2); border-color: #224; background: #0a0a18; }
+.badge-o { color: var(--amber); border-color: #3a2000; background: #180e00; }
+.toast-demo {
+  display: inline-block;
+  background: #1e1e1e;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 10px;
+  color: #ddd;
+}
+.toast-ok { border-color: var(--green); color: var(--green2); background: #0a1e0a; }
+.toast-err { border-color: var(--red); color: #f88; background: #1e0a0a; }
+.toast-warn { border-color: #883; color: #db8; background: #1a1600; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; margin: 10px 0; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--text2); }
+.dot { width: 12px; height: 12px; border-radius: 2px; border: 1px solid; flex-shrink: 0; }
+.sec-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+.sec-num { font-size: 28px; color: var(--border2); letter-spacing: 2px; line-height: 1; }
+[id] { scroll-margin-top: 20px; }
+@media (max-width: 700px) {
+  nav { display: none; }
+  main { padding: 20px 16px; }
+  .op-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+<!-- ===== SIDE NAV ===== -->
+<nav id="sidenav">
+  <div class="logo">honodori<span>FM+PSG SYNTH v4.2</span></div>
+  <div class="nav-sec">INTRODUCTION</div>
+  <a href="#overview">Overview</a>
+  <a href="#touch">Smartphone Controls</a>
+  <div class="nav-sec">BASIC OPERATIONS</div>
+  <a href="#transport">Transport</a>
+  <a href="#mode">Mode Selection</a>
+  <a href="#bank">Banks (Patterns)</a>
+  <div class="nav-sec">SEQUENCER</div>
+  <a href="#seq">Step Sequencer</a>
+  <a href="#seq-tabs">Sequencer Tabs</a>
+  <a href="#beatgroup">Beat Groups</a>
+  <a href="#song">SONG Mode</a>
+  <div class="nav-sec">SYNTHESIZER</div>
+  <a href="#sub">SUB (Subtractive)</a>
+  <a href="#fm">FM Synthesis</a>
+  <a href="#psg">PSG / SSG</a>
+  <a href="#drums">Drums</a>
+  <a href="#pcm">PCM</a>
+  <a href="#fx">FX Effects</a>
+  <div class="nav-sec">ADVANCED</div>
+  <a href="#tonebank">Tone Bank</a>
+  <a href="#mml">MML Mode</a>
+  <a href="#fxseq">FX / BPM Sequence</a>
+  <a href="#save">Save / Load</a>
+  <a href="#saveformat">Save Data Format</a>
+  <a href="#pcmsave">PCM Bank Save</a>
+</nav>
+
+<!-- ===== MAIN CONTENT ===== -->
+<main>
+
+<!-- ===== 01 OVERVIEW ===== -->
+<section id="overview">
+  <div class="sec-header">
+    <div class="sec-num">01</div>
+    <div>
+      <h1>honodori</h1>
+      <p class="lead">FM+PSG Extended Synth — A multi-channel synthesizer that runs in the browser</p>
+    </div>
+  </div>
+  <p>honodori is an integrated synthesizer with a built-in step sequencer running on the Web Audio API. Subtractive synthesis, FM synthesis, PSG synthesis, drum machine, and PCM sampler are all combined in one screen.</p>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">SCREEN LAYOUT</span>
+    <div style="font-size:9px;color:var(--text3);margin-bottom:8px;letter-spacing:1px">The screen is divided into 4 areas from top to bottom</div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <div class="mock-panel" style="border-color:#3a6">
+        <div class="mock-title" style="color:var(--green)">① Transport Bar</div>
+        <div class="mock-row">
+          <span class="mock-btn green">▶ PLAY</span>
+          <span class="mock-btn red">■ STOP</span>
+          <span style="font-size:8px;color:var(--text3)">BPM</span>
+          <span class="mock-input">120</span>
+          <span style="font-size:8px;color:var(--text3)">GAIN</span>
+          <div class="mock-slider"></div>
+          <span class="mock-btn">💾 SAVE</span>
+          <span class="mock-btn">📂 LOAD</span>
+        </div>
+        <div class="mock-row" style="margin-top:4px">
+          <span class="mock-btn active">PATTERN</span>
+          <span class="mock-btn">SONG</span>
+          <span class="mock-btn">MML</span>
+          &nbsp;
+          <div class="bank-grid" style="max-width:280px">
+            <div class="bank-btn active">1</div><div class="bank-btn">2</div><div class="bank-btn">3</div><div class="bank-btn">4</div><div class="bank-btn filled">5</div><div class="bank-btn">6</div><div class="bank-btn">7</div><div class="bank-btn">8</div>
+          </div>
+          <span class="mock-btn" style="color:var(--red);border-color:#522;font-size:8px">CLRA</span>
+        </div>
+      </div>
+      <div class="mock-panel" style="border-color:#446">
+        <div class="mock-title" style="color:#68a">② Step Sequencer</div>
+        <div class="mock-tab-bar">
+          <div class="mock-tab active">SUB</div><div class="mock-tab">FM1</div><div class="mock-tab">FM2</div><div class="mock-tab">FM3</div><div class="mock-tab">FM4</div><div class="mock-tab">FM5</div><div class="mock-tab">FM6</div><div class="mock-tab">PS1</div><div class="mock-tab">PS2</div><div class="mock-tab">PS3</div>
+        </div>
+        <div class="mock-tab-bar">
+          <div class="mock-tab">DRM</div><div class="mock-tab orange">PCM</div><div class="mock-tab">FX</div><div class="mock-tab blue">BPM</div>
+        </div>
+        <div class="step-grid">
+          <div class="step-label">SUB</div>
+          <div class="step-cell on beat-s"></div><div class="step-cell"></div><div class="step-cell"></div><div class="step-cell beat"></div>
+          <div class="step-cell on play"></div><div class="step-cell"></div><div class="step-cell"></div><div class="step-cell beat"></div>
+          <div class="step-cell on"></div><div class="step-cell"></div><div class="step-cell"></div><div class="step-cell beat"></div>
+          <div class="step-cell on"></div><div class="step-cell"></div><div class="step-cell"></div><div class="step-cell"></div>
+        </div>
+      </div>
+      <div class="mock-panel" style="border-color:#2a3a4a">
+        <div class="mock-title" style="color:#56a">③ Tone Editor Tabs</div>
+        <div class="mock-tab-bar">
+          <div class="mock-tab active">SUB</div><div class="mock-tab">FM1</div><div class="mock-tab">FM2</div><div class="mock-tab">FM3</div><div class="mock-tab">FM4</div><div class="mock-tab">FM5</div><div class="mock-tab">FM6</div><div class="mock-tab blue">PS1</div><div class="mock-tab blue">PS2</div><div class="mock-tab blue">PS3</div><div class="mock-tab">FX</div><div class="mock-tab orange">PCM</div>
+        </div>
+        <div style="font-size:9px;color:var(--text3);padding:4px">Each tab shows tone parameters (OSC / FILTER / ENVELOPE / ALGO / LFO, etc.)</div>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Channel</th><th>Type</th><th>Description</th></tr>
+    <tr><td>SUB</td><td>Subtractive</td><td>Classic oscillator + filter + ADSR configuration</td></tr>
+    <tr><td>FM1–FM6</td><td>FM Synthesis</td><td>4-operator / 8-algorithm, OPN2/YM2612 equivalent</td></tr>
+    <tr><td>PS1–PS3</td><td>PSG / SSG</td><td>Square wave, sawtooth, noise — AY-3-8910 equivalent</td></tr>
+    <tr><td>DRM</td><td>Drums</td><td>KICK / SNARE / HAT / TOM and other 8-part drum machine</td></tr>
+    <tr><td>PCM</td><td>Sampler</td><td>WAV file playback with pitch conversion, 32 slots</td></tr>
+  </table>
+</section>
+
+<!-- ===== 02 SMARTPHONE CONTROLS ===== -->
+<section id="touch">
+  <div class="sec-header">
+    <div class="sec-num">02</div>
+    <div><h1>Smartphone Controls</h1></div>
+  </div>
+
+  <h2>Pinch Zoom</h2>
+  <p>Pinch in/out with two fingers to scale the entire UI (up to 10×). Zoom in for easier access to fine parameters. On desktop, the scroll wheel works the same way.</p>
+
+  <div class="callout">
+    <span class="callout-icon">📱</span>
+    <div class="callout-text">
+      <strong>Touch operation tips</strong><br>
+      All operations are single-tap toggles. Long press and double-tap are not required. Sliders can be changed continuously by dragging.
+    </div>
+  </div>
+
+  <h2>Notifications (Toast)</h2>
+  <p>Instead of alert() dialogs, toast notifications appear from the bottom of the screen. Information is conveyed without interrupting your workflow.</p>
+  <div class="mock-row" style="margin:8px 0">
+    <div class="toast-demo toast-ok">✓ SAVED</div>
+    <div class="toast-demo toast-err">ERROR: invalid value</div>
+    <div class="toast-demo toast-warn">⚠ bank is empty</div>
+  </div>
+
+  <h2>Confirmation Dialogs</h2>
+  <p>Only irreversible operations such as deletion and clearing display a custom confirmation dialog (e.g. the CLRA button). All other operations take effect immediately.</p>
+</section>
+
+<!-- ===== 03 TRANSPORT ===== -->
+<section id="transport">
+  <div class="sec-header">
+    <div class="sec-num">03</div>
+    <div><h1>Transport Controls</h1></div>
+  </div>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">TRANSPORT BAR</span>
+    <div class="mock-panel">
+      <div class="mock-row">
+        <span class="mock-btn green">▶ PLAY</span>
+        <span class="mock-btn red">■ STOP</span>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <span class="mock-label">BPM</span>
+          <span class="mock-input">120</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <span class="mock-label">GAIN</span>
+          <div class="mock-slider"></div>
+        </div>
+        <span class="mock-btn">💾 SAVE</span>
+        <span class="mock-btn">📂 LOAD</span>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Control</th><th>Action</th></tr>
+    <tr><td><code>▶ PLAY</code></td><td>Start playback. Highlighted green during playback. Tap again to stop.</td></tr>
+    <tr><td><code>■ STOP</code></td><td>Stop and return to beginning (reset to step 0).</td></tr>
+    <tr><td>BPM field</td><td>40–300 BPM. Press Enter or unfocus to apply immediately. Can be changed during playback.</td></tr>
+    <tr><td>GAIN slider</td><td>Master volume (0–100%). Default 30%.</td></tr>
+    <tr><td><code>💾 SAVE</code></td><td>Download all settings as a JSON file.</td></tr>
+    <tr><td><code>📂 LOAD</code></td><td>Load a saved JSON file to restore settings.</td></tr>
+  </table>
+</section>
+
+<!-- ===== 04 MODE SELECTION ===== -->
+<section id="mode">
+  <div class="sec-header">
+    <div class="sec-num">04</div>
+    <div><h1>Mode Selection</h1></div>
+  </div>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">MODE SELECT</span>
+    <div class="mock-row">
+      <span class="mock-btn active">PATTERN</span>
+      <span class="mock-btn">SONG</span>
+      <span class="mock-btn">MML</span>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Mode</th><th>Description</th></tr>
+    <tr><td>PATTERN</td><td>Default mode. Edit phrases using the step grid. Up to 64 banks held independently.</td></tr>
+    <tr><td>SONG</td><td>Arrange multiple patterns in sequence to compose a full song (up to 160 slots). Loop playback supported.</td></tr>
+    <tr><td>MML</td><td>Input sequences using a text-based music notation language (MUCOM88 / FMP7 compatible).</td></tr>
+  </table>
+</section>
+
+<!-- ===== 05 BANKS ===== -->
+<section id="bank">
+  <div class="sec-header">
+    <div class="sec-num">05</div>
+    <div><h1>Banks (Pattern Slots)</h1></div>
+  </div>
+
+  <p>Up to 16 pattern slots (banks) are available. Each bank independently holds its sequence, step count, beat groups, and BPM track.</p>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">BANK BUTTONS</span>
+    <div class="bank-grid">
+      <div class="bank-btn active">1</div><div class="bank-btn">2</div><div class="bank-btn">3</div><div class="bank-btn filled">4</div><div class="bank-btn filled">5</div><div class="bank-btn">6</div><div class="bank-btn">7</div><div class="bank-btn">8</div>
+      <div class="bank-btn">9</div><div class="bank-btn">10</div><div class="bank-btn">11</div><div class="bank-btn">12</div><div class="bank-btn">13</div><div class="bank-btn">14</div><div class="bank-btn">15</div><div class="bank-btn">16</div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="dot" style="background:#1a2a1a;border-color:var(--green)"></div>Currently selected bank</div>
+    <div class="legend-item"><div class="dot" style="background:#12202a;border-color:#356"></div>Bank with data</div>
+    <div class="legend-item"><div class="dot" style="background:#111;border-color:#333"></div>Empty bank</div>
+    <div class="legend-item"><div class="dot" style="background:#1a1508;border-color:#a84"></div>Copied bank</div>
+  </div>
+
+  <table>
+    <tr><th>Operation</th><th>Action</th></tr>
+    <tr><td>Tap (empty bank)</td><td>Switch to that bank.</td></tr>
+    <tr><td>Tap (bank with data)</td><td>Switch to that bank. Tap the same bank again to open rename dialog.</td></tr>
+    <tr><td>Long press (PC: right-click)</td><td>Context menu: Copy / Paste / Clear.</td></tr>
+    <tr><td><code>CLRA</code> button</td><td>Reset all banks (confirmation dialog shown).</td></tr>
+  </table>
+</section>
+
+<!-- ===== 06 STEP SEQUENCER ===== -->
+<section id="seq">
+  <div class="sec-header">
+    <div class="sec-num">06</div>
+    <div><h1>Step Sequencer</h1></div>
+  </div>
+
+  <p>Each channel has an independent step grid. Tap a step button to toggle notes ON/OFF, and select the pitch from the dropdown below.</p>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">STEP SEQUENCER (16 STEPS)</span>
+    <div style="margin-bottom:6px">
+      <span style="font-size:8px;color:var(--text3)">STEPS: </span>
+      <span class="mock-btn">7</span><span class="mock-btn">8</span><span class="mock-btn">10</span><span class="mock-btn">12</span><span class="mock-btn active">16</span><span class="mock-btn">24</span><span class="mock-btn">28</span><span class="mock-btn">32</span>
+      <span class="mock-input" style="width:36px;font-size:9px">?</span>
+    </div>
+    <div style="margin-bottom:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+      <span style="font-size:8px;color:var(--text3)">BEAT:</span>
+      <span class="mock-btn active" style="color:var(--orange);border-color:#a85">4</span>
+      <span class="mock-btn active" style="color:var(--orange);border-color:#a85">4</span>
+      <span class="mock-btn active" style="color:var(--orange);border-color:#a85">4</span>
+      <span class="mock-btn active" style="color:var(--orange);border-color:#a85">4</span>
+      <span class="mock-btn" style="font-size:10px">+</span>
+      <span class="mock-btn" style="color:var(--red)">↺</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <div class="step-grid">
+        <div class="step-label">SUB</div>
+        <div class="step-col"><div class="step-cell on beat-s"></div><div class="note-sel">E2</div></div>
+        <div class="step-col"><div class="step-cell beat"></div><div class="note-sel">A3</div></div>
+        <div class="step-col"><div class="step-cell"></div><div class="note-sel">A3</div></div>
+        <div class="step-col"><div class="step-cell beat"></div><div class="note-sel">A3</div></div>
+        <div class="step-col"><div class="step-cell on play beat-s"></div><div class="note-sel">F2</div></div>
+        <div class="step-col"><div class="step-cell beat"></div><div class="note-sel">E3</div></div>
+        <div class="step-col"><div class="step-cell"></div><div class="note-sel">E3</div></div>
+        <div class="step-col"><div class="step-cell beat"></div><div class="note-sel">E3</div></div>
+        <div class="step-col"><div class="step-cell on beat-s"></div><div class="note-sel">G2</div></div>
+        <div class="step-col"><div class="step-cell beat"></div><div class="note-sel">G3</div></div>
+        <div class="step-col"><div class="step-cell"></div><div class="note-sel">G3</div></div>
+        <div class="step-col"><div class="step-cell beat"></div><div class="note-sel">G3</div></div>
+        <div class="step-col"><div class="step-cell on beat-s"></div><div class="note-sel">E2</div></div>
+        <div class="step-col"><div class="step-cell beat"></div><div class="note-sel">D3</div></div>
+        <div class="step-col"><div class="step-cell"></div><div class="note-sel">D3</div></div>
+        <div class="step-col"><div class="step-cell"></div><div class="note-sel">D3</div></div>
+      </div>
+      <div class="step-grid">
+        <div class="step-label">FM1</div>
+        <div class="step-cell"></div><div class="step-cell"></div><div class="step-cell on beat"></div><div class="step-cell"></div>
+        <div class="step-cell beat-s"></div><div class="step-cell"></div><div class="step-cell beat"></div><div class="step-cell"></div>
+        <div class="step-cell beat-s"></div><div class="step-cell"></div><div class="step-cell beat"></div><div class="step-cell"></div>
+        <div class="step-cell beat-s"></div><div class="step-cell beat"></div><div class="step-cell"></div><div class="step-cell"></div>
+      </div>
+    </div>
+    <div class="mock-row" style="margin-top:8px">
+      <span class="mock-btn" style="color:var(--red);border-color:#522;font-size:8px">CLR</span>
+      <span class="mock-btn" style="color:#f66;border-color:#933;font-size:8px;font-weight:bold">CLRA</span>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="dot" style="background:#1a1a1a;border-color:#2a2a2a"></div>OFF (silent on this step)</div>
+    <div class="legend-item"><div class="dot" style="background:#2a4a2a;border-color:#4a7"></div>ON (note plays)</div>
+    <div class="legend-item"><div class="dot" style="background:#3a6a3a;border-color:#8f8"></div>Currently playing step</div>
+    <div class="legend-item"><div class="dot" style="background:#2a2a3a;border-color:#559"></div>Tie (extends previous step)</div>
+    <div class="legend-item"><div class="dot" style="border-left-color:#e93;border-left-width:3px;border-radius:0;background:transparent;border-top:none;border-right:none;border-bottom:none;width:6px"></div>Strong beat start (beat group head)</div>
+  </div>
+
+  <table>
+    <tr><th>Operation</th><th>Action</th></tr>
+    <tr><td>Tap step button</td><td>Toggle ON / OFF.</td></tr>
+    <tr><td>Note dropdown</td><td>Select pitch from C2 to D#5.</td></tr>
+    <tr><td>VOL column (when shown)</td><td>Per-step volume (0–127).</td></tr>
+    <tr><td>TIE column (when shown)</td><td>Extend previous step's note (slur).</td></tr>
+    <tr><td>PAN column (when shown)</td><td>Pan position: L=−100 / C=0 / R=+100.</td></tr>
+    <tr><td>PORTA row (when shown)</td><td>Per-step portamento time (ms).</td></tr>
+    <tr><td><code>CLR</code></td><td>Clear current part only.</td></tr>
+    <tr><td><code>CLRA</code></td><td>Clear all parts at once (confirmation required).</td></tr>
+  </table>
+
+  <div class="callout info">
+    <span class="callout-icon">💡</span>
+    <div class="callout-text">
+      <strong>Step count presets</strong><br>
+      One tap to switch between 7, 8, 10, 12, 16, 24, 28, 32. Enter any value from 1–32 in the custom field (?). The grid automatically shrinks as step count increases.
+    </div>
+  </div>
+</section>
+
+<!-- ===== 07 SEQUENCER TABS ===== -->
+<section id="seq-tabs">
+  <div class="sec-header">
+    <div class="sec-num">07</div>
+    <div><h1>Sequencer Tabs</h1></div>
+  </div>
+
+  <p>Two rows of tabs appear at the top of the sequencer. Select a tab to switch to that channel's step grid.</p>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">SEQ TAB BAR</span>
+    <div class="mock-tab-bar">
+      <div class="mock-tab active">SUB</div>
+      <div class="mock-tab">FM1</div><div class="mock-tab">FM2</div><div class="mock-tab">FM3</div>
+      <div class="mock-tab">FM4</div><div class="mock-tab">FM5</div><div class="mock-tab">FM6</div>
+      <div class="mock-tab">PS1</div><div class="mock-tab">PS2</div><div class="mock-tab">PS3</div>
+    </div>
+    <div class="mock-tab-bar">
+      <div class="mock-tab">DRM</div>
+      <div class="mock-tab orange">PCM</div>
+      <div class="mock-tab">FX</div>
+      <div class="mock-tab blue">BPM</div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Tab</th><th>Content</th></tr>
+    <tr><td>SUB</td><td>Subtractive channel steps (pitch, volume, tie, pan, portamento).</td></tr>
+    <tr><td>FM1–FM6</td><td>FM channel 1–6 steps + tone switch row.</td></tr>
+    <tr><td>PS1–PS3</td><td>PSG channel 1–3 steps + tone switch row.</td></tr>
+    <tr><td>DRM</td><td>Edit drum parts row by row: KICK / SNARE / HAT / TOMhi / TOMmid / TOMlo / OpenHH / CloseHH / PCM.</td></tr>
+    <tr><td>PCM <span class="badge badge-o">AMBER</span></td><td>PCM sampler steps (slot number, playback frequency, volume).</td></tr>
+    <tr><td>FX</td><td>Per-step automation of Delay WET/FB, Chorus RATE/DEPTH/WET, and DJ Filter FREQ.</td></tr>
+    <tr><td>BPM <span class="badge badge-b">BLUE</span></td><td>Set an independent tempo per step (null = use global BPM).</td></tr>
+  </table>
+</section>
+
+<!-- ===== 08 BEAT GROUPS ===== -->
+<section id="beatgroup">
+  <div class="sec-header">
+    <div class="sec-num">08</div>
+    <div><h1>Beat Groups</h1></div>
+  </div>
+
+  <p>Groups steps into "beats." Visual beat markers appear on the grid, allowing you to intuitively configure odd time signatures and polyrhythms.</p>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">BEAT GROUP BAR</span>
+    <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+      <span style="font-size:8px;color:var(--text3)">BEAT:</span>
+      <span class="mock-btn" style="color:var(--orange);border-color:#8a4;background:#2a1a00">4</span>
+      <span class="mock-btn" style="color:var(--orange);border-color:#8a4;background:#2a1a00">3</span>
+      <span class="mock-btn" style="color:var(--orange);border-color:#8a4;background:#2a1a00">4</span>
+      <span class="mock-btn" style="color:var(--orange);border-color:#8a4;background:#2a1a00">5</span>
+      <span class="mock-btn" style="font-size:10px">+</span>
+      <span class="mock-btn" style="color:var(--red)">↺</span>
+      <span style="font-size:8px;color:var(--text3)">total: 16</span>
+    </div>
+    <div style="font-size:8px;color:var(--text3);margin-top:5px">Click a group chip to change its value (+1/−1 or direct input)</div>
+  </div>
+
+  <table>
+    <tr><th>Operation</th><th>Action</th></tr>
+    <tr><td>Tap group chip</td><td>Open dialog to change the group's step count.</td></tr>
+    <tr><td><code>+</code> button</td><td>Add one group (remaining steps appended to the end).</td></tr>
+    <tr><td><code>↺</code> button</td><td>Reset to default (4 beats × n).</td></tr>
+  </table>
+
+  <div class="callout warn">
+    <span class="callout-icon">⚠</span>
+    <div class="callout-text">
+      If the total steps of all groups does not match the step length, the last group is automatically adjusted.
+    </div>
+  </div>
+</section>
+
+<!-- ===== 09 SONG MODE ===== -->
+<section id="song">
+  <div class="sec-header">
+    <div class="sec-num">09</div>
+    <div><h1>SONG Mode</h1></div>
+  </div>
+
+  <p>Arrange pattern banks in sequence to compose longer songs. Up to 160 slots can be arranged.</p>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">SONG PANEL</span>
+    <div class="mock-panel">
+      <div class="mock-row" style="margin-bottom:6px">
+        <span class="mock-btn blue-a">LOOP ON</span>
+        <span class="mock-btn" style="color:var(--red)">CLRA</span>
+        <span style="font-size:8px;color:var(--text3)">8 / 160 steps</span>
+        <span style="font-size:8px;color:#446">← Click a bank button to add a slot</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:3px">
+        <div style="width:26px;height:22px;background:#1a2a3a;border:1px solid #356;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#6af">1</div>
+        <div style="width:26px;height:22px;background:#1a2a3a;border:2px solid #6af;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#9cf">1</div>
+        <div style="width:26px;height:22px;background:#1a2a3a;border:1px solid #356;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#6af">3</div>
+        <div style="width:26px;height:22px;background:#2a1a0a;border:1px solid #fa6;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fc9">5</div>
+        <div style="width:26px;height:22px;background:#1a2a3a;border:1px solid #356;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#6af">1</div>
+        <div style="width:26px;height:22px;background:#1a1a1a;border:1px dashed #333;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#444">+</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="dot" style="background:#12202a;border-color:#356"></div>Registered slot</div>
+    <div class="legend-item"><div class="dot" style="background:#1a2a3a;border-color:#6af;border-width:2px"></div>Currently playing slot</div>
+    <div class="legend-item"><div class="dot" style="background:#2a1a0a;border-color:#fa6"></div>Next slot to play (cursor)</div>
+    <div class="legend-item"><div class="dot" style="background:#2a1010;border-color:#a44"></div>Hovered (click to delete)</div>
+  </div>
+
+  <table>
+    <tr><th>Operation</th><th>Action</th></tr>
+    <tr><td>Tap bank button</td><td>Add that bank to the end of the SONG.</td></tr>
+    <tr><td>Tap slot</td><td>Delete that slot (turns red on hover).</td></tr>
+    <tr><td>LOOP ON/OFF</td><td>Whether to loop back to the beginning when the song ends.</td></tr>
+    <tr><td><code>CLRA</code></td><td>Delete all SONG slots (confirmation required).</td></tr>
+  </table>
+</section>
+
+<!-- ===== 10 SUB ===== -->
+<section id="sub">
+  <div class="sec-header">
+    <div class="sec-num">10</div>
+    <div><h1>SUB — Subtractive Synthesis</h1></div>
+  </div>
+
+  <p>Classic subtractive synthesis: oscillator → filter → amplifier (ADSR). The most accessible sound source, versatile for bass, pads, leads, and more.</p>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">SUB PANEL</span>
+    <div class="mock-panel">
+      <div class="mock-row" style="gap:20px;flex-wrap:wrap">
+        <div>
+          <div class="mock-title">OSC</div>
+          <div class="wave-btns">
+            <div class="wave-btn active" style="border-color:var(--green);color:var(--green2);background:#1a2a1a">SINE</div>
+            <div class="wave-btn">SQ</div><div class="wave-btn">SAW</div><div class="wave-btn">TRI</div>
+          </div>
+          <div class="mock-row" style="margin-top:4px">
+            <span class="mock-label">LENGTH</span>
+            <div class="mock-slider"></div>
+            <span style="font-size:9px;color:var(--text)">300ms</span>
+          </div>
+        </div>
+        <div>
+          <div class="mock-title">FILTER</div>
+          <div class="wave-btns">
+            <div class="wave-btn active" style="border-color:var(--green);color:var(--green2);background:#1a2a1a">LPF</div>
+            <div class="wave-btn">HPF</div>
+          </div>
+          <div class="mock-row" style="margin-top:4px"><span class="mock-label">FREQ</span><div class="mock-slider"></div><span style="font-size:9px;color:var(--text)">8000</span></div>
+          <div class="mock-row"><span class="mock-label">RES</span><div class="mock-slider"></div><span style="font-size:9px;color:var(--text)">1.0</span></div>
+        </div>
+        <div>
+          <div class="mock-title">ENVELOPE</div>
+          <div class="param-row"><span>A</span><div class="mock-slider"></div><span class="param-val">10ms</span></div>
+          <div class="param-row"><span>D</span><div class="mock-slider"></div><span class="param-val">100ms</span></div>
+          <div class="param-row"><span>S</span><div class="mock-slider"></div><span class="param-val">60%</span></div>
+          <div class="param-row"><span>R</span><div class="mock-slider"></div><span class="param-val">200ms</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Parameter</th><th>Range</th><th>Description</th></tr>
+    <tr><td>OSC waveform</td><td>SINE / SQ / SAW / TRI</td><td>Oscillator waveform selection.</td></tr>
+    <tr><td>LENGTH</td><td>10ms–5000ms</td><td>Note length. Determines how long the sound plays before release.</td></tr>
+    <tr><td>FILTER type</td><td>LPF / HPF</td><td>Low-pass filter or high-pass filter.</td></tr>
+    <tr><td>FREQ</td><td>20–20000 Hz</td><td>Filter cutoff frequency.</td></tr>
+    <tr><td>RES</td><td>0.1–20</td><td>Filter resonance (Q value).</td></tr>
+    <tr><td>A (Attack)</td><td>1ms–2000ms</td><td>Time to reach peak volume after note on.</td></tr>
+    <tr><td>D (Decay)</td><td>1ms–2000ms</td><td>Time to fall from peak to sustain level.</td></tr>
+    <tr><td>S (Sustain)</td><td>0–100%</td><td>Volume level held while note is held.</td></tr>
+    <tr><td>R (Release)</td><td>1ms–5000ms</td><td>Time to fade out after note off.</td></tr>
+  </table>
+</section>
+
+<!-- ===== 11 FM SYNTHESIS ===== -->
+<section id="fm">
+  <div class="sec-header">
+    <div class="sec-num">11</div>
+    <div><h1>FM Synthesis</h1></div>
+  </div>
+
+  <p>6 FM channels (FM1–FM6), each with 4 operators and 8 algorithms equivalent to OPN2/YM2612. A carrier operator generates the output sound; modulator operators change the carrier's frequency to create complex timbres.</p>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">FM CHANNEL PANEL</span>
+    <div class="mock-panel">
+      <div class="mock-title">ALGORITHM</div>
+      <div class="algo-grid">
+        <div class="algo-btn active">1</div><div class="algo-btn">2</div><div class="algo-btn">3</div><div class="algo-btn">4</div>
+        <div class="algo-btn">5</div><div class="algo-btn">6</div><div class="algo-btn">7</div><div class="algo-btn">8</div>
+      </div>
+      <div class="op-grid">
+        <div class="op-box">
+          <div class="op-title">OP1 (Modulator)</div>
+          <div class="param-row"><span>AR</span><div class="mock-slider"></div><span class="param-val">31</span></div>
+          <div class="param-row"><span>DR</span><div class="mock-slider"></div><span class="param-val">0</span></div>
+          <div class="param-row"><span>SR</span><div class="mock-slider"></div><span class="param-val">0</span></div>
+          <div class="param-row"><span>RR</span><div class="mock-slider"></div><span class="param-val">15</span></div>
+          <div class="param-row"><span>SL</span><div class="mock-slider"></div><span class="param-val">0</span></div>
+          <div class="param-row"><span>TL</span><div class="mock-slider"></div><span class="param-val">32</span></div>
+          <div class="param-row"><span>KS</span><div class="mock-slider"></div><span class="param-val">0</span></div>
+          <div class="param-row"><span>MUL</span><div class="mock-slider"></div><span class="param-val">1</span></div>
+          <div class="param-row"><span>DT</span><div class="mock-slider"></div><span class="param-val">0</span></div>
+        </div>
+        <div class="op-box">
+          <div class="op-title">OP2 (Carrier)</div>
+          <div class="param-row"><span>AR</span><div class="mock-slider"></div><span class="param-val">28</span></div>
+          <div class="param-row"><span>DR</span><div class="mock-slider"></div><span class="param-val">5</span></div>
+          <div class="param-row"><span>SR</span><div class="mock-slider"></div><span class="param-val">2</span></div>
+          <div class="param-row"><span>RR</span><div class="mock-slider"></div><span class="param-val">8</span></div>
+          <div class="param-row"><span>SL</span><div class="mock-slider"></div><span class="param-val">3</span></div>
+          <div class="param-row"><span>TL</span><div class="mock-slider"></div><span class="param-val">0</span></div>
+          <div class="param-row"><span>KS</span><div class="mock-slider"></div><span class="param-val">1</span></div>
+          <div class="param-row"><span>MUL</span><div class="mock-slider"></div><span class="param-val">2</span></div>
+          <div class="param-row"><span>DT</span><div class="mock-slider"></div><span class="param-val">3</span></div>
+        </div>
+      </div>
+      <div style="margin-top:6px">
+        <div class="mock-row">
+          <span class="mock-label">FB</span><div class="mock-slider"></div><span style="font-size:9px;color:var(--text)">3</span>
+          <span class="mock-label" style="margin-left:12px">LFO FREQ</span><div class="mock-slider"></div><span style="font-size:9px;color:var(--text)">0</span>
+          <span class="mock-label">PMS</span><div class="mock-slider"></div>
+          <span class="mock-label">AMS</span><div class="mock-slider"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Parameter</th><th>Range</th><th>Description</th></tr>
+    <tr><td>ALGO (Algorithm)</td><td>1–8</td><td>Operator connection pattern. Determines which operators are carriers and modulators.</td></tr>
+    <tr><td>AR (Attack Rate)</td><td>0–31</td><td>Envelope attack speed.</td></tr>
+    <tr><td>DR (Decay Rate)</td><td>0–31</td><td>Decay speed from peak to sustain level.</td></tr>
+    <tr><td>SR (Sustain Rate)</td><td>0–31</td><td>Decay speed during sustain phase.</td></tr>
+    <tr><td>RR (Release Rate)</td><td>0–15</td><td>Release speed after note off.</td></tr>
+    <tr><td>SL (Sustain Level)</td><td>0–15</td><td>Level at which decay transitions to sustain.</td></tr>
+    <tr><td>TL (Total Level)</td><td>0–127</td><td>Operator output level (volume). 0 = maximum.</td></tr>
+    <tr><td>KS (Key Scale)</td><td>0–3</td><td>Degree to which pitch affects envelope speed.</td></tr>
+    <tr><td>MUL (Multiplier)</td><td>0–15</td><td>Operator frequency multiplier relative to base note.</td></tr>
+    <tr><td>DT (Detune)</td><td>0–7</td><td>Fine pitch offset. Creates slight detuning for richness.</td></tr>
+    <tr><td>FB (Feedback)</td><td>0–7</td><td>OP1 self-feedback amount. Higher values add distortion/noise.</td></tr>
+    <tr><td>LFO FREQ</td><td>0–7</td><td>LFO frequency. 0 = LFO off.</td></tr>
+    <tr><td>PMS</td><td>0–7</td><td>Pitch modulation sensitivity (vibrato depth).</td></tr>
+    <tr><td>AMS</td><td>0–3</td><td>Amplitude modulation sensitivity (tremolo depth).</td></tr>
+  </table>
+</section>
+
+<!-- ===== 12 PSG / SSG ===== -->
+<section id="psg">
+  <div class="sec-header">
+    <div class="sec-num">12</div>
+    <div><h1>PSG / SSG</h1></div>
+  </div>
+
+  <p>3 PSG channels (PS1–PS3) equivalent to the AY-3-8910 / SSG sound chip. Characterized by square wave, sawtooth, and noise tones reminiscent of 8-bit game music.</p>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">PSG PANEL</span>
+    <div class="psg-panel">
+      <div class="psg-ch">
+        <div class="psg-title">PS1</div>
+        <div class="wave-btns">
+          <div class="wave-btn active" style="border-color:var(--blue);color:var(--blue2);background:#1a1a3a">SQ</div>
+          <div class="wave-btn">SAW</div><div class="wave-btn">TRI</div><div class="wave-btn">NOISE</div>
+        </div>
+        <div class="param-row"><span>VOL</span><div class="mock-slider"></div><span class="param-val">15</span></div>
+        <div class="param-row"><span>DUTY</span><div class="mock-slider"></div><span class="param-val">50%</span></div>
+        <div class="param-row"><span>A</span><div class="mock-slider"></div><span class="param-val">5ms</span></div>
+        <div class="param-row"><span>D</span><div class="mock-slider"></div><span class="param-val">80ms</span></div>
+        <div class="param-row"><span>S</span><div class="mock-slider"></div><span class="param-val">70%</span></div>
+        <div class="param-row"><span>R</span><div class="mock-slider"></div><span class="param-val">120ms</span></div>
+      </div>
+      <div class="psg-ch">
+        <div class="psg-title">PS2</div>
+        <div class="wave-btns">
+          <div class="wave-btn">SQ</div>
+          <div class="wave-btn active" style="border-color:var(--blue);color:var(--blue2);background:#1a1a3a">NOISE</div>
+          <div class="wave-btn">SAW</div><div class="wave-btn">TRI</div>
+        </div>
+        <div class="param-row"><span>VOL</span><div class="mock-slider"></div><span class="param-val">12</span></div>
+        <div class="param-row"><span>NOISE PITCH</span><div class="mock-slider"></div><span class="param-val">16</span></div>
+        <div class="param-row"><span>A</span><div class="mock-slider"></div><span class="param-val">1ms</span></div>
+        <div class="param-row"><span>D</span><div class="mock-slider"></div><span class="param-val">200ms</span></div>
+        <div class="param-row"><span>S</span><div class="mock-slider"></div><span class="param-val">0%</span></div>
+        <div class="param-row"><span>R</span><div class="mock-slider"></div><span class="param-val">50ms</span></div>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Parameter</th><th>Range</th><th>Description</th></tr>
+    <tr><td>Waveform</td><td>SQ / SAW / TRI / NOISE</td><td>Oscillator waveform. NOISE generates random noise.</td></tr>
+    <tr><td>VOL</td><td>0–15</td><td>Channel volume.</td></tr>
+    <tr><td>DUTY</td><td>0–100%</td><td>Square wave duty cycle. 50% = standard square wave.</td></tr>
+    <tr><td>NOISE PITCH</td><td>0–31</td><td>Noise pitch (frequency divider). Higher = lower noise pitch.</td></tr>
+    <tr><td>A / D / S / R</td><td>same as SUB</td><td>Amplitude envelope.</td></tr>
+  </table>
+</section>
+
+<!-- ===== 13 DRUMS ===== -->
+<section id="drums">
+  <div class="sec-header">
+    <div class="sec-num">13</div>
+    <div><h1>Drums</h1></div>
+  </div>
+
+  <p>An 8-part drum machine. Each part has an independent step grid, and per-step velocity can be set.</p>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">DRUM PANEL</span>
+    <div class="mock-panel">
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <div class="step-grid">
+          <div class="step-label" style="font-size:7px;width:32px">KICK</div>
+          <div class="step-cell on beat-s"></div><div class="step-cell"></div><div class="step-cell"></div><div class="step-cell"></div>
+          <div class="step-cell on beat-s"></div><div class="step-cell"></div><div class="step-cell"></div><div class="step-cell"></div>
+          <div class="step-cell on beat-s"></div><div class="step-cell"></div><div class="step-cell"></div><div class="step-cell"></div>
+          <div class="step-cell on beat-s"></div><div class="step-cell"></div><div class="step-cell"></div><div class="step-cell"></div>
+        </div>
+        <div class="step-grid">
+          <div class="step-label" style="font-size:7px;width:32px">SNARE</div>
+          <div class="step-cell"></div><div class="step-cell"></div><div class="step-cell"></div><div class="step-cell"></div>
+          <div class="step-cell on"></div><div class="step-cell"></div><div class="step-cell"></div><div class="step-cell"></div>
+          <div class="step-cell"></div><div class="step-cell"></div><div class="step-cell"></div><div class="step-cell"></div>
+          <div class="step-cell on"></div><div class="step-cell"></div><div class="step-cell"></div><div class="step-cell"></div>
+        </div>
+        <div class="step-grid">
+          <div class="step-label" style="font-size:7px;width:32px">HiHAT</div>
+          <div class="step-cell on"></div><div class="step-cell"></div><div class="step-cell on"></div><div class="step-cell"></div>
+          <div class="step-cell on"></div><div class="step-cell"></div><div class="step-cell on"></div><div class="step-cell"></div>
+          <div class="step-cell on"></div><div class="step-cell"></div><div class="step-cell on"></div><div class="step-cell"></div>
+          <div class="step-cell on"></div><div class="step-cell"></div><div class="step-cell on"></div><div class="step-cell"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Part</th><th>Description</th></tr>
+    <tr><td>KICK</td><td>Bass drum — low-pitched impact sound.</td></tr>
+    <tr><td>SNARE</td><td>Snare drum — mid-range crackling sound.</td></tr>
+    <tr><td>HAT (cl)</td><td>Closed hi-hat — short metallic sound.</td></tr>
+    <tr><td>HAT (op)</td><td>Open hi-hat — sustained metallic sound.</td></tr>
+    <tr><td>TOMhi / TOMmid / TOMlo</td><td>High, mid, and low tom drums.</td></tr>
+    <tr><td>PCM</td><td>Trigger a PCM slot from the drum track.</td></tr>
+  </table>
+
+  <div class="callout info">
+    <span class="callout-icon">💡</span>
+    <div class="callout-text">
+      <strong>Per-step velocity</strong><br>
+      Long press (PC: right-click) a step to set its velocity (0–127). Different velocities can be set for each step.
+    </div>
+  </div>
+</section>
+
+<!-- ===== 14 PCM ===== -->
+<section id="pcm">
+  <div class="sec-header">
+    <div class="sec-num">14</div>
+    <div><h1>PCM Sampler</h1></div>
+  </div>
+
+  <p>Load WAV files for playback. Supports up to 32 slots. Loaded samples are embedded in JSON save data as base64.</p>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">PCM PANEL</span>
+    <div class="mock-panel">
+      <div class="mock-title">SLOT SELECT</div>
+      <div class="bank-grid" style="margin-bottom:8px">
+        <div class="bank-btn active">1</div><div class="bank-btn filled">2</div><div class="bank-btn filled">3</div><div class="bank-btn">4</div>
+        <div class="bank-btn">5</div><div class="bank-btn">6</div><div class="bank-btn">7</div><div class="bank-btn">8</div>
+      </div>
+      <div class="mock-row">
+        <span class="mock-btn">📁 LOAD WAV</span>
+        <span class="mock-btn" style="color:var(--red)">DELETE</span>
+        <span style="font-size:9px;color:var(--text2)">kick_01.wav</span>
+      </div>
+      <div class="mock-row" style="margin-top:6px">
+        <span class="mock-label">PITCH</span><div class="mock-slider"></div><span style="font-size:9px;color:var(--text)">0 st</span>
+        <span class="mock-label" style="margin-left:8px">VOL</span><div class="mock-slider"></div><span style="font-size:9px;color:var(--text)">100%</span>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Parameter</th><th>Range</th><th>Description</th></tr>
+    <tr><td>Slot</td><td>1–32</td><td>Sample slot number. Up to 32 WAV files can be loaded.</td></tr>
+    <tr><td>LOAD WAV</td><td>—</td><td>Load a WAV file from local storage into the selected slot.</td></tr>
+    <tr><td>DELETE</td><td>—</td><td>Delete the sample in the current slot.</td></tr>
+    <tr><td>PITCH</td><td>−48 to +48 st</td><td>Pitch offset in semitones. Applied globally to the slot.</td></tr>
+    <tr><td>VOL</td><td>0–100%</td><td>Slot volume. Can also be set per step.</td></tr>
+  </table>
+
+  <div class="callout warn">
+    <span class="callout-icon">⚠</span>
+    <div class="callout-text">
+      <strong>File size note</strong><br>
+      PCM data is stored as base64 in the JSON save file. Large WAV files significantly increase file size. It is recommended to use short, compressed samples.
+    </div>
+  </div>
+</section>
+
+<!-- ===== 15 FX EFFECTS ===== -->
+<section id="fx">
+  <div class="sec-header">
+    <div class="sec-num">15</div>
+    <div><h1>FX Effects</h1></div>
+  </div>
+
+  <p>Three types of effects are available: Delay, Chorus, and DJ Filter. Each effect can also be automated per step in the FX sequencer tab.</p>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">FX PANEL</span>
+    <div class="mock-panel">
+      <div class="mock-row" style="gap:24px;flex-wrap:wrap;align-items:flex-start">
+        <div>
+          <div class="mock-title" style="color:#559">DELAY</div>
+          <div class="param-row"><span>TIME</span><div class="mock-slider"></div><span class="param-val">375ms</span></div>
+          <div class="param-row"><span>FB</span><div class="mock-slider"></div><span class="param-val">0.4</span></div>
+          <div class="param-row"><span>WET</span><div class="mock-slider"></div><span class="param-val">0.3</span></div>
+        </div>
+        <div>
+          <div class="mock-title" style="color:#559">CHORUS</div>
+          <div class="param-row"><span>RATE</span><div class="mock-slider"></div><span class="param-val">1.0Hz</span></div>
+          <div class="param-row"><span>DEPTH</span><div class="mock-slider"></div><span class="param-val">0.003</span></div>
+          <div class="param-row"><span>WET</span><div class="mock-slider"></div><span class="param-val">0.5</span></div>
+        </div>
+        <div>
+          <div class="mock-title" style="color:#559">DJ FILTER</div>
+          <div class="param-row"><span>FREQ</span><div class="mock-slider"></div><span class="param-val">8000Hz</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Effect</th><th>Parameter</th><th>Range</th><th>Description</th></tr>
+    <tr><td>Delay</td><td>TIME</td><td>10ms–2000ms</td><td>Delay time.</td></tr>
+    <tr><td>Delay</td><td>FB (Feedback)</td><td>0.0–0.95</td><td>Feedback amount. Higher = more repeats.</td></tr>
+    <tr><td>Delay</td><td>WET</td><td>0.0–1.0</td><td>Delay wet/dry mix. 0 = dry only.</td></tr>
+    <tr><td>Chorus</td><td>RATE</td><td>0.1–10 Hz</td><td>Modulation speed.</td></tr>
+    <tr><td>Chorus</td><td>DEPTH</td><td>0.0001–0.02</td><td>Modulation depth.</td></tr>
+    <tr><td>Chorus</td><td>WET</td><td>0.0–1.0</td><td>Chorus wet/dry mix.</td></tr>
+    <tr><td>DJ Filter</td><td>FREQ</td><td>20–20000 Hz</td><td>Low-pass filter cutoff frequency applied to the master output.</td></tr>
+  </table>
+</section>
+
+<!-- ===== 16 TONE BANK ===== -->
+<section id="tonebank">
+  <div class="sec-header">
+    <div class="sec-num">16</div>
+    <div><h1>Tone Bank</h1></div>
+  </div>
+
+  <p>Save and recall FM/PSG tone settings. Up to 128 presets can be stored per channel. Presets are saved within the JSON data.</p>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">TONE BANK (FM1)</span>
+    <div class="mock-panel">
+      <div class="bank-grid" style="max-width:100%">
+        <div class="bank-btn active">1</div><div class="bank-btn filled">2</div><div class="bank-btn filled">3</div><div class="bank-btn filled">4</div>
+        <div class="bank-btn">5</div><div class="bank-btn">6</div><div class="bank-btn">7</div><div class="bank-btn">8</div>
+      </div>
+      <div class="mock-row" style="margin-top:6px">
+        <span class="mock-btn green">WRITE</span>
+        <span class="mock-btn">RENAME</span>
+        <span class="mock-btn" style="color:var(--red)">DELETE</span>
+        <span style="font-size:9px;color:var(--text2)">Slot 1: brass_01</span>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Operation</th><th>Action</th></tr>
+    <tr><td>Select slot</td><td>Load the tone in that slot to the current channel.</td></tr>
+    <tr><td>WRITE</td><td>Save the current channel's tone to the selected slot.</td></tr>
+    <tr><td>RENAME</td><td>Rename the selected slot.</td></tr>
+    <tr><td>DELETE</td><td>Delete the tone in the selected slot.</td></tr>
+  </table>
+
+  <div class="callout info">
+    <span class="callout-icon">💡</span>
+    <div class="callout-text">
+      <strong>Using the tone bank in the sequencer</strong><br>
+      A tone switch row appears in the FM/PSG sequencer tabs. You can switch to any saved preset per step.
+    </div>
+  </div>
+</section>
+
+<!-- ===== 17 MML MODE ===== -->
+<section id="mml">
+  <div class="sec-header">
+    <div class="sec-num">17</div>
+    <div><h1>MML Mode</h1></div>
+  </div>
+
+  <p>Input sequences as text using Music Macro Language (MML). Compatible with MUCOM88 / FMP7 notation. After entering MML, press COMPILE to convert it into step data.</p>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">MML EDITOR</span>
+    <div class="mock-panel">
+      <div class="mock-tab-bar">
+        <div class="mock-tab active">FM1</div><div class="mock-tab">FM2</div><div class="mock-tab">FM3</div><div class="mock-tab">PS1</div><div class="mock-tab">SUB</div>
+      </div>
+      <pre style="margin:6px 0;font-size:10px;color:#9cf;background:#0a0a12;border:1px solid #224;padding:6px">t120 l8 o4 cde2fga2&gt;c2</pre>
+      <div class="mock-row" style="margin-top:4px">
+        <span class="mock-btn green">COMPILE</span>
+        <span class="mock-btn" style="color:var(--red)">CLEAR</span>
+        <span style="font-size:9px;color:var(--green)">✓ OK — 12 steps</span>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Command</th><th>Description</th></tr>
+    <tr><td><code>t&lt;n&gt;</code></td><td>Set tempo. Example: <code>t120</code></td></tr>
+    <tr><td><code>l&lt;n&gt;</code></td><td>Set default note length. Example: <code>l8</code> = eighth note</td></tr>
+    <tr><td><code>o&lt;n&gt;</code></td><td>Set octave (1–8). Example: <code>o4</code></td></tr>
+    <tr><td><code>&gt;</code> / <code>&lt;</code></td><td>Raise / lower octave by 1.</td></tr>
+    <tr><td><code>c</code>–<code>b</code></td><td>Notes. Add <code>+</code> for sharp, <code>-</code> for flat. Example: <code>c+</code>, <code>e-</code></td></tr>
+    <tr><td><code>r</code></td><td>Rest.</td></tr>
+    <tr><td><code>&amp;</code></td><td>Tie — connect to next note.</td></tr>
+    <tr><td><code>v&lt;n&gt;</code></td><td>Set velocity (0–127). Example: <code>v100</code></td></tr>
+    <tr><td><code>@&lt;n&gt;</code></td><td>Select tone bank preset number.</td></tr>
+  </table>
+
+  <div class="callout">
+    <span class="callout-icon">📝</span>
+    <div class="callout-text">
+      <strong>Note length notation</strong><br>
+      Append a number after a note to specify its length individually. Example: <code>c4</code> = quarter note C, <code>a8</code> = eighth note A, <code>g16</code> = sixteenth note G. Omitting the number uses the current default length set by <code>l</code>.
+    </div>
+  </div>
+</section>
+
+<!-- ===== 18 FX / BPM SEQUENCE ===== -->
+<section id="fxseq">
+  <div class="sec-header">
+    <div class="sec-num">18</div>
+    <div><h1>FX / BPM Sequence</h1></div>
+  </div>
+
+  <p>All FX parameters and the global BPM can be automated per step. Select the FX or BPM tab in the sequencer to edit automation values.</p>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">FX SEQ TAB</span>
+    <div class="mock-panel">
+      <div class="mock-tab-bar">
+        <div class="mock-tab active">FX</div>
+        <div class="mock-tab blue">BPM</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;margin-top:4px">
+        <div class="step-grid">
+          <div class="step-label" style="font-size:7px;width:52px">DLY WET</div>
+          <div class="step-cell on"></div><div class="step-cell"></div><div class="step-cell on"></div><div class="step-cell"></div>
+          <div class="step-cell on"></div><div class="step-cell"></div><div class="step-cell"></div><div class="step-cell"></div>
+        </div>
+        <div class="step-grid">
+          <div class="step-label" style="font-size:7px;width:52px">DJ FREQ</div>
+          <div class="step-cell"></div><div class="step-cell on"></div><div class="step-cell"></div><div class="step-cell on"></div>
+          <div class="step-cell"></div><div class="step-cell"></div><div class="step-cell on"></div><div class="step-cell"></div>
+        </div>
+        <div class="step-grid">
+          <div class="step-label" style="font-size:7px;width:52px">BPM</div>
+          <div class="step-cell on" style="background:#1a1a2a;border-color:#446"></div>
+          <div class="step-cell"></div><div class="step-cell"></div><div class="step-cell"></div>
+          <div class="step-cell on" style="background:#1a1a2a;border-color:#446"></div>
+          <div class="step-cell"></div><div class="step-cell"></div><div class="step-cell"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Row</th><th>Description</th></tr>
+    <tr><td>DLY WET</td><td>Delay wet amount per step (0.0–1.0). Steps with no value use the global FX setting.</td></tr>
+    <tr><td>DLY FB</td><td>Delay feedback per step (0.0–0.95).</td></tr>
+    <tr><td>CHO RATE</td><td>Chorus rate per step (0.1–10 Hz).</td></tr>
+    <tr><td>CHO DEPTH</td><td>Chorus depth per step.</td></tr>
+    <tr><td>CHO WET</td><td>Chorus wet per step.</td></tr>
+    <tr><td>DJ FREQ</td><td>DJ Filter frequency per step.</td></tr>
+    <tr><td>BPM</td><td>Tempo per step. Steps set to null use the global BPM.</td></tr>
+  </table>
+
+  <div class="callout info">
+    <span class="callout-icon">💡</span>
+    <div class="callout-text">
+      FX/BPM automation is per-bank and independent. Use it for DJ-style filter sweeps or sudden tempo changes.
+    </div>
+  </div>
+</section>
+
+<!-- ===== 19 SAVE / LOAD ===== -->
+<section id="save">
+  <div class="sec-header">
+    <div class="sec-num">19</div>
+    <div><h1>Save / Load</h1></div>
+  </div>
+
+  <p>All data is saved as a single JSON file and loaded back from it. There is no auto-save and no localStorage — always save manually.</p>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">SAVE / LOAD</span>
+    <div class="mock-row" style="padding:6px">
+      <span class="mock-btn">💾 SAVE</span>
+      <span style="font-size:9px;color:var(--text3)">→ honodori_save.json downloaded</span>
+    </div>
+    <div class="mock-row" style="padding:6px">
+      <span class="mock-btn">📂 LOAD</span>
+      <span style="font-size:9px;color:var(--text3)">→ select .json file → all settings restored</span>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Item</th><th>Details</th></tr>
+    <tr><td>Save format</td><td>JSON text file. Filename: <code>honodori_save.json</code></td></tr>
+    <tr><td>What is saved</td><td>All banks (steps, notes, vol, pan, tie, porta), song data, tone banks, FX settings, PCM samples (base64), BPM, GAIN.</td></tr>
+    <tr><td>Auto-save</td><td>None. Closing the browser without saving loses all data.</td></tr>
+    <tr><td>localStorage</td><td>Not used. Data is not stored in the browser.</td></tr>
+  </table>
+
+  <div class="callout warn">
+    <span class="callout-icon">⚠</span>
+    <div class="callout-text">
+      <strong>Save before closing.</strong><br>
+      honodori does not use localStorage. All data is lost if you close or refresh the browser tab without saving.
+    </div>
+  </div>
+</section>
+
+<!-- ===== 20 SAVE DATA FORMAT ===== -->
+<section id="saveformat">
+  <div class="sec-header">
+    <div class="sec-num">20</div>
+    <div><h1>Save Data Format</h1></div>
+  </div>
+
+  <p>The saved JSON has the following top-level keys:</p>
+
+  <pre>{
+  "version": "4.2",
+  "bpm": 120,
+  "gain": 0.3,
+  "mode": "PATTERN",
+  "currentBank": 0,
+  "banks": [ /* array of 16 bank objects */ ],
+  "song": [ /* array of bank indices */ ],
+  "tones": { /* FM/PSG tone bank presets */ },
+  "fx": { /* delay/chorus/filter settings */ },
+  "pcm": [ /* base64-encoded WAV data per slot */ ]
+}</pre>
+
+  <table>
+    <tr><th>Key</th><th>Type</th><th>Description</th></tr>
+    <tr><td>version</td><td>string</td><td>Save data format version.</td></tr>
+    <tr><td>bpm</td><td>number</td><td>Global BPM (40–300).</td></tr>
+    <tr><td>gain</td><td>number</td><td>Master gain (0.0–1.0).</td></tr>
+    <tr><td>mode</td><td>string</td><td>Active mode: "PATTERN" | "SONG" | "MML".</td></tr>
+    <tr><td>currentBank</td><td>number</td><td>Index of the currently selected bank (0-based).</td></tr>
+    <tr><td>banks</td><td>array[16]</td><td>Array of bank objects. Each bank contains steps for all channels.</td></tr>
+    <tr><td>song</td><td>array</td><td>Ordered array of bank indices for SONG mode playback.</td></tr>
+    <tr><td>tones</td><td>object</td><td>Tone bank presets for FM1–FM6 and PS1–PS3.</td></tr>
+    <tr><td>fx</td><td>object</td><td>Global FX settings (delay, chorus, DJ filter).</td></tr>
+    <tr><td>pcm</td><td>array[32]</td><td>Base64-encoded WAV data for each PCM slot. null if empty.</td></tr>
+  </table>
+</section>
+
+<!-- ===== 21 PCM BANK SAVE ===== -->
+<section id="pcmsave">
+  <div class="sec-header">
+    <div class="sec-num">21</div>
+    <div><h1>PCM Bank Save</h1></div>
+  </div>
+
+  <p>The PCM sample bank can be exported and imported independently from pattern data. This allows reusing sample sets across different projects.</p>
+
+  <div class="ui-mock">
+    <span class="ui-mock-label">PCM BANK EXPORT / IMPORT</span>
+    <div class="mock-panel">
+      <div class="mock-row">
+        <span class="mock-btn">💾 EXPORT PCM BANK</span>
+        <span style="font-size:9px;color:var(--text3)">→ honodori_pcm.json</span>
+      </div>
+      <div class="mock-row" style="margin-top:4px">
+        <span class="mock-btn">📂 IMPORT PCM BANK</span>
+        <span style="font-size:9px;color:var(--text3)">→ loads PCM slots only, other data unchanged</span>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Operation</th><th>Action</th></tr>
+    <tr><td>EXPORT PCM BANK</td><td>Save only the PCM sample bank as <code>honodori_pcm.json</code>.</td></tr>
+    <tr><td>IMPORT PCM BANK</td><td>Load a PCM bank file. Only PCM slots are replaced; all other data (patterns, FM tones, etc.) remains unchanged.</td></tr>
+  </table>
+
+  <div class="callout info">
+    <span class="callout-icon">💡</span>
+    <div class="callout-text">
+      <strong>Use case</strong><br>
+      Export your drum kit once, then import it into any project. PCM bank files are separate from the main save file, making them easy to share and reuse.
+    </div>
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+// Scroll-spy: highlight active nav link
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('nav a');
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      navLinks.forEach(a => a.classList.remove('active'));
+      const active = document.querySelector(`nav a[href="#${entry.target.id}"]`);
+      if (active) active.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
