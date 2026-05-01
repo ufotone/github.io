@@ -882,6 +882,7 @@ const state = {
   },
   // PCM TONE BANK 64スロット
   pcmToneBank: Array(64).fill(null),
+  pcmSlotColors: Array(64).fill(null),
   pcmActiveToneSlot: -1,
   // PCM登録時のデフォルトサンプリングレート (0 = 元のまま)
   pcmDefaultSampleRate: 16000,
@@ -3447,6 +3448,12 @@ function renderPcmToneBank() {
     div.className = 'pcm-slot' + (isLoaded ? ' loaded' : '') + (isActive ? ' active-pcm' : '');
     div.dataset.slot = s;
     div.title = isLoaded ? `S${s+1}: ${slot.name}` : `S${s+1}: 未読込`;
+    const _sc = state.pcmSlotColors[s];
+    if (_sc) {
+      div.style.backgroundColor = _sc;
+      div.style.borderColor = isActive ? '#f0c080' : _sc;
+      div.style.setProperty('--slot-color', _sc);
+    }
 
     const numEl = document.createElement('div');
     numEl.className = 'pcm-slot-num';
@@ -3620,6 +3627,26 @@ function showPcmCtxMenu(e, slotIdx) {
     }});
   }
 
+  // セパレータ + カラー設定
+  const _colorSep = document.createElement('div');
+  _colorSep.className = 'ctx-sep';
+  pcmCtxMenu.appendChild(_colorSep);
+
+  const _colorItem = document.createElement('div');
+  _colorItem.className = 'ctx-item';
+  _colorItem.textContent = `🎨 カラー設定${state.pcmSlotColors[slotIdx] ? ' ●' : ''}`;
+  _colorItem.onclick = (ev) => { ev.stopPropagation(); pcmCtxMenu.style.display = 'none'; showPcmSlotColorPicker(slotIdx); };
+  pcmCtxMenu.appendChild(_colorItem);
+
+  if (state.pcmSlotColors[slotIdx]) {
+    const _clrColorItem = document.createElement('div');
+    _clrColorItem.className = 'ctx-item';
+    _clrColorItem.style.color = '#888';
+    _clrColorItem.textContent = '✕ カラーをリセット';
+    _clrColorItem.onclick = (ev) => { ev.stopPropagation(); pcmCtxMenu.style.display = 'none'; state.pcmSlotColors[slotIdx] = null; renderPcmToneBank(); };
+    pcmCtxMenu.appendChild(_clrColorItem);
+  }
+
   items.forEach(it => {
     const d = document.createElement('div');
     d.className = 'ctx-item';
@@ -3631,6 +3658,98 @@ function showPcmCtxMenu(e, slotIdx) {
   pcmCtxMenu.style.display = 'block';
   pcmCtxMenu.style.left = Math.min(e.clientX || 0, window.innerWidth - 200) + 'px';
   pcmCtxMenu.style.top = Math.min(e.clientY || 0, window.innerHeight - 360) + 'px';
+}
+
+
+// ============================================================================
+// PCM SLOT カラーピッカー (16色パレット)
+// ============================================================================
+const PCM_SLOT_PALETTE = [
+  '#5a1010','#6b3010','#5a4d00','#0d4a20',
+  '#0a3a30','#0d2e58','#2e1050','#580838',
+  '#1e1e1e','#2a2a2a','#263040','#1a2a1a',
+  '#1a1430','#102820','#301040','#3a1800'
+];
+
+function showPcmSlotColorPicker(slotIdx) {
+  // 既存ピッカーを除去
+  const existingPicker = document.getElementById('pcmColorPicker');
+  if (existingPicker) existingPicker.remove();
+
+  const bg = document.createElement('div');
+  bg.id = 'pcmColorPicker';
+  bg.style.cssText = 'position:fixed;inset:0;background:#000a;z-index:20002;display:flex;align-items:center;justify-content:center';
+
+  const box = document.createElement('div');
+  box.style.cssText = 'background:#1a1a1a;border:1px solid #555;border-radius:6px;padding:14px;min-width:220px;box-shadow:0 8px 32px #000c';
+
+  const title = document.createElement('div');
+  title.style.cssText = 'font-size:10px;color:#c4803a;letter-spacing:2px;margin-bottom:10px;font-family:monospace';
+  title.textContent = `S${slotIdx+1} カラー設定`;
+  box.appendChild(title);
+
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin-bottom:10px';
+
+  PCM_SLOT_PALETTE.forEach(col => {
+    const sw = document.createElement('div');
+    sw.style.cssText = `width:22px;height:22px;background:${col};border-radius:3px;cursor:pointer;border:2px solid ${state.pcmSlotColors[slotIdx]===col?'#fff':'transparent'};box-sizing:border-box`;
+    sw.title = col;
+    sw.onclick = () => {
+      state.pcmSlotColors[slotIdx] = col;
+      renderPcmToneBank();
+      bg.remove();
+      showToast(`S${slotIdx+1} カラー設定: ${col}`, 'ok', 1500);
+    };
+    grid.appendChild(sw);
+  });
+  box.appendChild(grid);
+
+  // カスタムカラー入力
+  const customRow = document.createElement('div');
+  customRow.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:10px';
+  const customLabel = document.createElement('span');
+  customLabel.style.cssText = 'font-size:9px;color:#888;font-family:monospace;flex-shrink:0';
+  customLabel.textContent = 'CUSTOM:';
+  const colorInp = document.createElement('input');
+  colorInp.type = 'color';
+  colorInp.value = state.pcmSlotColors[slotIdx] || '#3a6a9a';
+  colorInp.style.cssText = 'width:36px;height:22px;border:none;background:none;cursor:pointer;padding:0';
+  const applyBtn = document.createElement('button');
+  applyBtn.className = 'btn';
+  applyBtn.textContent = 'SET';
+  applyBtn.onclick = () => {
+    state.pcmSlotColors[slotIdx] = colorInp.value;
+    renderPcmToneBank();
+    bg.remove();
+    showToast(`S${slotIdx+1} カラー設定: ${colorInp.value}`, 'ok', 1500);
+  };
+  customRow.appendChild(customLabel);
+  customRow.appendChild(colorInp);
+  customRow.appendChild(applyBtn);
+  box.appendChild(customRow);
+
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:6px;justify-content:flex-end';
+
+  if (state.pcmSlotColors[slotIdx]) {
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'btn warn';
+    resetBtn.textContent = 'RESET';
+    resetBtn.onclick = () => { state.pcmSlotColors[slotIdx] = null; renderPcmToneBank(); bg.remove(); };
+    btnRow.appendChild(resetBtn);
+  }
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn';
+  cancelBtn.textContent = 'CANCEL';
+  cancelBtn.onclick = () => bg.remove();
+  btnRow.appendChild(cancelBtn);
+  box.appendChild(btnRow);
+
+  bg.appendChild(box);
+  bg.addEventListener('click', (e) => { if (e.target === bg) bg.remove(); });
+  document.body.appendChild(bg);
 }
 
 function openPcmFileDialog(slotIdx) {
