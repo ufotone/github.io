@@ -432,6 +432,9 @@
     #pianoOctLabel {
       font-size: 8px; color: #c4803a; white-space: nowrap; text-align: center;
     }
+    #pianoKeys {
+      position: relative; height: 52px; flex: 1; min-width: 0;
+    }
     .pk-white {
       position: absolute; bottom: 0;
       width: calc(100% / 14 - 1px); height: 100%;
@@ -453,19 +456,74 @@
       text-align: center; font-size: 6px; color: #666;
       pointer-events: none;
     }
-    /* キーボードショートカットラベル */
-    .pk-keylabel {
-      position: absolute; top: 4px; left: 0; right: 0;
-      text-align: center; font-size: 7px; color: #888;
-      font-family: monospace; font-weight: bold;
+
+    /* ===== RECORDING ===== */
+    .rec-btn {
+      background: #2a0a0a; border: 1px solid #733; color: #d55;
+      font-family: monospace; font-size: 9px; padding: 3px 8px;
+      cursor: pointer; border-radius: 3px;
+    }
+    .rec-btn:hover { background: #3a1010; border-color: #d55; }
+    .rec-btn.recording {
+      background: #4a0a0a; border-color: #f55; color: #fcc;
+      animation: recBlink 0.8s ease-in-out infinite;
+    }
+    @keyframes recBlink {
+      0%,100% { box-shadow: 0 0 0px #f550; }
+      50% { box-shadow: 0 0 8px #f554; }
+    }
+    .rec-timer { font-size: 9px; color: #f55; font-family: monospace; min-width: 36px; }
+
+    /* ===== WAVE EDITOR ===== */
+    .wave-editor-bg {
+      position: fixed; inset: 0; background: #000c;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 20000;
+    }
+    .wave-editor-box {
+      background: #161616; border: 1px solid #555; border-radius: 6px;
+      padding: 14px; width: min(700px, 96vw);
+      box-shadow: 0 8px 40px #000e;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .wave-editor-title { font-size: 11px; color: #c4803a; letter-spacing: 2px; font-weight: bold; }
+    .wave-canvas-wrap {
+      position: relative; background: #0d0d0d; border: 1px solid #333;
+      border-radius: 3px; overflow: hidden; cursor: crosshair;
+      height: 120px;
+    }
+    canvas.wave-canvas { width: 100%; height: 100%; display: block; }
+    .wave-trim-overlay {
+      position: absolute; inset: 0; pointer-events: none;
+    }
+    .wave-editor-info {
+      font-size: 9px; color: #888; display: flex; gap: 12px; flex-wrap: wrap;
+    }
+    .wave-editor-info span { color: #fc8; }
+    .wave-editor-controls {
+      display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+    }
+    .wave-editor-controls label { font-size: 9px; color: #aaa; }
+    .trim-handle {
+      position: absolute; top: 0; bottom: 0; width: 3px;
+      cursor: ew-resize; z-index: 10;
+    }
+    .trim-handle.left  { background: #5af8; left: 0; }
+    .trim-handle.right { background: #fa58; right: 0; }
+    .trim-region {
+      position: absolute; top: 0; bottom: 0;
+      background: #5af1; pointer-events: none;
+    }
+    .trim-fade-left {
+      position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
+      background: linear-gradient(to right, #0008, #0000);
       pointer-events: none;
-      background: rgba(0,0,0,0.08); border-radius: 2px;
     }
-    .pk-keylabel-black {
-      top: 2px; font-size: 6px; color: #c4803a;
-      background: rgba(0,0,0,0.3);
+    .trim-fade-right {
+      position: absolute; top: 0; bottom: 0; right: 0; width: 40%;
+      background: linear-gradient(to left, #0008, #0000);
+      pointer-events: none;
     }
-    #pianoKeys { position: relative; height: 64px; flex: 1; min-width: 0; }
   </style>
 </head>
 <body>
@@ -3112,11 +3170,84 @@ function buildPcmBankPanel() {
   };
   hdr.appendChild(clrAllBtn);
 
+  // ===== REC ボタン =====
+  const recBtn = document.createElement('button');
+  recBtn.className = 'rec-btn';
+  recBtn.id = 'pcmRecBtn';
+  recBtn.textContent = '⏺ REC → SLOT';
+  const recTimer = document.createElement('span');
+  recTimer.className = 'rec-timer';
+  recTimer.id = 'pcmRecTimer';
+  recTimer.textContent = '';
+  hdr.appendChild(recBtn);
+  hdr.appendChild(recTimer);
+
+  let _recState = { mediaRecorder: null, chunks: [], startTime: null, timerInterval: null };
+
+  recBtn.onclick = async () => {
+    if (_recState.mediaRecorder && _recState.mediaRecorder.state === 'recording') {
+      // 停止
+      _recState.mediaRecorder.stop();
+    } else {
+      // 空きスロット確認
+      const empty = state.pcmToneBank.findIndex(s => s == null);
+      if (empty < 0) { showToast('全スロットが埋まっています', 'warn'); return; }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (!audioCtx) initAudio();
+        _recState.chunks = [];
+        _recState.mediaRecorder = new MediaRecorder(stream);
+        _recState.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) _recState.chunks.push(e.data); };
+        _recState.mediaRecorder.onstop = async () => {
+          clearInterval(_recState.timerInterval);
+          stream.getTracks().forEach(t => t.stop());
+          recBtn.classList.remove('recording');
+          recBtn.textContent = '⏺ REC → SLOT';
+          recTimer.textContent = '';
+          const blob = new Blob(_recState.chunks, { type: 'audio/webm' });
+          const arrayBuf = await blob.arrayBuffer();
+          try {
+            const decoded = await audioCtx.decodeAudioData(arrayBuf);
+            const slotIdx = state.pcmToneBank.findIndex(s => s == null);
+            if (slotIdx < 0) { showToast('スロットが満杯です', 'warn'); return; }
+            const stepDur = (60 / state.bpm) / 4;
+            const slotSteps = Math.max(1, Math.round(decoded.duration / stepDur));
+            const name = `REC${String(slotIdx+1).padStart(2,'0')}`;
+            if (state.pcmToneBank[slotIdx]) releasePcmSlot(slotIdx);
+            state.pcmToneBank[slotIdx] = {
+              rawBuffer: decoded, buffer: null, stretchedBuffer: null,
+              bits: 16, sampleRate: decoded.sampleRate,
+              name, gain: 100, slotSteps,
+            };
+            applyPcmSlotBits(slotIdx);
+            state.pcmActiveToneSlot = slotIdx;
+            renderPcmToneBank();
+            if (state.currentSeqTab === 'pcmseq') renderSeq();
+            showToast(`S${slotIdx+1} 録音完了: ${decoded.duration.toFixed(2)}s (${slotSteps}steps)`, 'ok', 3000);
+            // 録音後すぐWAVE編集を開く
+            openWaveEditor(slotIdx);
+          } catch(err) { showToast('録音デコードエラー: ' + err.message, 'error'); }
+        };
+        _recState.mediaRecorder.start();
+        recBtn.classList.add('recording');
+        recBtn.textContent = '⏹ STOP REC';
+        _recState.startTime = Date.now();
+        _recState.timerInterval = setInterval(() => {
+          const s = ((Date.now() - _recState.startTime) / 1000).toFixed(1);
+          recTimer.textContent = s + 's';
+        }, 100);
+        showToast('録音開始...', 'warn', 2000);
+      } catch(err) {
+        showToast('マイクアクセスエラー: ' + err.message, 'error', 4000);
+      }
+    }
+  };
+
   container.appendChild(hdr);
 
   const desc = document.createElement('div');
   desc.style.cssText = 'font-size:9px;color:#888;margin-bottom:8px';
-  desc.innerHTML = 'クリック=アクティブ選択　右クリック/長押し=メニュー(LOAD/RENAME/STEP/BIT/RATE/GAIN/MATCH STEP/CLEAR)';
+  desc.innerHTML = 'クリック=アクティブ選択　右クリック/長押し=メニュー(LOAD/REC/EDIT WAVE/RENAME/STEP/BIT/RATE/GAIN/MATCH STEP/CLEAR)';
   container.appendChild(desc);
 
   // スロットグリッド
@@ -3207,12 +3338,50 @@ function showPcmCtxMenu(e, slotIdx) {
 
   const items = [
     { label: '📂 LOAD WAV...', action: () => openPcmFileDialog(slotIdx) },
+    { label: '⏺ REC マイク録音 → このSLOT', action: async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (!audioCtx) initAudio();
+        const chunks = [];
+        const mr = new MediaRecorder(stream);
+        mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+        mr.onstop = async () => {
+          stream.getTracks().forEach(t => t.stop());
+          const blob = new Blob(chunks, { type: 'audio/webm' });
+          const arrayBuf = await blob.arrayBuffer();
+          try {
+            const decoded = await audioCtx.decodeAudioData(arrayBuf);
+            const stepDur = (60 / state.bpm) / 4;
+            const slotSteps = Math.max(1, Math.round(decoded.duration / stepDur));
+            const name = `REC${String(slotIdx+1).padStart(2,'0')}`;
+            if (state.pcmToneBank[slotIdx]) releasePcmSlot(slotIdx);
+            state.pcmToneBank[slotIdx] = {
+              rawBuffer: decoded, buffer: null, stretchedBuffer: null,
+              bits: 16, sampleRate: decoded.sampleRate,
+              name, gain: 100, slotSteps,
+            };
+            applyPcmSlotBits(slotIdx);
+            state.pcmActiveToneSlot = slotIdx;
+            renderPcmToneBank();
+            if (state.currentSeqTab === 'pcmseq') renderSeq();
+            showToast(`S${slotIdx+1} 録音完了: ${decoded.duration.toFixed(2)}s`, 'ok', 3000);
+            openWaveEditor(slotIdx);
+          } catch(err) { showToast('デコードエラー: ' + err.message, 'error'); }
+        };
+        mr.start();
+        showToast('録音中... もう一度メニューを開いて STOP → ここでは自動3秒', 'warn', 3500);
+        setTimeout(() => { if (mr.state === 'recording') mr.stop(); }, 3000);
+      } catch(err) { showToast('マイクエラー: ' + err.message, 'error', 4000); }
+    }},
   ];
 
   if (slot) {
     items.push({ label: `🎵 PLAY (ACT音量で試聴)`, action: () => {
       if (!audioCtx) initAudio();
       playPCM(0, audioCtx.currentTime, slotIdx, null, 100, 0);
+    }});
+    items.push({ label: `✂ EDIT WAVE (トリム/カット)`, action: () => {
+      openWaveEditor(slotIdx);
     }});
     items.push({ label: `✏ RENAME (現: ${slot.name})`, action: async () => {
       const nm = await mobilePrompt('音色名:', slot.name);
@@ -3321,6 +3490,398 @@ function openPcmFileDialog(slotIdx) {
     reader.readAsArrayBuffer(file);
   };
   inp.click();
+}
+
+// ============================================================================
+// WAVE EDITOR (トリム / 不要部カット)
+// ============================================================================
+
+function openWaveEditor(slotIdx) {
+  const slot = state.pcmToneBank[slotIdx];
+  if (!slot || !slot.rawBuffer) { showToast('WAVEデータがありません', 'warn'); return; }
+
+  const buf = slot.rawBuffer;
+  const totalSamples = buf.length;
+  const sr = buf.sampleRate;
+  const durationSec = buf.duration;
+
+  // トリム範囲 (0.0〜1.0の正規化値)
+  let trimStart = 0.0;
+  let trimEnd   = 1.0;
+
+  // ==== モーダルUI構築 ====
+  const bg = document.createElement('div');
+  bg.className = 'wave-editor-bg';
+
+  const box = document.createElement('div');
+  box.className = 'wave-editor-box';
+
+  // タイトル行
+  const titleRow = document.createElement('div');
+  titleRow.style.cssText = 'display:flex;align-items:center;gap:8px';
+  const titleEl = document.createElement('div');
+  titleEl.className = 'wave-editor-title';
+  titleEl.textContent = `✂ WAVE EDITOR — S${slotIdx+1}: ${slot.name}`;
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'btn';
+  closeBtn.style.cssText = 'margin-left:auto;font-size:10px;padding:3px 10px';
+  closeBtn.textContent = '✕ 閉じる';
+  closeBtn.onclick = () => bg.remove();
+  titleRow.appendChild(titleEl);
+  titleRow.appendChild(closeBtn);
+  box.appendChild(titleRow);
+
+  // 情報行
+  const infoEl = document.createElement('div');
+  infoEl.className = 'wave-editor-info';
+  box.appendChild(infoEl);
+
+  function updateInfo() {
+    const sStart = (trimStart * durationSec).toFixed(3);
+    const sEnd   = (trimEnd   * durationSec).toFixed(3);
+    const sLen   = ((trimEnd - trimStart) * durationSec).toFixed(3);
+    infoEl.innerHTML = `
+      全長: <span>${durationSec.toFixed(3)}s</span>
+      &nbsp;|&nbsp; SR: <span>${sr}Hz</span>
+      &nbsp;|&nbsp; START: <span id="weStartVal">${sStart}s</span>
+      &nbsp;|&nbsp; END: <span id="weEndVal">${sEnd}s</span>
+      &nbsp;|&nbsp; 長さ: <span id="weLenVal">${sLen}s</span>
+    `;
+  }
+  updateInfo();
+
+  // 波形 Canvas
+  const canvasWrap = document.createElement('div');
+  canvasWrap.className = 'wave-canvas-wrap';
+  const canvas = document.createElement('canvas');
+  canvas.className = 'wave-canvas';
+  canvas.width  = 600;
+  canvas.height = 120;
+
+  // トリムオーバーレイ
+  const overlayEl = document.createElement('div');
+  overlayEl.className = 'wave-trim-overlay';
+
+  // 左ハンドル
+  const lHandle = document.createElement('div');
+  lHandle.className = 'trim-handle left';
+  lHandle.title = 'トリム開始';
+  // 右ハンドル
+  const rHandle = document.createElement('div');
+  rHandle.className = 'trim-handle right';
+  rHandle.title = 'トリム終了';
+  // 選択領域
+  const trimRegion = document.createElement('div');
+  trimRegion.className = 'trim-region';
+
+  overlayEl.appendChild(trimRegion);
+  overlayEl.appendChild(lHandle);
+  overlayEl.appendChild(rHandle);
+  canvasWrap.appendChild(canvas);
+  canvasWrap.appendChild(overlayEl);
+  box.appendChild(canvasWrap);
+
+  // 波形描画
+  function drawWaveform() {
+    const ctx2 = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx2.clearRect(0, 0, W, H);
+
+    // 背景
+    ctx2.fillStyle = '#0d0d0d';
+    ctx2.fillRect(0, 0, W, H);
+
+    // グリッド線
+    ctx2.strokeStyle = '#1a1a1a';
+    ctx2.lineWidth = 1;
+    for (let y = 0; y <= 4; y++) {
+      ctx2.beginPath(); ctx2.moveTo(0, H * y / 4); ctx2.lineTo(W, H * y / 4);
+      ctx2.stroke();
+    }
+
+    // 波形
+    const chData = buf.getChannelData(0);
+    const step = Math.max(1, Math.floor(totalSamples / W));
+    ctx2.strokeStyle = '#5a8';
+    ctx2.lineWidth = 1;
+    ctx2.beginPath();
+    for (let x = 0; x < W; x++) {
+      const idx = Math.floor(x / W * totalSamples);
+      let min = 1, max = -1;
+      for (let j = 0; j < step; j++) {
+        const v = chData[Math.min(idx + j, totalSamples - 1)];
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+      const yTop = (1 - max) / 2 * H;
+      const yBot = (1 - min) / 2 * H;
+      if (x === 0) { ctx2.moveTo(x, yTop); }
+      ctx2.lineTo(x, yTop);
+      ctx2.lineTo(x, yBot);
+    }
+    ctx2.stroke();
+
+    // トリム領域ハイライト (外側をダーク)
+    const lx = trimStart * W;
+    const rx = trimEnd   * W;
+    ctx2.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx2.fillRect(0, 0, lx, H);
+    ctx2.fillRect(rx, 0, W - rx, H);
+
+    // 選択範囲ライン
+    ctx2.strokeStyle = '#5af';
+    ctx2.lineWidth = 1;
+    ctx2.setLineDash([4, 3]);
+    ctx2.beginPath(); ctx2.moveTo(lx, 0); ctx2.lineTo(lx, H); ctx2.stroke();
+    ctx2.strokeStyle = '#fa5';
+    ctx2.beginPath(); ctx2.moveTo(rx, 0); ctx2.lineTo(rx, H); ctx2.stroke();
+    ctx2.setLineDash([]);
+
+    // ハンドル位置をCSSで更新
+    lHandle.style.left = `calc(${trimStart * 100}% - 2px)`;
+    rHandle.style.right = `calc(${(1 - trimEnd) * 100}% - 2px)`;
+    trimRegion.style.left  = `${trimStart * 100}%`;
+    trimRegion.style.width = `${(trimEnd - trimStart) * 100}%`;
+  }
+  drawWaveform();
+
+  // ===== ドラッグでトリム操作 =====
+  let dragging = null; // 'left' | 'right' | 'canvas'
+  let dragStartX = 0, dragStartTrimStart = 0, dragStartTrimEnd = 0;
+
+  function getRelX(e) {
+    const rect = canvasWrap.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  }
+
+  function onDragStart(e, type) {
+    dragging = type;
+    dragStartX = getRelX(e);
+    dragStartTrimStart = trimStart;
+    dragStartTrimEnd   = trimEnd;
+    e.preventDefault();
+  }
+  function onDragMove(e) {
+    if (!dragging) return;
+    const x = getRelX(e);
+    if (dragging === 'left') {
+      trimStart = Math.max(0, Math.min(trimEnd - 0.001, x));
+    } else if (dragging === 'right') {
+      trimEnd = Math.min(1, Math.max(trimStart + 0.001, x));
+    }
+    drawWaveform();
+    updateInfo();
+    e.preventDefault();
+  }
+  function onDragEnd() { dragging = null; }
+
+  lHandle.addEventListener('mousedown',  e => onDragStart(e, 'left'));
+  rHandle.addEventListener('mousedown',  e => onDragStart(e, 'right'));
+  lHandle.addEventListener('touchstart', e => onDragStart(e, 'left'),  { passive: false });
+  rHandle.addEventListener('touchstart', e => onDragStart(e, 'right'), { passive: false });
+
+  // canvas上でのクリックドラッグ（左右ハンドル以外）
+  canvas.addEventListener('mousedown', e => {
+    const x = getRelX(e);
+    const dL = Math.abs(x - trimStart);
+    const dR = Math.abs(x - trimEnd);
+    onDragStart(e, dL < dR ? 'left' : 'right');
+  });
+  canvas.addEventListener('touchstart', e => {
+    const x = getRelX(e);
+    const dL = Math.abs(x - trimStart);
+    const dR = Math.abs(x - trimEnd);
+    onDragStart(e, dL < dR ? 'left' : 'right');
+  }, { passive: false });
+
+  window.addEventListener('mousemove', onDragMove);
+  window.addEventListener('touchmove',  onDragMove, { passive: false });
+  window.addEventListener('mouseup',   onDragEnd);
+  window.addEventListener('touchend',  onDragEnd);
+
+  // クリーンアップ
+  bg.addEventListener('remove', () => {
+    window.removeEventListener('mousemove', onDragMove);
+    window.removeEventListener('touchmove',  onDragMove);
+    window.removeEventListener('mouseup',   onDragEnd);
+    window.removeEventListener('touchend',  onDragEnd);
+  });
+
+  // ===== コントロールボタン行 =====
+  const ctrlRow = document.createElement('div');
+  ctrlRow.className = 'wave-editor-controls';
+
+  // 試聴ボタン（選択範囲）
+  const playSelBtn = document.createElement('button');
+  playSelBtn.className = 'btn primary';
+  playSelBtn.textContent = '▶ 選択範囲を試聴';
+  playSelBtn.onclick = () => {
+    if (!audioCtx) initAudio();
+    const sampleStart = Math.floor(trimStart * totalSamples);
+    const sampleLen   = Math.floor((trimEnd - trimStart) * totalSamples);
+    if (sampleLen <= 0) return;
+    // 一時バッファ作成
+    const tmpBuf = audioCtx.createBuffer(buf.numberOfChannels, sampleLen, sr);
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const src = buf.getChannelData(c);
+      const dst = tmpBuf.getChannelData(c);
+      for (let i = 0; i < sampleLen; i++) dst[i] = src[sampleStart + i];
+    }
+    const src2 = audioCtx.createBufferSource();
+    src2.buffer = tmpBuf;
+    src2.connect(audioCtx.destination);
+    src2.start();
+  };
+  ctrlRow.appendChild(playSelBtn);
+
+  // 全体試聴
+  const playAllBtn = document.createElement('button');
+  playAllBtn.className = 'btn';
+  playAllBtn.textContent = '▶ 全体試聴';
+  playAllBtn.onclick = () => {
+    if (!audioCtx) initAudio();
+    const src2 = audioCtx.createBufferSource();
+    src2.buffer = buf;
+    src2.connect(audioCtx.destination);
+    src2.start();
+  };
+  ctrlRow.appendChild(playAllBtn);
+
+  // 選択範囲を全体に
+  const trimApplyBtn = document.createElement('button');
+  trimApplyBtn.className = 'btn active';
+  trimApplyBtn.style.cssText = 'margin-left:auto;border-color:#c4803a;color:#fc8';
+  trimApplyBtn.textContent = '✂ カット適用 (選択範囲を保持)';
+  trimApplyBtn.onclick = async () => {
+    const sampleStart = Math.floor(trimStart * totalSamples);
+    const sampleLen   = Math.floor((trimEnd - trimStart) * totalSamples);
+    if (sampleLen <= 0) { showToast('選択範囲が空です', 'warn'); return; }
+    if (!await mobileConfirm(`選択範囲 (${(trimStart * durationSec).toFixed(3)}s〜${(trimEnd * durationSec).toFixed(3)}s) を保持して前後をカットします。`)) return;
+
+    // 新しいバッファを作成
+    const newBuf = audioCtx.createBuffer(buf.numberOfChannels, sampleLen, sr);
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const src = buf.getChannelData(c);
+      const dst = newBuf.getChannelData(c);
+      for (let i = 0; i < sampleLen; i++) dst[i] = src[sampleStart + i];
+    }
+
+    slot.rawBuffer = newBuf;
+    slot.buffer = null;
+    slot.stretchedBuffer = null;
+    const stepDur = (60 / state.bpm) / 4;
+    slot.slotSteps = Math.max(1, Math.round(newBuf.duration / stepDur));
+    applyPcmSlotBits(slotIdx);
+    renderPcmToneBank();
+    if (state.currentSeqTab === 'pcmseq') renderSeq();
+    showToast(`S${slotIdx+1} カット完了: ${newBuf.duration.toFixed(3)}s`, 'ok', 3000);
+    bg.remove();
+  };
+  ctrlRow.appendChild(trimApplyBtn);
+
+  box.appendChild(ctrlRow);
+
+  // WAV書き出しボタン行
+  const exportRow = document.createElement('div');
+  exportRow.className = 'wave-editor-controls';
+  exportRow.style.borderTop = '1px solid #222';
+  exportRow.style.paddingTop = '6px';
+
+  const exportSelBtn = document.createElement('button');
+  exportSelBtn.className = 'btn';
+  exportSelBtn.style.cssText = 'font-size:9px;border-color:#444;color:#aaa';
+  exportSelBtn.textContent = '💾 選択範囲をWAV書き出し';
+  exportSelBtn.onclick = () => {
+    const sampleStart = Math.floor(trimStart * totalSamples);
+    const sampleLen   = Math.floor((trimEnd - trimStart) * totalSamples);
+    if (sampleLen <= 0) { showToast('選択範囲が空です', 'warn'); return; }
+    const tmpBuf = audioCtx.createBuffer(buf.numberOfChannels, sampleLen, sr);
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const s2 = buf.getChannelData(c), d2 = tmpBuf.getChannelData(c);
+      for (let i = 0; i < sampleLen; i++) d2[i] = s2[sampleStart + i];
+    }
+    downloadWav(tmpBuf, `${slot.name}_trim.wav`);
+    showToast('WAV書き出し完了', 'ok');
+  };
+  exportRow.appendChild(exportSelBtn);
+
+  const exportAllBtn = document.createElement('button');
+  exportAllBtn.className = 'btn';
+  exportAllBtn.style.cssText = 'font-size:9px;border-color:#444;color:#aaa';
+  exportAllBtn.textContent = '💾 全体をWAV書き出し';
+  exportAllBtn.onclick = () => {
+    downloadWav(buf, `${slot.name}.wav`);
+    showToast('WAV書き出し完了', 'ok');
+  };
+  exportRow.appendChild(exportAllBtn);
+
+  const tipEl = document.createElement('span');
+  tipEl.style.cssText = 'font-size:8px;color:#555;margin-left:auto';
+  tipEl.textContent = 'ハンドルをドラッグ or 波形クリックでトリム範囲を設定';
+  exportRow.appendChild(tipEl);
+
+  box.appendChild(exportRow);
+
+  bg.appendChild(box);
+  document.body.appendChild(bg);
+
+  // 背景クリックで閉じる
+  bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
+
+  // イベントリスナー破棄
+  const origRemove = bg.remove.bind(bg);
+  bg.remove = () => {
+    window.removeEventListener('mousemove', onDragMove);
+    window.removeEventListener('touchmove',  onDragMove);
+    window.removeEventListener('mouseup',   onDragEnd);
+    window.removeEventListener('touchend',  onDragEnd);
+    origRemove();
+  };
+}
+
+// WAV書き出しユーティリティ
+function downloadWav(audioBuffer, filename) {
+  const numCh = audioBuffer.numberOfChannels;
+  const sr    = audioBuffer.sampleRate;
+  const len   = audioBuffer.length;
+  const pcmLen = len * numCh * 2; // 16bit
+  const buf   = new ArrayBuffer(44 + pcmLen);
+  const view  = new DataView(buf);
+
+  function writeStr(offset, str) {
+    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+  }
+  writeStr(0,  'RIFF');
+  view.setUint32(4,  36 + pcmLen,           true);
+  writeStr(8,  'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16,                    true);
+  view.setUint16(20, 1,                     true);  // PCM
+  view.setUint16(22, numCh,                 true);
+  view.setUint32(24, sr,                    true);
+  view.setUint32(28, sr * numCh * 2,        true);
+  view.setUint16(32, numCh * 2,             true);
+  view.setUint16(34, 16,                    true);
+  writeStr(36, 'data');
+  view.setUint32(40, pcmLen,                true);
+
+  let offset = 44;
+  for (let i = 0; i < len; i++) {
+    for (let c = 0; c < numCh; c++) {
+      const s = Math.max(-1, Math.min(1, audioBuffer.getChannelData(c)[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      offset += 2;
+    }
+  }
+
+  const blob = new Blob([buf], { type: 'audio/wav' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 // ============================================================================
@@ -4530,14 +5091,6 @@ const PIANO_NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 // A4=440Hz基準のHz計算（noteToHz と同じだが直接使う）
 const C4_HZ = 261.6256; // C4
 
-// 白鍵インデックス(0-13) → キー表示ラベル
-const PIANO_WHITE_KEY_LABELS = ['A','S','D','F','G','H','J','K','L',';',':',']','Z','C'];
-// 黒鍵: octOff/semi → キー表示ラベル
-const PIANO_BLACK_KEY_LABELS = {
-  '0-1': 'Q', '0-3': 'W', '0-6': 'R', '0-8': 'T', '0-10': 'Y',
-  '1-1': 'I', '1-3': 'O', '1-6': '@', '1-8': '[', '1-10': 'X'
-};
-
 function buildPianoKeys() {
   const wrap = document.getElementById('pianoKeys');
   if (!wrap) return;
@@ -4554,22 +5107,10 @@ function buildPianoKeys() {
       el.className = 'pk-white';
       el.style.left = `calc(${idx} * (100% / 14))`;
       el.dataset.note = note;
-
-      // ノート名ラベル
       const lbl = document.createElement('div');
       lbl.className = 'pk-label';
       lbl.textContent = (name === 'C') ? note : name;
       el.appendChild(lbl);
-
-      // キーショートカットラベル
-      const keyLbl = PIANO_WHITE_KEY_LABELS[idx];
-      if (keyLbl) {
-        const kl = document.createElement('div');
-        kl.className = 'pk-keylabel';
-        kl.textContent = keyLbl;
-        el.appendChild(kl);
-      }
-
       el.addEventListener('pointerdown', e => { e.preventDefault(); pianoTrigger(note, el); });
       wrap.appendChild(el);
     });
@@ -4582,16 +5123,6 @@ function buildPianoKeys() {
       el.style.left = `calc(${whiteIdx * ww}% - ${bw / 2}%)`;
       el.style.width = `${bw}%`;
       el.dataset.note = note;
-
-      // キーショートカットラベル（黒鍵）
-      const bkeyLbl = PIANO_BLACK_KEY_LABELS[`${octOff}-${semi}`];
-      if (bkeyLbl) {
-        const kl = document.createElement('div');
-        kl.className = 'pk-keylabel pk-keylabel-black';
-        kl.textContent = bkeyLbl;
-        el.appendChild(kl);
-      }
-
       el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); pianoTrigger(note, el); });
       wrap.appendChild(el);
     });
@@ -4988,100 +5519,31 @@ async function initWebMidi() {
   }
 }
 
-// ===== キーボード → ピアノ鍵盤マッピング (日本語JISキーボード) =====
-// A列(白鍵): A S D F G H J K L ; : ]
-// Q列(黒鍵): Q W   R T Y   I O   @  [
-//
-// ピアノオクターブは pianoState.octave 基準の 2オクターブ分
-// 白鍵インデックス 0-13 → [oct]C D E F G A B [oct+1]C D E F G A B
-// 黒鍵は半音: C# D# F# G# A# / C# D# F# G#
-//
-// キーは e.code を使用（入力言語に依存しない物理位置）
-
-const PIANO_KEY_MAP_WHITE = [
-  // code,          whiteIdx (0-13)
-  ['KeyA',           0],  // C
-  ['KeyS',           1],  // D
-  ['KeyD',           2],  // E
-  ['KeyF',           3],  // F
-  ['KeyG',           4],  // G
-  ['KeyH',           5],  // A
-  ['KeyJ',           6],  // B
-  ['KeyK',           7],  // C+1
-  ['KeyL',           8],  // D+1
-  ['Semicolon',      9],  // E+1  (;)
-  ['Quote',         10],  // F+1  (:)
-  ['BracketRight',  11],  // G+1  (])
-  ['KeyZ',          12],  // A+1
-  ['KeyC',          13],  // B+1
-];
-
-const PIANO_KEY_MAP_BLACK = [
-  // code,          黒鍵 semi(0-11), octOffset
-  ['KeyQ',    1,  0],  // C#
-  ['KeyW',    3,  0],  // D#
-  ['KeyR',    6,  0],  // F#
-  ['KeyT',    8,  0],  // G#
-  ['KeyY',   10,  0],  // A#
-  ['KeyI',    1,  1],  // C#+1
-  ['KeyO',    3,  1],  // D#+1
-  ['BracketLeft',  6, 1], // F#+1  (@)
-  ['Backslash',    8, 1], // G#+1  ([)
-  ['KeyX',   10,  1],  // A#+1
-];
-
-// 押下中のキーを管理（ポリフォニック対応）
-const pianoKeyHeld = new Map(); // code → noteName
-
+// ===== STEP REC キーボードショートカット =====
 document.addEventListener('keydown', (e) => {
+  // フォーカスがinput/select上にある場合はスキップ
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-  if (e.repeat) return;
+  if (!samplerSeqRecMode || samplerSeqRecType !== 'step') return;
 
-  // 白鍵チェック
-  const wEntry = PIANO_KEY_MAP_WHITE.find(([c]) => c === e.code);
-  if (wEntry) {
+  const stepLen = getStepLen();
+  if (e.key === 'ArrowRight' || e.key === '.') {
     e.preventDefault();
-    const [, idx] = wEntry;
-    const octOff = Math.floor(idx / 7);
-    const nameIdx = idx % 7;
-    const oct = pianoState.octave + octOff;
-    const note = PIANO_WHITE[nameIdx] + oct;
-    if (pianoKeyHeld.has(e.code)) return;
-    pianoKeyHeld.set(e.code, note);
-    const el = document.querySelector(`#pianoKeys [data-note="${note}"]`);
-    if (el) pianoTrigger(note, el);
-    else midiNoteOnTrigger(note, 100);
-    return;
-  }
-
-  // 黒鍵チェック
-  const bEntry = PIANO_KEY_MAP_BLACK.find(([c]) => c === e.code);
-  if (bEntry) {
+    advanceStepRecCursor(stepLen);
+  } else if (e.key === 'ArrowLeft' || e.key === ',') {
     e.preventDefault();
-    const [, semi, octOff] = bEntry;
-    const oct = pianoState.octave + octOff;
-    const note = PIANO_NOTE_NAMES[semi] + oct;
-    if (pianoKeyHeld.has(e.code)) return;
-    pianoKeyHeld.set(e.code, note);
-    const el = document.querySelector(`#pianoKeys [data-note="${note}"]`);
-    if (el) pianoTrigger(note, el);
-    else midiNoteOnTrigger(note, 100);
-    return;
-  }
-});
-
-document.addEventListener('keyup', (e) => {
-  const tag = document.activeElement?.tagName;
-  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-
-  if (pianoKeyHeld.has(e.code)) {
-    const note = pianoKeyHeld.get(e.code);
-    pianoKeyHeld.delete(e.code);
-    // GUIハイライト解除
-    const el = document.querySelector(`#pianoKeys [data-note="${note}"]`);
-    if (el) el.classList.remove('on');
-    midiNoteOffTrigger(note);
+    if (stepRecCursor > 0) stepRecCursor--;
+    const el = document.getElementById('stepRecCursorInfo');
+    if (el) el.textContent = `STEP: ${stepRecCursor + 1} / ${stepLen}`;
+    highlightStepRecCursor();
+  } else if (e.key === ' ') {
+    // スペース = REST (OFF にして進む)
+    e.preventDefault();
+    const seq = getSeqData();
+    if (seq.samplerSeq && seq.samplerSeq[samplerActivePad]) {
+      seq.samplerSeq[samplerActivePad].on[stepRecCursor] = false;
+    }
+    advanceStepRecCursor(stepLen);
   }
 });
 
