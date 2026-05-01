@@ -1614,7 +1614,7 @@ function initSongMode() {
 
   // CLR
   document.getElementById('songClearBtn').onclick = async () => {
-    if (!await mobileConfirm('SONGをクリアしますか?')) return;
+    // confirm 抑制: SONGクリアは直接実行
     songState.steps = [];
     songState.selectedIdx = -1;
     songState.curSongStep = 0;
@@ -2022,7 +2022,7 @@ function showBankCtx(e, bi) {
   bankCtxMenu.innerHTML = '';
   const items = [
     { label: '🗑 Clear', action: async () => {
-      if (!await mobileConfirm(`Bank ${bi+1} を初期化しますか?`)) return;
+      // confirm 抑制: Bank初期化は直接実行
       state.banks[bi] = { stepLen: 16, beatGroups: [4,4,4,4], seqData: createEmptySeqData(16) };
       if (state.currentBank === bi) renderSeq();
     }},
@@ -2180,7 +2180,7 @@ function renderPcmSeq(content, seq, len, beatHeads) {
   clrBtn.style.fontSize = '8px';
   clrBtn.textContent = 'CLR ALL TRACKS';
   clrBtn.onclick = async () => {
-    if (!await mobileConfirm('全PCMトラックのシーケンスを初期化しますか?')) return;
+    // confirm 抑制: 全PCMトラック初期化は直接実行
     seq.pcm.forEach(tr => {
       tr.on.fill(false); tr.slot.fill(null);
       tr.freq.fill(null); tr.vol.fill(null); tr.pan.fill(null);
@@ -2784,7 +2784,7 @@ function renderSamplerSeq(content, seq, len, beatHeads) {
   const clrBtn = document.createElement('button');
   clrBtn.className = 'btn warn'; clrBtn.style.fontSize = '8px'; clrBtn.textContent = 'SEQCLR ALL';
   clrBtn.onclick = async () => {
-    if (!await mobileConfirm('SAMPLERシーケンス全トラックを初期化しますか?')) return;
+    // confirm 抑制: SAMPLERシーケンス全トラック初期化は直接実行
     seq.samplerSeq.forEach(tr => {
       tr.on.fill(false);
       tr.notes = Array(len).fill(null).map(() => ['C4']);
@@ -3456,7 +3456,7 @@ function showPcmCtxMenu(e, slotIdx) {
       showToast(`Sequencer STEP → ${targetSteps}`, 'ok');
     }});
     items.push({ label: '🗑 CLEAR', action: async () => {
-      if (!await mobileConfirm(`S${slotIdx+1} をクリアしますか?`)) return;
+      // confirm 抑制: スロットクリアは直接実行
       releasePcmSlot(slotIdx);
       renderPcmToneBank();
       if (state.currentSeqTab === 'pcmseq') renderSeq();
@@ -4358,7 +4358,8 @@ async function loadConfig() {
       const text = await file.text();
       const cfg = JSON.parse(text);
       if (cfg._app !== 'ageage90_pcm16') {
-        if (!await mobileConfirm('ageage90_pcm16のCONFIGではない可能性があります。読込を試みますか?')) return;
+        // confirm 抑制: フォーマット不一致でも読込を試みる（Toastで警告のみ）
+        showToast('ageage90_pcm16以外のCONFIGの可能性: 読込を試みます', 'warn', 3000);
       }
       applyConfig(cfg);
       showToast('CONFIG 読込完了', 'ok');
