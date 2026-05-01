@@ -92,12 +92,12 @@
     .steplen-custom-input::-webkit-outer-spin-button { -webkit-appearance: none; }
 
     .note-select {
-      width: 100%; height: 22px; background: #1a1a1a;
+      width: 100%; min-width: 0; height: 22px; background: #1a1a1a;
       color: #ddd; border: 1px solid #333; font-size: 9px;
       font-family: monospace; padding: 0 2px; border-radius: 2px;
     }
     .vol-input, .pan-input, .freq-input, .slot-select {
-      width: 100%; height: 22px; background: #1a1a1a;
+      width: 100%; min-width: 0; height: 22px; background: #1a1a1a;
       color: #ddd; border: 1px solid #333; font-size: 9px;
       font-family: monospace; padding: 0 2px; border-radius: 2px;
     }
@@ -844,6 +844,8 @@ const state = {
   // PCM TONE BANK 64スロット
   pcmToneBank: Array(64).fill(null),
   pcmActiveToneSlot: -1,
+  // PCM登録時のデフォルトサンプリングレート (0 = 元のまま)
+  pcmDefaultSampleRate: 16000,
 };
 
 function createEmptySeqData(stepLen) {
@@ -1179,14 +1181,23 @@ function downsampleBuffer(srcBuf, targetSR) {
   const origSR = srcBuf.sampleRate;
   if (targetSR >= origSR) return srcBuf;
   const ratio = origSR / targetSR;
-  const len = srcBuf.length;
-  const out = audioCtx.createBuffer(srcBuf.numberOfChannels, len, origSR);
+  const srcLen = srcBuf.length;
+  // 出力バッファ長をtargetSRに合わせて縮小し、sampleRateもtargetSRにセット
+  const dstLen = Math.floor(srcLen / ratio);
+  const out = audioCtx.createBuffer(srcBuf.numberOfChannels, dstLen, targetSR);
   for (let ch = 0; ch < srcBuf.numberOfChannels; ch++) {
     const src = srcBuf.getChannelData(ch);
     const dst = out.getChannelData(ch);
-    for (let i = 0; i < len; i++) {
-      const srcIdx = Math.floor(i / ratio) * ratio;
-      dst[i] = src[Math.min(Math.floor(srcIdx), len - 1)];
+    // ボックス平均フィルタで折り返しノイズを抑制してから間引く
+    const halfW = Math.max(1, Math.floor(ratio / 2));
+    for (let i = 0; i < dstLen; i++) {
+      const center = Math.floor(i * ratio);
+      let sum = 0, count = 0;
+      for (let k = -halfW; k <= halfW; k++) {
+        const idx = center + k;
+        if (idx >= 0 && idx < srcLen) { sum += src[idx]; count++; }
+      }
+      dst[i] = count > 0 ? sum / count : 0;
     }
   }
   return out;
@@ -1614,7 +1625,7 @@ function initSongMode() {
 
   // CLR
   document.getElementById('songClearBtn').onclick = async () => {
-    // confirm 抑制: SONGクリアは直接実行
+    if (!await mobileConfirm('SONGをクリアしますか?')) return;
     songState.steps = [];
     songState.selectedIdx = -1;
     songState.curSongStep = 0;
@@ -2022,7 +2033,6 @@ function showBankCtx(e, bi) {
   bankCtxMenu.innerHTML = '';
   const items = [
     { label: '🗑 Clear', action: async () => {
-      // confirm 抑制: Bank初期化は直接実行
       state.banks[bi] = { stepLen: 16, beatGroups: [4,4,4,4], seqData: createEmptySeqData(16) };
       if (state.currentBank === bi) renderSeq();
     }},
@@ -2180,7 +2190,7 @@ function renderPcmSeq(content, seq, len, beatHeads) {
   clrBtn.style.fontSize = '8px';
   clrBtn.textContent = 'CLR ALL TRACKS';
   clrBtn.onclick = async () => {
-    // confirm 抑制: 全PCMトラック初期化は直接実行
+    if (!await mobileConfirm('全PCMトラックのシーケンスを初期化しますか?')) return;
     seq.pcm.forEach(tr => {
       tr.on.fill(false); tr.slot.fill(null);
       tr.freq.fill(null); tr.vol.fill(null); tr.pan.fill(null);
@@ -2784,7 +2794,7 @@ function renderSamplerSeq(content, seq, len, beatHeads) {
   const clrBtn = document.createElement('button');
   clrBtn.className = 'btn warn'; clrBtn.style.fontSize = '8px'; clrBtn.textContent = 'SEQCLR ALL';
   clrBtn.onclick = async () => {
-    // confirm 抑制: SAMPLERシーケンス全トラック初期化は直接実行
+    if (!await mobileConfirm('SAMPLERシーケンス全トラックを初期化しますか?')) return;
     seq.samplerSeq.forEach(tr => {
       tr.on.fill(false);
       tr.notes = Array(len).fill(null).map(() => ['C4']);
@@ -3185,7 +3195,44 @@ function buildPcmBankPanel() {
   };
   hdr.appendChild(clrAllBtn);
 
-  // ===== REC ボタン =====
+  // ===== デフォルトサンプリングレート セレクタ =====
+  const srLabel = document.createElement('span');
+  srLabel.style.cssText = 'font-size:9px;color:#888;margin-left:6px';
+  srLabel.textContent = 'DEF SR:';
+  hdr.appendChild(srLabel);
+
+  const srSel = document.createElement('select');
+  srSel.style.cssText = 'background:#1a1a1a;border:1px solid #555;color:#fc8;font-family:monospace;font-size:9px;padding:2px 4px;border-radius:2px;cursor:pointer';
+  srSel.title = 'PCM登録時のデフォルトサンプリングレート (元のまま=変換なし)';
+  [
+    [0,     '元のまま'],
+    [44100, '44.1k'],
+    [22050, '22.1k'],
+    [16000, '16k'],
+    [11025, '11k'],
+    [8000,  '8k'],
+    [5512,  '5.5k'],
+    [4000,  '4k'],
+  ].forEach(([val, label]) => {
+    const opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = label;
+    if (val === state.pcmDefaultSampleRate) opt.selected = true;
+    srSel.appendChild(opt);
+  });
+  srSel.onchange = () => {
+    state.pcmDefaultSampleRate = parseInt(srSel.value);
+    const txt = state.pcmDefaultSampleRate > 0
+      ? `DEF SR → ${(state.pcmDefaultSampleRate/1000).toFixed(1)}kHz (次回登録から適用)`
+      : 'DEF SR → 元のまま (変換なし)';
+    showToast(txt, 'ok', 2000);
+  };
+  hdr.appendChild(srSel);
+
+  const srHint = document.createElement('span');
+  srHint.style.cssText = 'font-size:8px;color:#555';
+  srHint.textContent = '※次回登録から適用';
+  hdr.appendChild(srHint);
   const recBtn = document.createElement('button');
   recBtn.className = 'rec-btn';
   recBtn.id = 'pcmRecBtn';
@@ -3231,16 +3278,18 @@ function buildPcmBankPanel() {
             const slotSteps = Math.max(1, Math.round(decoded.duration / stepDur));
             const name = `REC${String(slotIdx+1).padStart(2,'0')}`;
             if (state.pcmToneBank[slotIdx]) releasePcmSlot(slotIdx);
+            const _recDefSR = state.pcmDefaultSampleRate > 0 ? Math.min(state.pcmDefaultSampleRate, decoded.sampleRate) : decoded.sampleRate;
             state.pcmToneBank[slotIdx] = {
               rawBuffer: decoded, buffer: null, stretchedBuffer: null,
-              bits: 16, sampleRate: decoded.sampleRate,
-              name, gain: 100, slotSteps,
+              bits: 16, sampleRate: _recDefSR,
+              name, gain: 100, slotSteps, initialSlotSteps: slotSteps,
             };
             applyPcmSlotBits(slotIdx);
             state.pcmActiveToneSlot = slotIdx;
             renderPcmToneBank();
             if (state.currentSeqTab === 'pcmseq') renderSeq();
-            showToast(`S${slotIdx+1} 録音完了: ${decoded.duration.toFixed(2)}s (${slotSteps}steps)`, 'ok', 3000);
+            const _recSrInfo = _recDefSR < decoded.sampleRate ? ` [↓${(_recDefSR/1000).toFixed(1)}k]` : '';
+            showToast(`S${slotIdx+1} 録音完了: ${decoded.duration.toFixed(2)}s (${slotSteps}steps)${_recSrInfo}`, 'ok', 3000);
             // 録音後すぐWAVE編集を開く
             openWaveEditor(slotIdx);
           } catch(err) { showToast('録音デコードエラー: ' + err.message, 'error'); }
@@ -3268,7 +3317,7 @@ function buildPcmBankPanel() {
 
   const desc = document.createElement('div');
   desc.style.cssText = 'font-size:9px;color:#888;margin-bottom:8px';
-  desc.innerHTML = 'クリック=アクティブ選択　右クリック/長押し=メニュー(LOAD/REC/EDIT WAVE/RENAME/STEP/BIT/RATE/GAIN/MATCH STEP/CLEAR)';
+  desc.innerHTML = 'クリック=アクティブ選択　右クリック/長押し=メニュー(LOAD/REC/EDIT WAVE/RENAME/STEP/BIT/RATE/GAIN/MATCH STEP/CLEAR)　DEF SRで登録時のサンプリングレートを設定可能';
   container.appendChild(desc);
 
   // スロットグリッド
@@ -3377,10 +3426,11 @@ function showPcmCtxMenu(e, slotIdx) {
             const slotSteps = Math.max(1, Math.round(decoded.duration / stepDur));
             const name = `REC${String(slotIdx+1).padStart(2,'0')}`;
             if (state.pcmToneBank[slotIdx]) releasePcmSlot(slotIdx);
+            const _ctxRecDefSR = state.pcmDefaultSampleRate > 0 ? Math.min(state.pcmDefaultSampleRate, decoded.sampleRate) : decoded.sampleRate;
             state.pcmToneBank[slotIdx] = {
               rawBuffer: decoded, buffer: null, stretchedBuffer: null,
-              bits: 16, sampleRate: decoded.sampleRate,
-              name, gain: 100, slotSteps,
+              bits: 16, sampleRate: _ctxRecDefSR,
+              name, gain: 100, slotSteps, initialSlotSteps: slotSteps,
             };
             applyPcmSlotBits(slotIdx);
             state.pcmActiveToneSlot = slotIdx;
@@ -3417,6 +3467,14 @@ function showPcmCtxMenu(e, slotIdx) {
         showToast(`S${slotIdx+1} STEPS → ${s}`, 'ok');
       }
     }});
+    if ((slot.initialSlotSteps != null) && slot.slotSteps !== slot.initialSlotSteps) {
+      items.push({ label: `↩ 元のSTEPに戻す (→${slot.initialSlotSteps}step)`, action: () => {
+        slot.slotSteps = slot.initialSlotSteps;
+        applyPcmSlotStretch(slotIdx);
+        renderPcmToneBank();
+        showToast(`S${slotIdx+1} STEPS → ${slot.initialSlotSteps} (元に戻しました)`, 'ok');
+      }});
+    }
     items.push({ label: `🎚 BIT (現:${slot.bits}b)`, action: async () => {
       const nm = await mobilePrompt('ビット深度 (1〜16):', slot.bits);
       if (nm !== null) {
@@ -3456,7 +3514,6 @@ function showPcmCtxMenu(e, slotIdx) {
       showToast(`Sequencer STEP → ${targetSteps}`, 'ok');
     }});
     items.push({ label: '🗑 CLEAR', action: async () => {
-      // confirm 抑制: スロットクリアは直接実行
       releasePcmSlot(slotIdx);
       renderPcmToneBank();
       if (state.currentSeqTab === 'pcmseq') renderSeq();
@@ -3492,21 +3549,24 @@ function openPcmFileDialog(slotIdx) {
         const stepDur = (60 / state.bpm) / 4;
         const slotSteps = Math.max(1, Math.round(buf.duration / stepDur));
         if (state.pcmToneBank[slotIdx]) releasePcmSlot(slotIdx);
+        const _defSR = state.pcmDefaultSampleRate > 0 ? Math.min(state.pcmDefaultSampleRate, buf.sampleRate) : buf.sampleRate;
         state.pcmToneBank[slotIdx] = {
           rawBuffer: buf,
           buffer: null,
           stretchedBuffer: null,
           bits: 16,
-          sampleRate: buf.sampleRate,
+          sampleRate: _defSR,
           name: shortName,
           gain: 100,
           slotSteps,
+          initialSlotSteps: slotSteps,
         };
         applyPcmSlotBits(slotIdx);  // → 内部でapplyPcmSlotStretchも呼ぶ
         state.pcmActiveToneSlot = slotIdx;
         renderPcmToneBank();
         if (state.currentSeqTab === 'pcmseq') renderSeq();
-        showToast(`S${slotIdx+1} に読み込み: ${shortName} (${slotSteps}steps)`, 'ok');
+        const _srInfo = _defSR < buf.sampleRate ? ` [↓${(_defSR/1000).toFixed(1)}k]` : '';
+        showToast(`S${slotIdx+1} に読み込み: ${shortName} (${slotSteps}steps)${_srInfo}`, 'ok');
       }).catch(err => showToast('PCM読み込みエラー: ' + err.message, 'error'));
     };
     reader.readAsArrayBuffer(file);
@@ -4358,8 +4418,7 @@ async function loadConfig() {
       const text = await file.text();
       const cfg = JSON.parse(text);
       if (cfg._app !== 'ageage90_pcm16') {
-        // confirm 抑制: フォーマット不一致でも読込を試みる（Toastで警告のみ）
-        showToast('ageage90_pcm16以外のCONFIGの可能性: 読込を試みます', 'warn', 3000);
+        if (!await mobileConfirm('ageage90_pcm16のCONFIGではない可能性があります。読込を試みますか?')) return;
       }
       applyConfig(cfg);
       showToast('CONFIG 読込完了', 'ok');
@@ -4603,7 +4662,9 @@ async function savePcmToneBank() {
     const slot = state.pcmToneBank[i];
     if (!slot || !slot.rawBuffer) continue;
     try {
-      const wavAb = audioBufToWavAb(slot.rawBuffer);
+      // buffer（ダウンサンプル済み）があればそれを保存してファイルサイズ縮小、なければrawBufferにフォールバック
+      const saveBuf = slot.buffer ?? slot.rawBuffer;
+      const wavAb = audioBufToWavAb(saveBuf);
       const gz = await gzipAb(wavAb);
       const b64 = abToB64(gz);
       slots.push({
@@ -4663,6 +4724,7 @@ async function loadPcmToneBank() {
             bits: s.bits || 16, sampleRate: s.sampleRate || 16000,
             name: s.name || `S${si+1}`, gain: s.gain ?? 100,
             slotSteps: savedSteps ?? calcSteps,
+            initialSlotSteps: savedSteps ?? calcSteps,
           };
           applyPcmSlotBits(si);  // → 内部でapplyPcmSlotStretchも呼ぶ
           loaded++;
