@@ -541,6 +541,29 @@
       pointer-events: none;
     }
 
+    /* ===== WAVE EDITOR FADE ===== */
+    .fade-ctrl-row {
+      display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+      background: #111; border: 1px solid #2a2a2a; border-radius: 3px;
+      padding: 6px 8px;
+    }
+    .fade-ctrl-group {
+      display: flex; align-items: center; gap: 5px; flex: 1; min-width: 160px;
+    }
+    .fade-ctrl-label {
+      font-size: 9px; color: #aaa; min-width: 56px; flex-shrink: 0;
+    }
+    .fade-ctrl-slider {
+      flex: 1; accent-color: #5af;
+    }
+    .fade-ctrl-slider.fade-out-slider { accent-color: #fa5; }
+    .fade-ctrl-val {
+      font-size: 9px; font-family: monospace; min-width: 38px;
+      text-align: right;
+    }
+    .fade-ctrl-val.in  { color: #5af; }
+    .fade-ctrl-val.out { color: #fa5; }
+
     /* ===== PCM SLOT 録音中発光 ===== */
     .pcm-slot.recording-active {
       border-color: #f55 !important;
@@ -3655,6 +3678,47 @@ function openPcmFileDialog(slotIdx) {
 // WAVE EDITOR (トリム / 不要部カット)
 // ============================================================================
 
+// ===== 波形反転 =====
+// 時間軸反転（逆再生）
+function reverseBuffer(audioBuf) {
+  for (let c = 0; c < audioBuf.numberOfChannels; c++) {
+    const data = audioBuf.getChannelData(c);
+    let l = 0, r = data.length - 1;
+    while (l < r) { const t = data[l]; data[l++] = data[r]; data[r--] = t; }
+  }
+}
+// 極性反転（位相反転）
+function invertPolarityBuffer(audioBuf) {
+  for (let c = 0; c < audioBuf.numberOfChannels; c++) {
+    const data = audioBuf.getChannelData(c);
+    for (let i = 0; i < data.length; i++) data[i] = -data[i];
+  }
+}
+
+// ===== フェードイン・フェードアウト適用 =====
+// AudioBuffer の全チャンネルに線形フェードを書き込む
+function applyFadeToBuffer(audioBuf, fadeInSec, fadeOutSec) {
+  const sr = audioBuf.sampleRate;
+  const len = audioBuf.length;
+  const fiSamples = Math.min(Math.floor(fadeInSec  * sr), len);
+  const foSamples = Math.min(Math.floor(fadeOutSec * sr), len);
+
+  // フェードイン + フェードアウトがバッファ長を超えないようクランプ
+  const fiSafe = Math.min(fiSamples, len - foSamples);
+
+  for (let c = 0; c < audioBuf.numberOfChannels; c++) {
+    const data = audioBuf.getChannelData(c);
+    // フェードイン
+    for (let i = 0; i < fiSafe; i++) {
+      data[i] *= i / fiSafe;
+    }
+    // フェードアウト
+    for (let i = 0; i < foSamples; i++) {
+      data[len - 1 - i] *= i / foSamples;
+    }
+  }
+}
+
 function openWaveEditor(slotIdx) {
   const slot = state.pcmToneBank[slotIdx];
   if (!slot || !slot.rawBuffer) { showToast('WAVEデータがありません', 'warn'); return; }
@@ -3667,6 +3731,14 @@ function openWaveEditor(slotIdx) {
   // トリム範囲 (0.0〜1.0の正規化値)
   let trimStart = 0.0;
   let trimEnd   = 1.0;
+
+  // フェード (秒)
+  let fadeInSec  = 0.0;
+  let fadeOutSec = 0.0;
+
+  // 反転フラグ (プレビュー用・適用前の状態)
+  let isReversed  = false; // 時間軸反転
+  let isPolarInv  = false; // 極性反転
 
   // ==== モーダルUI構築 ====
   const bg = document.createElement('div');
@@ -3761,14 +3833,17 @@ function openWaveEditor(slotIdx) {
     // 波形
     const chData = buf.getChannelData(0);
     const step = Math.max(1, Math.floor(totalSamples / W));
-    ctx2.strokeStyle = '#5a8';
+    ctx2.strokeStyle = isPolarInv ? '#f88' : '#5a8';
     ctx2.lineWidth = 1;
     ctx2.beginPath();
     for (let x = 0; x < W; x++) {
-      const idx = Math.floor(x / W * totalSamples);
+      // 逆再生プレビュー: サンプルインデックスを逆順で読む
+      const srcX = isReversed ? (W - 1 - x) : x;
+      const idx = Math.floor(srcX / W * totalSamples);
       let min = 1, max = -1;
       for (let j = 0; j < step; j++) {
-        const v = chData[Math.min(idx + j, totalSamples - 1)];
+        let v = chData[Math.min(idx + j, totalSamples - 1)];
+        if (isPolarInv) v = -v;
         if (v < min) min = v;
         if (v > max) max = v;
       }
@@ -3801,6 +3876,59 @@ function openWaveEditor(slotIdx) {
     rHandle.style.right = `calc(${(1 - trimEnd) * 100}% - 2px)`;
     trimRegion.style.left  = `${trimStart * 100}%`;
     trimRegion.style.width = `${(trimEnd - trimStart) * 100}%`;
+
+    // フェードイン・フェードアウトのオーバーレイ描画
+    const selDurSec = (trimEnd - trimStart) * durationSec;
+    const selStartX = trimStart * W;
+    const selWidth  = (trimEnd - trimStart) * W;
+
+    if (fadeInSec > 0 && selDurSec > 0) {
+      const fiRatio = Math.min(1, fadeInSec / selDurSec);
+      const fiWidth = selWidth * fiRatio;
+      const grad = ctx2.createLinearGradient(selStartX, 0, selStartX + fiWidth, 0);
+      grad.addColorStop(0, 'rgba(80,170,255,0.38)');
+      grad.addColorStop(1, 'rgba(80,170,255,0.0)');
+      ctx2.fillStyle = grad;
+      ctx2.fillRect(selStartX, 0, fiWidth, H);
+      // ラベル
+      ctx2.fillStyle = '#5af';
+      ctx2.font = 'bold 9px monospace';
+      ctx2.textAlign = 'left';
+      ctx2.fillText(`FI ${fadeInSec.toFixed(2)}s`, selStartX + 3, 11);
+    }
+    if (fadeOutSec > 0 && selDurSec > 0) {
+      const foRatio = Math.min(1, fadeOutSec / selDurSec);
+      const foWidth = selWidth * foRatio;
+      const foStartX = selStartX + selWidth - foWidth;
+      const grad2 = ctx2.createLinearGradient(foStartX, 0, foStartX + foWidth, 0);
+      grad2.addColorStop(0, 'rgba(255,170,80,0.0)');
+      grad2.addColorStop(1, 'rgba(255,170,80,0.38)');
+      ctx2.fillStyle = grad2;
+      ctx2.fillRect(foStartX, 0, foWidth, H);
+      // ラベル
+      ctx2.fillStyle = '#fa5';
+      ctx2.font = 'bold 9px monospace';
+      ctx2.textAlign = 'right';
+      ctx2.fillText(`FO ${fadeOutSec.toFixed(2)}s`, selStartX + selWidth - 3, 11);
+    }
+
+    // 反転バッジ
+    const badges = [];
+    if (isReversed) badges.push({ text: '◀ REV', color: '#c8f' });
+    if (isPolarInv) badges.push({ text: '± INV', color: '#f88' });
+    if (badges.length > 0) {
+      ctx2.font = 'bold 9px monospace';
+      ctx2.textAlign = 'right';
+      let bx = W - 5;
+      for (const b of badges) {
+        const tw = ctx2.measureText(b.text).width;
+        ctx2.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx2.fillRect(bx - tw - 4, H - 16, tw + 8, 14);
+        ctx2.fillStyle = b.color;
+        ctx2.fillText(b.text, bx, H - 5);
+        bx -= tw + 14;
+      }
+    }
   }
   drawWaveform();
 
@@ -3833,7 +3961,10 @@ function openWaveEditor(slotIdx) {
     updateInfo();
     e.preventDefault();
   }
-  function onDragEnd() { dragging = null; }
+  function onDragEnd() {
+    if (dragging) syncFadeSliders();
+    dragging = null;
+  }
 
   lHandle.addEventListener('mousedown',  e => onDragStart(e, 'left'));
   rHandle.addEventListener('mousedown',  e => onDragStart(e, 'right'));
@@ -3867,6 +3998,153 @@ function openWaveEditor(slotIdx) {
     window.removeEventListener('touchend',  onDragEnd);
   });
 
+  // ===== フェードイン・フェードアウト コントロール =====
+  const fadeRow = document.createElement('div');
+  fadeRow.className = 'fade-ctrl-row';
+
+  // フェードイン
+  const fiGroup = document.createElement('div');
+  fiGroup.className = 'fade-ctrl-group';
+  const fiLabel = document.createElement('span');
+  fiLabel.className = 'fade-ctrl-label';
+  fiLabel.innerHTML = '<span style="color:#5af">▶</span> FADE IN';
+  const fiSlider = document.createElement('input');
+  fiSlider.type = 'range';
+  fiSlider.className = 'fade-ctrl-slider';
+  fiSlider.min = '0'; fiSlider.max = '100'; fiSlider.step = '1'; fiSlider.value = '0';
+  const fiVal = document.createElement('span');
+  fiVal.className = 'fade-ctrl-val in';
+  fiVal.textContent = '0.00s';
+
+  function getSelDurSec() { return (trimEnd - trimStart) * durationSec; }
+
+  fiSlider.oninput = () => {
+    const selDur = getSelDurSec();
+    fadeInSec = (parseFloat(fiSlider.value) / 100) * selDur;
+    // フェードアウトと合計が選択長を超えないようにクランプ
+    if (fadeInSec + fadeOutSec > selDur) {
+      fadeOutSec = Math.max(0, selDur - fadeInSec);
+      foSlider.value = String(Math.round((fadeOutSec / selDur) * 100));
+      foVal.textContent = fadeOutSec.toFixed(2) + 's';
+    }
+    fiVal.textContent = fadeInSec.toFixed(2) + 's';
+    drawWaveform();
+  };
+  fiGroup.appendChild(fiLabel);
+  fiGroup.appendChild(fiSlider);
+  fiGroup.appendChild(fiVal);
+
+  // フェードアウト
+  const foGroup = document.createElement('div');
+  foGroup.className = 'fade-ctrl-group';
+  const foLabel = document.createElement('span');
+  foLabel.className = 'fade-ctrl-label';
+  foLabel.innerHTML = '<span style="color:#fa5">◀</span> FADE OUT';
+  const foSlider = document.createElement('input');
+  foSlider.type = 'range';
+  foSlider.className = 'fade-ctrl-slider fade-out-slider';
+  foSlider.min = '0'; foSlider.max = '100'; foSlider.step = '1'; foSlider.value = '0';
+  const foVal = document.createElement('span');
+  foVal.className = 'fade-ctrl-val out';
+  foVal.textContent = '0.00s';
+
+  foSlider.oninput = () => {
+    const selDur = getSelDurSec();
+    fadeOutSec = (parseFloat(foSlider.value) / 100) * selDur;
+    if (fadeInSec + fadeOutSec > selDur) {
+      fadeInSec = Math.max(0, selDur - fadeOutSec);
+      fiSlider.value = String(Math.round((fadeInSec / selDur) * 100));
+      fiVal.textContent = fadeInSec.toFixed(2) + 's';
+    }
+    foVal.textContent = fadeOutSec.toFixed(2) + 's';
+    drawWaveform();
+  };
+  foGroup.appendChild(foLabel);
+  foGroup.appendChild(foSlider);
+  foGroup.appendChild(foVal);
+
+  // フェードリセットボタン
+  const fadeResetBtn = document.createElement('button');
+  fadeResetBtn.className = 'btn';
+  fadeResetBtn.style.cssText = 'font-size:8px;padding:2px 7px;flex-shrink:0';
+  fadeResetBtn.textContent = 'FADE RST';
+  fadeResetBtn.onclick = () => {
+    fadeInSec = 0; fadeOutSec = 0;
+    fiSlider.value = '0'; foSlider.value = '0';
+    fiVal.textContent = '0.00s'; foVal.textContent = '0.00s';
+    drawWaveform();
+  };
+
+  fadeRow.appendChild(fiGroup);
+  fadeRow.appendChild(foGroup);
+  fadeRow.appendChild(fadeResetBtn);
+  box.appendChild(fadeRow);
+
+  // ===== 反転コントロール行 =====
+  const invertRow = document.createElement('div');
+  invertRow.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 0';
+
+  const invertLabel = document.createElement('span');
+  invertLabel.style.cssText = 'font-size:9px;color:#888;min-width:52px';
+  invertLabel.textContent = 'REVERSE:';
+  invertRow.appendChild(invertLabel);
+
+  // 時間軸反転ボタン
+  const revBtn = document.createElement('button');
+  revBtn.className = 'btn';
+  revBtn.style.cssText = 'border-color:#a8c;color:#c8f;font-size:9px;padding:2px 9px';
+  revBtn.textContent = '◀ 時間軸反転';
+  revBtn.title = '選択範囲を逆再生（時間軸を反転）';
+  revBtn.onclick = () => {
+    isReversed = !isReversed;
+    revBtn.className = 'btn' + (isReversed ? ' active' : '');
+    revBtn.style.cssText = isReversed
+      ? 'border-color:#c8f;color:#fff;background:#2a1a3a;font-size:9px;padding:2px 9px'
+      : 'border-color:#a8c;color:#c8f;font-size:9px;padding:2px 9px';
+    drawWaveform();
+  };
+  invertRow.appendChild(revBtn);
+
+  // 極性反転ボタン
+  const polarBtn = document.createElement('button');
+  polarBtn.className = 'btn';
+  polarBtn.style.cssText = 'border-color:#a55;color:#f88;font-size:9px;padding:2px 9px';
+  polarBtn.textContent = '± 極性反転';
+  polarBtn.title = '波形の上下を反転（位相反転）';
+  polarBtn.onclick = () => {
+    isPolarInv = !isPolarInv;
+    polarBtn.className = 'btn' + (isPolarInv ? ' active' : '');
+    polarBtn.style.cssText = isPolarInv
+      ? 'border-color:#f88;color:#fff;background:#3a1a1a;font-size:9px;padding:2px 9px'
+      : 'border-color:#a55;color:#f88;font-size:9px;padding:2px 9px';
+    drawWaveform();
+  };
+  invertRow.appendChild(polarBtn);
+
+  const invertTip = document.createElement('span');
+  invertTip.style.cssText = 'font-size:8px;color:#444;margin-left:4px';
+  invertTip.textContent = '※ カット適用・試聴・書き出しに反映';
+  invertRow.appendChild(invertTip);
+
+  box.appendChild(invertRow);
+
+  // スライダーの秒表示をトリム変更時にも同期
+  const origUpdateInfo = updateInfo;
+  // trimStart/trimEnd 変更後に呼ばれる updateInfo をフックして秒値を再計算
+  function syncFadeSliders() {
+    const selDur = getSelDurSec();
+    if (selDur <= 0) { fadeInSec = 0; fadeOutSec = 0; }
+    else {
+      fadeInSec  = Math.min(fadeInSec,  selDur * 0.999);
+      fadeOutSec = Math.min(fadeOutSec, selDur * 0.999 - fadeInSec);
+      if (fadeInSec + fadeOutSec > selDur) fadeOutSec = Math.max(0, selDur - fadeInSec);
+      fiSlider.value = String(Math.round((fadeInSec  / selDur) * 100));
+      foSlider.value = String(Math.round((fadeOutSec / selDur) * 100));
+    }
+    fiVal.textContent = fadeInSec.toFixed(2)  + 's';
+    foVal.textContent = fadeOutSec.toFixed(2) + 's';
+  }
+
   // ===== コントロールボタン行 =====
   const ctrlRow = document.createElement('div');
   ctrlRow.className = 'wave-editor-controls';
@@ -3880,13 +4158,16 @@ function openWaveEditor(slotIdx) {
     const sampleStart = Math.floor(trimStart * totalSamples);
     const sampleLen   = Math.floor((trimEnd - trimStart) * totalSamples);
     if (sampleLen <= 0) return;
-    // 一時バッファ作成
+    // 試聴用バッファ作成 (フェード・反転適用)
     const tmpBuf = audioCtx.createBuffer(buf.numberOfChannels, sampleLen, sr);
     for (let c = 0; c < buf.numberOfChannels; c++) {
       const src = buf.getChannelData(c);
       const dst = tmpBuf.getChannelData(c);
       for (let i = 0; i < sampleLen; i++) dst[i] = src[sampleStart + i];
     }
+    if (isReversed)  reverseBuffer(tmpBuf);
+    if (isPolarInv)  invertPolarityBuffer(tmpBuf);
+    applyFadeToBuffer(tmpBuf, fadeInSec, fadeOutSec);
     const src2 = audioCtx.createBufferSource();
     src2.buffer = tmpBuf;
     src2.connect(audioCtx.destination);
@@ -3924,6 +4205,9 @@ function openWaveEditor(slotIdx) {
       const dst = newBuf.getChannelData(c);
       for (let i = 0; i < sampleLen; i++) dst[i] = src[sampleStart + i];
     }
+    applyFadeToBuffer(newBuf, fadeInSec, fadeOutSec);
+    if (isReversed) reverseBuffer(newBuf);
+    if (isPolarInv) invertPolarityBuffer(newBuf);
 
     slot.rawBuffer = newBuf;
     slot.buffer = null;
@@ -3933,7 +4217,10 @@ function openWaveEditor(slotIdx) {
     applyPcmSlotBits(slotIdx);
     renderPcmToneBank();
     if (state.currentSeqTab === 'pcmseq') renderSeq();
-    showToast(`S${slotIdx+1} カット完了: ${newBuf.duration.toFixed(3)}s`, 'ok', 3000);
+    const fadeDesc = (fadeInSec > 0 || fadeOutSec > 0)
+      ? ` [FI:${fadeInSec.toFixed(2)}s FO:${fadeOutSec.toFixed(2)}s]` : '';
+    const revDesc = [isReversed ? 'REV' : '', isPolarInv ? 'INV' : ''].filter(Boolean).join('+');
+    showToast(`S${slotIdx+1} カット完了: ${newBuf.duration.toFixed(3)}s${fadeDesc}${revDesc ? ' [' + revDesc + ']' : ''}`, 'ok', 3000);
     bg.remove();
   };
   ctrlRow.appendChild(trimApplyBtn);
@@ -3959,6 +4246,9 @@ function openWaveEditor(slotIdx) {
       const s2 = buf.getChannelData(c), d2 = tmpBuf.getChannelData(c);
       for (let i = 0; i < sampleLen; i++) d2[i] = s2[sampleStart + i];
     }
+    applyFadeToBuffer(tmpBuf, fadeInSec, fadeOutSec);
+    if (isReversed) reverseBuffer(tmpBuf);
+    if (isPolarInv) invertPolarityBuffer(tmpBuf);
     downloadWav(tmpBuf, `${slot.name}_trim.wav`);
     showToast('WAV書き出し完了', 'ok');
   };
