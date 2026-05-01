@@ -100,11 +100,26 @@
       width: 100%; min-width: 0; height: 22px; background: #1a1a1a;
       color: #ddd; border: 1px solid #333; font-size: 9px;
       font-family: monospace; padding: 0 2px; border-radius: 2px;
+      -moz-appearance: textfield;
     }
+    /* spinボタン除去: FREQ/VOL/S-REV/S-DIST/S-COMP の number入力 */
+    .vol-input::-webkit-inner-spin-button, .vol-input::-webkit-outer-spin-button,
+    .freq-input::-webkit-inner-spin-button, .freq-input::-webkit-outer-spin-button { -webkit-appearance: none; }
     .vol-input.active { border-color: #5a8; color: #afe; }
     .pan-input.active { border-color: #58a; color: #aef; }
     .freq-input.active { border-color: #c80; color: #fc8; }
     .slot-select.active { border-color: #c80; color: #fc8; }
+    /* PAN プルダウン (select要素) */
+    .pan-select {
+      width: 100%; min-width: 0; height: 22px; background: #1a1a1a;
+      color: #ddd; border: 1px solid #333; font-size: 9px;
+      font-family: monospace; padding: 0 2px; border-radius: 2px;
+    }
+    .pan-select.active { border-color: #58a; color: #aef; }
+    /* FILLコントロール数値入力: spinボタン除去 */
+    input.fill-num-inp { -moz-appearance: textfield; }
+    input.fill-num-inp::-webkit-inner-spin-button,
+    input.fill-num-inp::-webkit-outer-spin-button { -webkit-appearance: none; }
 
     /* ===== MIXER ===== */
     .mixer-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; }
@@ -256,6 +271,7 @@
 
     /* PCM Track row separator */
     .track-group-sep {
+      grid-column: 1 / -1; height: 1px; background: #333; margin: 3px 0;
       grid-column: 1 / -1; height: 1px; background: #333; margin: 3px 0;
     }
 
@@ -825,8 +841,8 @@ const state = {
   subActiveTone: -1,
   // FX
   fx: {
-    delayFb: 30, delayWet: 0,
-    chorusRate: 30, chorusDepth: 0, chorusWet: 0,
+    delayFb: 30,
+    chorusRate: 30, chorusDepth: 0,
     djFilterFreq: 20000, djFilterType: 'lowpass', djFilterRes: 1,
     delaySync: '3',  // 1=4分, 2=8分, 3=16分, 4=付点8分
     // Reverb
@@ -836,10 +852,10 @@ const state = {
     // Compressor
     compThresh: -24, compRatio: 4, compAttack: 0.003, compRelease: 0.25, compWet: 0,
   },
-  // ミキサー: SUB + PCM 16ch  (sendRev/sendDist/sendComp: 0〜100%)
+  // ミキサー: SUB + PCM 16ch  (sendRev/sendDist/sendComp/sendDly/sendChr: 0〜100%)
   mix: {
-    sub: 80, panSub: 0, sendRevSub: 0, sendDistSub: 0, sendCompSub: 0,
-    pcm: Array(16).fill(null).map(() => ({ vol: 80, pan: 0, sendRev: 0, sendDist: 0, sendComp: 0 }))
+    sub: 80, panSub: 0, sendRevSub: 0, sendDistSub: 0, sendCompSub: 0, sendDlySub: 0, sendChrSub: 0,
+    pcm: Array(16).fill(null).map(() => ({ vol: 80, pan: 0, sendRev: 0, sendDist: 0, sendComp: 0, sendDly: 0, sendChr: 0 }))
   },
   // PCM TONE BANK 64スロット
   pcmToneBank: Array(64).fill(null),
@@ -906,8 +922,8 @@ function getStepLen() { return state.banks[state.currentBank].stepLen; }
 
 // ===== AUDIO =====
 let audioCtx = null, masterGainNode = null, masterFilter = null;
-let delayNode = null, delayFb = null, delayWet = null;
-let chorusDelay = null, chorusLfo = null, chorusDepthGain = null, chorusWet = null;
+let delayNode = null, delayFb = null;
+let chorusDelay = null, chorusLfo = null, chorusDepthGain = null;
 // Reverb
 let reverbConv = null, reverbWetGain = null;
 // Distortion
@@ -916,6 +932,7 @@ let distShaper = null, distWetGain = null, distToneFilter = null;
 let compressor = null, compWetGain = null;
 // FX Bus: ソース側からセンドする先のGainノード（常時alive）
 let fxBusRev = null, fxBusDist = null, fxBusComp = null;
+let fxBusDly = null, fxBusChr = null;
 const activePcmSources = new Set();
 // PCM トラックごとにアクティブなソースを追跡（タイミング正確な停止用）
 const activePcmSourcesByTrack = Array(16).fill(null).map(() => new Set());
@@ -1040,8 +1057,9 @@ function initAudio() {
   delayNode.delayTime.value = getDelaySeconds();
   delayFb = audioCtx.createGain();
   delayFb.gain.value = state.fx.delayFb / 100;
-  delayWet = audioCtx.createGain();
-  delayWet.gain.value = state.fx.delayWet / 100;
+  // Delay出力はdestinationへ直結（wetゲインは廃止→センド量で制御）
+  const delayOutGain = audioCtx.createGain();
+  delayOutGain.gain.value = 1.0;
 
   chorusDelay = audioCtx.createDelay(0.05);
   chorusDelay.delayTime.value = 0.020;
@@ -1049,8 +1067,9 @@ function initAudio() {
   chorusLfo.frequency.value = state.fx.chorusRate / 10;
   chorusDepthGain = audioCtx.createGain();
   chorusDepthGain.gain.value = state.fx.chorusDepth / 1000;
-  chorusWet = audioCtx.createGain();
-  chorusWet.gain.value = state.fx.chorusWet / 100;
+  // Chorus出力もdestinationへ直結（wetゲインは廃止→センド量で制御）
+  const chorusOutGain = audioCtx.createGain();
+  chorusOutGain.gain.value = 1.0;
 
   // ===== REVERB =====
   // ConvolverNode + 合成インパルス応答
@@ -1083,26 +1102,33 @@ function initAudio() {
   fxBusRev  = audioCtx.createGain(); fxBusRev.gain.value = 1;
   fxBusDist = audioCtx.createGain(); fxBusDist.gain.value = 1;
   fxBusComp = audioCtx.createGain(); fxBusComp.gain.value = 1;
+  fxBusDly  = audioCtx.createGain(); fxBusDly.gain.value = 1;
+  fxBusChr  = audioCtx.createGain(); fxBusChr.gain.value = 1;
 
   // Routing:
   // [source] → masterGainNode → masterFilter → dest
-  //                                           → delay loop → delayWet → dest
-  //                                           → chorusDelay → chorusWet → dest
-  // [source] --(sendGain)-→ fxBusRev → reverbConv → reverbWetGain → dest
-  // [source] --(sendGain)-→ fxBusDist → distShaper → distToneFilter → distWetGain → dest
-  // [source] --(sendGain)-→ fxBusComp → compressor → compWetGain → dest
+  //
+  // [source] --(sendDlyGain)-→ fxBusDly → delayNode ⇄ delayFb(loop) → delayOutGain → dest
+  // [source] --(sendChrGain)-→ fxBusChr → chorusDelay → chorusOutGain → dest
+  // [source] --(sendGain)---→ fxBusRev  → reverbConv → reverbWetGain → dest
+  // [source] --(sendGain)---→ fxBusDist → distShaper → distToneFilter → distWetGain → dest
+  // [source] --(sendGain)---→ fxBusComp → compressor → compWetGain → dest
   masterGainNode.connect(masterFilter);
   masterFilter.connect(audioCtx.destination);
-  masterFilter.connect(delayNode);
+
+  // Delay send bus
+  fxBusDly.connect(delayNode);
   delayNode.connect(delayFb);
   delayFb.connect(delayNode);
-  delayNode.connect(delayWet);
-  delayWet.connect(audioCtx.destination);
-  masterFilter.connect(chorusDelay);
+  delayNode.connect(delayOutGain);
+  delayOutGain.connect(audioCtx.destination);
+
+  // Chorus send bus
+  fxBusChr.connect(chorusDelay);
   chorusLfo.connect(chorusDepthGain);
   chorusDepthGain.connect(chorusDelay.delayTime);
-  chorusDelay.connect(chorusWet);
-  chorusWet.connect(audioCtx.destination);
+  chorusDelay.connect(chorusOutGain);
+  chorusOutGain.connect(audioCtx.destination);
 
   // Reverb bus
   fxBusRev.connect(reverbConv);
@@ -1320,6 +1346,8 @@ function playSubtractive(freq, vol, when, tie, dur, portaMs) {
   if (fxBusRev)  { const sg = audioCtx.createGain(); sg.gain.value = (state.mix.sendRevSub ?? 0) / 100;  panner.connect(sg); sg.connect(fxBusRev); }
   if (fxBusDist) { const sg = audioCtx.createGain(); sg.gain.value = (state.mix.sendDistSub ?? 0) / 100; panner.connect(sg); sg.connect(fxBusDist); }
   if (fxBusComp) { const sg = audioCtx.createGain(); sg.gain.value = (state.mix.sendCompSub ?? 0) / 100; panner.connect(sg); sg.connect(fxBusComp); }
+  if (fxBusDly)  { const sg = audioCtx.createGain(); sg.gain.value = (state.mix.sendDlySub ?? 0) / 100;  panner.connect(sg); sg.connect(fxBusDly); }
+  if (fxBusChr)  { const sg = audioCtx.createGain(); sg.gain.value = (state.mix.sendChrSub ?? 0) / 100;  panner.connect(sg); sg.connect(fxBusChr); }
   osc.start(when); osc.stop(when + noteLen + R + 60);
   activeSubNode = { osc, gn, filt, sustainGain: v * S, releaseAt: when + noteLen };
 }
@@ -1374,6 +1402,8 @@ function playPCM(trackIdx, when, slotIdx, playFreq, vol, pan) {
   if (fxBusRev  && mixCh) { const sg = audioCtx.createGain(); sg.gain.value = (mixCh.sendRev  ?? 0) / 100; panner.connect(sg); sg.connect(fxBusRev); }
   if (fxBusDist && mixCh) { const sg = audioCtx.createGain(); sg.gain.value = (mixCh.sendDist ?? 0) / 100; panner.connect(sg); sg.connect(fxBusDist); }
   if (fxBusComp && mixCh) { const sg = audioCtx.createGain(); sg.gain.value = (mixCh.sendComp ?? 0) / 100; panner.connect(sg); sg.connect(fxBusComp); }
+  if (fxBusDly  && mixCh) { const sg = audioCtx.createGain(); sg.gain.value = (mixCh.sendDly  ?? 0) / 100; panner.connect(sg); sg.connect(fxBusDly); }
+  if (fxBusChr  && mixCh) { const sg = audioCtx.createGain(); sg.gain.value = (mixCh.sendChr  ?? 0) / 100; panner.connect(sg); sg.connect(fxBusChr); }
   
   src.onended = () => {
     activePcmSources.delete(src);
@@ -1710,11 +1740,6 @@ function scheduleStep() {
 
     // ===== FX シーケンス適用 =====
     const fxSeq = seq.fxSeq;
-    if (fxSeq.delayWet.on[step]) {
-      const v = fxSeq.delayWet.vals[step];
-      state.fx.delayWet = v;
-      if (delayWet) delayWet.gain.setValueAtTime(v / 100, swungTime);
-    }
     if (fxSeq.delayFb.on[step]) {
       const v = fxSeq.delayFb.vals[step];
       state.fx.delayFb = v;
@@ -1729,11 +1754,6 @@ function scheduleStep() {
       const v = fxSeq.chorusDepth.vals[step];
       state.fx.chorusDepth = v;
       if (chorusDepthGain) chorusDepthGain.gain.setValueAtTime(v / 1000, swungTime);
-    }
-    if (fxSeq.chorusWet.on[step]) {
-      const v = fxSeq.chorusWet.vals[step];
-      state.fx.chorusWet = v;
-      if (chorusWet) chorusWet.gain.setValueAtTime(v / 100, swungTime);
     }
     if (fxSeq.djFreq.on[step]) {
       const v = fxSeq.djFreq.vals[step];
@@ -2230,68 +2250,102 @@ function renderPcmTrack(parent, seq, t, len, beatHeads) {
   trName.textContent = `PCM ${(t+1).toString().padStart(2, '0')}`;
   hdr.appendChild(trName);
 
-  // VOL/PAN/REV/DIST/COMP/CLR をまとめるサブコンテナ（幅不足時に折り返す単位）
+  // FILL/CLR をまとめるサブコンテナ
   const ctrlWrap = document.createElement('span');
   ctrlWrap.style.cssText = 'display:flex;align-items:center;gap:4px;flex-wrap:wrap';
 
-  // VOL slider (track default)
-  const volWrap = document.createElement('span');
-  volWrap.style.cssText = 'display:flex;align-items:center;gap:3px';
-  volWrap.innerHTML = `<span style="color:#888">VOL</span>`;
-  const volSlider = document.createElement('input');
-  volSlider.type = 'range'; volSlider.min = 0; volSlider.max = 100;
-  volSlider.value = state.mix.pcm[t].vol; volSlider.style.width = '70px';
-  const volVal = document.createElement('span');
-  volVal.style.cssText = 'color:#afe;min-width:24px';
-  volVal.textContent = state.mix.pcm[t].vol;
-  volSlider.oninput = (e) => {
-    state.mix.pcm[t].vol = parseInt(e.target.value);
-    volVal.textContent = state.mix.pcm[t].vol;
+  // ---- FILL ボタン群 ----
+  // 共通: 入力欄に値を入れてFILL
+  // FILL VOL
+  const fillVolWrap = document.createElement('span');
+  fillVolWrap.style.cssText = 'display:flex;align-items:center;gap:2px';
+  fillVolWrap.innerHTML = `<span style="color:#afe;font-size:8px">VOL</span>`;
+  const fillVolInp = document.createElement('input');
+  fillVolInp.type = 'number'; fillVolInp.min = 0; fillVolInp.max = 100;
+  fillVolInp.value = state.mix.pcm[t].vol;
+  fillVolInp.className = 'fill-num-inp';
+  fillVolInp.style.cssText = 'width:38px;background:#1a1a1a;border:1px solid #3a4a3a;color:#afe;font-family:monospace;font-size:8px;padding:1px 3px;border-radius:2px;-moz-appearance:textfield';
+  fillVolInp.setAttribute('style', fillVolInp.getAttribute('style') + ';-webkit-appearance:none');
+  const fillVolBtn = document.createElement('button');
+  fillVolBtn.className = 'btn';
+  fillVolBtn.style.cssText = 'font-size:8px;padding:1px 5px;border-color:#3a4a3a;color:#afe';
+  fillVolBtn.textContent = 'FILL';
+  fillVolBtn.onclick = () => {
+    const v = parseInt(fillVolInp.value);
+    if (isNaN(v)) return;
+    const val = Math.max(0, Math.min(100, v));
+    tr.vol.fill(val);
+    state.mix.pcm[t].vol = val;
+    renderSeq();
   };
-  volWrap.appendChild(volSlider); volWrap.appendChild(volVal);
-  ctrlWrap.appendChild(volWrap);
+  fillVolWrap.appendChild(fillVolInp); fillVolWrap.appendChild(fillVolBtn);
+  ctrlWrap.appendChild(fillVolWrap);
 
-  // PAN slider
-  const panWrap = document.createElement('span');
-  panWrap.style.cssText = 'display:flex;align-items:center;gap:3px';
-  panWrap.innerHTML = `<span style="color:#888">PAN</span>`;
-  const panSlider = document.createElement('input');
-  panSlider.type = 'range'; panSlider.min = -100; panSlider.max = 100;
-  panSlider.value = state.mix.pcm[t].pan; panSlider.style.width = '70px';
-  const panVal = document.createElement('span');
-  panVal.style.cssText = 'color:#aef;min-width:30px';
-  panVal.textContent = state.mix.pcm[t].pan;
-  panSlider.oninput = (e) => {
-    state.mix.pcm[t].pan = parseInt(e.target.value);
-    panVal.textContent = state.mix.pcm[t].pan;
-  };
-  panWrap.appendChild(panSlider); panWrap.appendChild(panVal);
-  ctrlWrap.appendChild(panWrap);
-
-  // FX SENDS
-  const sendDefs = [
-    { key: 'sendRev',  label: 'REV',  color: '#a8f' },
-    { key: 'sendDist', label: 'DIST', color: '#fa8' },
-    { key: 'sendComp', label: 'COMP', color: '#8af' },
+  // FILL PAN (プルダウン)
+  const fillPanWrap = document.createElement('span');
+  fillPanWrap.style.cssText = 'display:flex;align-items:center;gap:2px';
+  fillPanWrap.innerHTML = `<span style="color:#aef;font-size:8px">PAN</span>`;
+  const fillPanSel = document.createElement('select');
+  fillPanSel.style.cssText = 'background:#1a1a1a;border:1px solid #2a3a4a;color:#aef;font-family:monospace;font-size:8px;padding:1px 2px;border-radius:2px;height:20px';
+  const panOptions = [
+    {label:'L100', val:-100},{label:'L75', val:-75},{label:'L50', val:-50},
+    {label:'L25', val:-25},{label:'L10', val:-10},{label:'C', val:0},
+    {label:'R10', val:10},{label:'R25', val:25},{label:'R50', val:50},
+    {label:'R75', val:75},{label:'R100', val:100}
   ];
-  sendDefs.forEach(def => {
-    const sw = document.createElement('span');
-    sw.style.cssText = 'display:flex;align-items:center;gap:2px';
-    const sl = document.createElement('span');
-    sl.style.cssText = `color:${def.color};font-size:8px;min-width:26px`;
-    sl.textContent = def.label;
-    const si = document.createElement('input');
-    si.type = 'range'; si.min = 0; si.max = 100;
-    si.value = state.mix.pcm[t][def.key] ?? 0; si.style.width = '50px';
-    const sv = document.createElement('span');
-    sv.style.cssText = `color:${def.color};font-size:8px;min-width:20px`;
-    sv.textContent = state.mix.pcm[t][def.key] ?? 0;
-    si.oninput = (e) => {
-      state.mix.pcm[t][def.key] = parseInt(e.target.value);
-      sv.textContent = state.mix.pcm[t][def.key];
+  const curPan = state.mix.pcm[t].pan;
+  panOptions.forEach(po => {
+    const opt = document.createElement('option');
+    opt.value = po.val; opt.textContent = po.label;
+    if (po.val === curPan) opt.selected = true;
+    fillPanSel.appendChild(opt);
+  });
+  const fillPanBtn = document.createElement('button');
+  fillPanBtn.className = 'btn';
+  fillPanBtn.style.cssText = 'font-size:8px;padding:1px 5px;border-color:#2a3a4a;color:#aef';
+  fillPanBtn.textContent = 'FILL';
+  fillPanBtn.onclick = () => {
+    const v = parseInt(fillPanSel.value);
+    tr.pan.fill(v);
+    state.mix.pcm[t].pan = v;
+    renderSeq();
+  };
+  fillPanWrap.appendChild(fillPanSel); fillPanWrap.appendChild(fillPanBtn);
+  ctrlWrap.appendChild(fillPanWrap);
+
+  // FILL REV / DIST / COMP
+  const fillSendDefs = [
+    { key: 'sendRev',  seqKey: 'sendRev',  label: 'REV',  color: '#a8f' },
+    { key: 'sendDist', seqKey: 'sendDist', label: 'DIST', color: '#fa8' },
+    { key: 'sendComp', seqKey: 'sendComp', label: 'COMP', color: '#8af' },
+  ];
+  fillSendDefs.forEach(def => {
+    const fw = document.createElement('span');
+    fw.style.cssText = 'display:flex;align-items:center;gap:2px';
+    const fl = document.createElement('span');
+    fl.style.cssText = `color:${def.color};font-size:8px`;
+    fl.textContent = def.label;
+    const fi = document.createElement('input');
+    fi.type = 'number'; fi.min = 0; fi.max = 100;
+    fi.value = state.mix.pcm[t][def.key] ?? 0;
+    fi.className = 'fill-num-inp';
+    fi.style.cssText = `width:34px;background:#1a1a1a;border:1px solid ${def.color}44;color:${def.color};font-family:monospace;font-size:8px;padding:1px 3px;border-radius:2px;-moz-appearance:textfield`;
+    const fb = document.createElement('button');
+    fb.className = 'btn';
+    fb.style.cssText = `font-size:8px;padding:1px 5px;border-color:${def.color}66;color:${def.color}`;
+    fb.textContent = 'FILL';
+    fb.onclick = () => {
+      const v = parseInt(fi.value);
+      if (isNaN(v)) return;
+      const val = Math.max(0, Math.min(100, v));
+      const sendData = tr[def.seqKey];
+      sendData.vals.fill(val);
+      sendData.on.fill(true);
+      state.mix.pcm[t][def.key] = val;
+      renderSeq();
     };
-    sw.appendChild(sl); sw.appendChild(si); sw.appendChild(sv);
-    ctrlWrap.appendChild(sw);
+    fw.appendChild(fl); fw.appendChild(fi); fw.appendChild(fb);
+    ctrlWrap.appendChild(fw);
   });
 
   // CLR
@@ -2302,6 +2356,9 @@ function renderPcmTrack(parent, seq, t, len, beatHeads) {
   clrTrBtn.onclick = () => {
     tr.on.fill(false); tr.slot.fill(null);
     tr.freq.fill(null); tr.vol.fill(null); tr.pan.fill(null);
+    tr.sendRev.vals.fill(null); tr.sendRev.on.fill(false);
+    tr.sendDist.vals.fill(null); tr.sendDist.on.fill(false);
+    tr.sendComp.vals.fill(null); tr.sendComp.on.fill(false);
     renderSeq();
   };
   ctrlWrap.appendChild(clrTrBtn);
@@ -2415,7 +2472,7 @@ function renderPcmTrack(parent, seq, t, len, beatHeads) {
     }
     trackBox.appendChild(volRow);
 
-    // PAN
+    // PAN (プルダウン: L100〜C〜R100 5刻み)
     const panRow = document.createElement('div');
     panRow.className = 'seq-grid-custom';
     const panLbl = document.createElement('div');
@@ -2423,19 +2480,40 @@ function renderPcmTrack(parent, seq, t, len, beatHeads) {
     panLbl.style.cssText = 'font-size:8px;color:#aef';
     panLbl.textContent = 'PAN';
     panRow.appendChild(panLbl);
+    const panOpts = [
+      {label:'─',   val:null},
+      {label:'L100', val:-100},{label:'L95', val:-95},{label:'L90', val:-90},
+      {label:'L85', val:-85},{label:'L80', val:-80},{label:'L75', val:-75},
+      {label:'L70', val:-70},{label:'L65', val:-65},{label:'L60', val:-60},
+      {label:'L55', val:-55},{label:'L50', val:-50},{label:'L45', val:-45},
+      {label:'L40', val:-40},{label:'L35', val:-35},{label:'L30', val:-30},
+      {label:'L25', val:-25},{label:'L20', val:-20},{label:'L15', val:-15},
+      {label:'L10', val:-10},{label:'L5',  val:-5}, {label:'C',   val:0},
+      {label:'R5',  val:5},  {label:'R10', val:10},{label:'R15', val:15},
+      {label:'R20', val:20},{label:'R25', val:25},{label:'R30', val:30},
+      {label:'R35', val:35},{label:'R40', val:40},{label:'R45', val:45},
+      {label:'R50', val:50},{label:'R55', val:55},{label:'R60', val:60},
+      {label:'R65', val:65},{label:'R70', val:70},{label:'R75', val:75},
+      {label:'R80', val:80},{label:'R85', val:85},{label:'R90', val:90},
+      {label:'R95', val:95},{label:'R100', val:100}
+    ];
     for (let i = 0; i < len; i++) {
-      const inp = document.createElement('input');
-      inp.type = 'number'; inp.min = -100; inp.max = 100;
-      inp.placeholder = '─';
-      inp.value = tr.pan[i] != null ? tr.pan[i] : '';
-      inp.className = 'pan-input' + (tr.pan[i] != null ? ' active' : '');
-      applyStepBorder(inp, i, beatHeads);
-      inp.onchange = (e) => {
-        const v = e.target.value.trim();
-        tr.pan[i] = v === '' ? null : Math.max(-100, Math.min(100, parseInt(v)));
-        inp.classList.toggle('active', tr.pan[i] != null);
+      const sel = document.createElement('select');
+      sel.className = 'pan-select' + (tr.pan[i] != null ? ' active' : '');
+      applyStepBorder(sel, i, beatHeads);
+      panOpts.forEach(po => {
+        const opt = document.createElement('option');
+        opt.value = po.val === null ? '' : po.val;
+        opt.textContent = po.label;
+        if (po.val === tr.pan[i]) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.onchange = (e) => {
+        const v = e.target.value;
+        tr.pan[i] = v === '' ? null : parseInt(v);
+        sel.classList.toggle('active', tr.pan[i] != null);
       };
-      panRow.appendChild(inp);
+      panRow.appendChild(sel);
     }
     trackBox.appendChild(panRow);
 
@@ -2461,7 +2539,8 @@ function renderPcmTrack(parent, seq, t, len, beatHeads) {
         valInp.placeholder = '─';
         valInp.value = sendData.vals[i] != null ? sendData.vals[i] : '';
         valInp.className = 'vol-input' + (sendData.vals[i] != null ? ' active' : '');
-        valInp.style.cssText = `font-size:7px;height:26px;border-color:${def.color}44;width:100%`;
+        valInp.style.cssText = `font-size:7px;height:26px;border-color:${def.color}44;width:100%;-moz-appearance:textfield`;
+        valInp.style.setProperty('-webkit-appearance', 'none');
         applyStepBorder(valInp, i, beatHeads);
         valInp.onchange = (e) => {
           const v = e.target.value.trim();
@@ -3100,15 +3179,13 @@ function renderSamplerSeq(content, seq, len, beatHeads) {
 function renderFxSeq(content, seq, len, beatHeads) {
   const desc = document.createElement('div');
   desc.style.cssText = 'font-size:9px;color:#aaa;margin-bottom:6px;padding:3px 6px;border-left:2px solid #58a;background:#101a20';
-  desc.innerHTML = '<b>FX Sequencer (GLOBAL)</b> &nbsp;|&nbsp; ステップごとにグローバルFXパラメータを自動化。チャンネル別センド量は PCM SEQ / SUB SEQ 内で設定。';
+  desc.innerHTML = '<b>FX Sequencer (GLOBAL)</b> &nbsp;|&nbsp; ステップごとにグローバルFXパラメータを自動化。Delay/Chorus送り量はミキサーのセンド (Y/H) で各チャンネルごとに設定。';
   content.appendChild(desc);
 
   const fxDefs = [
-    { key: 'delayWet',   label: 'DLY-WET',  min: 0,   max: 100,   color: '#aef' },
     { key: 'delayFb',    label: 'DLY-FB',   min: 0,   max: 95,    color: '#aef' },
     { key: 'chorusRate', label: 'CHR-RATE', min: 1,   max: 200,   color: '#fc8' },
     { key: 'chorusDepth',label: 'CHR-DEP',  min: 0,   max: 100,   color: '#fc8' },
-    { key: 'chorusWet',  label: 'CHR-WET',  min: 0,   max: 100,   color: '#fc8' },
     { key: 'djFreq',     label: 'FILT-Hz',  min: 100, max: 20000, color: '#5a8' },
     { key: 'djRes',      label: 'FILT-Q',   min: 0,   max: 30,    color: '#5a8' },
     { key: 'revWet',     label: 'REV-WET',  min: 0,   max: 100,   color: '#a8f' },
@@ -4199,7 +4276,6 @@ function buildFxPanel() {
 
   // ===== DELAY =====
   const dlyBox = makeFxSection('DELAY');
-  dlyBox.appendChild(makeFxSlider('DLY-WET', 'delayWet', 0, 100, 1, '%', v => { if (delayWet) delayWet.gain.value = v / 100; }));
   dlyBox.appendChild(makeFxSlider('DLY-FB', 'delayFb', 0, 95, 1, '%', v => { if (delayFb) delayFb.gain.value = v / 100; }));
   const dsRow = makeSubRow('DLY-SYNC');
   const dsSel = document.createElement('select');
@@ -4216,7 +4292,6 @@ function buildFxPanel() {
   const chrBox = makeFxSection('CHORUS');
   chrBox.appendChild(makeFxSlider('CHR-RATE', 'chorusRate', 1, 200, 1, '/10Hz', v => { if (chorusLfo) chorusLfo.frequency.value = v / 10; }));
   chrBox.appendChild(makeFxSlider('CHR-DEP', 'chorusDepth', 0, 100, 1, '', v => { if (chorusDepthGain) chorusDepthGain.gain.value = v / 1000; }));
-  chrBox.appendChild(makeFxSlider('CHR-WET', 'chorusWet', 0, 100, 1, '%', v => { if (chorusWet) chorusWet.gain.value = v / 100; }));
   container.appendChild(chrBox);
 
   // ===== REVERB =====
@@ -4263,7 +4338,7 @@ function buildFxPanel() {
   mixWrap.style.cssText = 'margin-top:12px';
   const mh = document.createElement('div');
   mh.className = 'small-title';
-  mh.innerHTML = 'MIXER <span style="font-size:8px;color:#888;font-weight:normal">(VOL / PAN / <span style="color:#a8f">REV</span> / <span style="color:#fa8">DIST</span> / <span style="color:#8af">COMP</span> send%)</span>';
+  mh.innerHTML = 'MIXER <span style="font-size:8px;color:#888;font-weight:normal">(VOL / PAN / <span style="color:#a8f">REV</span> / <span style="color:#fa8">DIST</span> / <span style="color:#8af">COMP</span> / <span style="color:#aef">DLY</span> / <span style="color:#fc8">CHR</span> send%)</span>';
   mixWrap.appendChild(mh);
 
   const mixScrollWrap = document.createElement('div');
@@ -4274,13 +4349,15 @@ function buildFxPanel() {
 
   // SUB
   mixRow.appendChild(makeMixerCh('SUB',
-    { vol: state.mix.sub, pan: state.mix.panSub, sendRev: state.mix.sendRevSub, sendDist: state.mix.sendDistSub, sendComp: state.mix.sendCompSub },
+    { vol: state.mix.sub, pan: state.mix.panSub, sendRev: state.mix.sendRevSub, sendDist: state.mix.sendDistSub, sendComp: state.mix.sendCompSub, sendDly: state.mix.sendDlySub, sendChr: state.mix.sendChrSub },
     (k,v) => {
       if (k === 'vol')  state.mix.sub = v;
       if (k === 'pan')  state.mix.panSub = v;
       if (k === 'sendRev')  state.mix.sendRevSub = v;
       if (k === 'sendDist') state.mix.sendDistSub = v;
       if (k === 'sendComp') state.mix.sendCompSub = v;
+      if (k === 'sendDly')  state.mix.sendDlySub = v;
+      if (k === 'sendChr')  state.mix.sendChrSub = v;
     }
   ));
 
@@ -4341,6 +4418,8 @@ function makeMixerCh(name, vals, onChange) {
     { key: 'sendRev',  label: 'R', min:  0, max: 100, color: '#a8f' },
     { key: 'sendDist', label: 'D', min:  0, max: 100, color: '#fa8' },
     { key: 'sendComp', label: 'C', min:  0, max: 100, color: '#8af' },
+    { key: 'sendDly',  label: 'Dy', min:  0, max: 100, color: '#aef', title: 'Delay Send' },
+    { key: 'sendChr',  label: 'Ch', min:  0, max: 100, color: '#fc8', title: 'Chorus Send' },
   ];
 
   defs.forEach(def => {
@@ -4349,6 +4428,7 @@ function makeMixerCh(name, vals, onChange) {
     const lbl = document.createElement('span');
     lbl.style.cssText = `color:${def.color};font-size:8px;min-width:9px`;
     lbl.textContent = def.label;
+    if (def.title) lbl.title = def.title;
     const inp = document.createElement('input');
     inp.type = 'range'; inp.min = def.min; inp.max = def.max;
     inp.value = vals[def.key] ?? 0;
@@ -4532,6 +4612,8 @@ function applyConfig(cfg) {
     if (cfg.mix.sendRevSub  != null) state.mix.sendRevSub  = cfg.mix.sendRevSub;
     if (cfg.mix.sendDistSub != null) state.mix.sendDistSub = cfg.mix.sendDistSub;
     if (cfg.mix.sendCompSub != null) state.mix.sendCompSub = cfg.mix.sendCompSub;
+    if (cfg.mix.sendDlySub  != null) state.mix.sendDlySub  = cfg.mix.sendDlySub;
+    if (cfg.mix.sendChrSub  != null) state.mix.sendChrSub  = cfg.mix.sendChrSub;
     if (Array.isArray(cfg.mix.pcm)) {
       for (let i = 0; i < 16 && i < cfg.mix.pcm.length; i++) {
         if (cfg.mix.pcm[i]) Object.assign(state.mix.pcm[i], cfg.mix.pcm[i]);
@@ -4564,12 +4646,10 @@ function applyConfig(cfg) {
 
   // FX を再適用
   if (audioCtx) {
-    if (delayWet) delayWet.gain.value = state.fx.delayWet / 100;
     if (delayFb) delayFb.gain.value = state.fx.delayFb / 100;
     if (delayNode) delayNode.delayTime.value = getDelaySeconds();
     if (chorusLfo) chorusLfo.frequency.value = state.fx.chorusRate / 10;
     if (chorusDepthGain) chorusDepthGain.gain.value = state.fx.chorusDepth / 1000;
-    if (chorusWet) chorusWet.gain.value = state.fx.chorusWet / 100;
     if (masterFilter) {
       masterFilter.type = state.fx.djFilterType;
       masterFilter.frequency.value = state.fx.djFilterFreq;
