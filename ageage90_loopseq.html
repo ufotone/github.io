@@ -524,6 +524,16 @@
       background: linear-gradient(to left, #0008, #0000);
       pointer-events: none;
     }
+
+    /* ===== PCM SLOT 録音中発光 ===== */
+    .pcm-slot.recording-active {
+      border-color: #f55 !important;
+      animation: slotRecPulse 0.65s ease-in-out infinite alternate;
+    }
+    @keyframes slotRecPulse {
+      from { background: #2a0808; box-shadow: 0 0 4px #f330 inset; }
+      to   { background: #3e0e0e; box-shadow: 0 0 12px #f558 inset, 0 0 10px #f443; }
+    }
   </style>
 </head>
 <body>
@@ -2196,7 +2206,7 @@ function renderPcmTrack(parent, seq, t, len, beatHeads) {
 
   // ===== ヘッダー行 =====
   const hdr = document.createElement('div');
-  hdr.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:9px';
+  hdr.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:9px;flex-wrap:wrap';
 
   const expBtn = document.createElement('button');
   expBtn.className = 'btn';
@@ -2209,6 +2219,10 @@ function renderPcmTrack(parent, seq, t, len, beatHeads) {
   trName.style.cssText = 'color:#fc8;font-weight:bold;letter-spacing:1px;min-width:54px';
   trName.textContent = `PCM ${(t+1).toString().padStart(2, '0')}`;
   hdr.appendChild(trName);
+
+  // VOL/PAN/REV/DIST/COMP/CLR をまとめるサブコンテナ（幅不足時に折り返す単位）
+  const ctrlWrap = document.createElement('span');
+  ctrlWrap.style.cssText = 'display:flex;align-items:center;gap:4px;flex-wrap:wrap';
 
   // VOL slider (track default)
   const volWrap = document.createElement('span');
@@ -2225,7 +2239,7 @@ function renderPcmTrack(parent, seq, t, len, beatHeads) {
     volVal.textContent = state.mix.pcm[t].vol;
   };
   volWrap.appendChild(volSlider); volWrap.appendChild(volVal);
-  hdr.appendChild(volWrap);
+  ctrlWrap.appendChild(volWrap);
 
   // PAN slider
   const panWrap = document.createElement('span');
@@ -2242,7 +2256,7 @@ function renderPcmTrack(parent, seq, t, len, beatHeads) {
     panVal.textContent = state.mix.pcm[t].pan;
   };
   panWrap.appendChild(panSlider); panWrap.appendChild(panVal);
-  hdr.appendChild(panWrap);
+  ctrlWrap.appendChild(panWrap);
 
   // FX SENDS
   const sendDefs = [
@@ -2267,21 +2281,22 @@ function renderPcmTrack(parent, seq, t, len, beatHeads) {
       sv.textContent = state.mix.pcm[t][def.key];
     };
     sw.appendChild(sl); sw.appendChild(si); sw.appendChild(sv);
-    hdr.appendChild(sw);
+    ctrlWrap.appendChild(sw);
   });
 
-  // CLR/COPY/PASTE
+  // CLR
   const clrTrBtn = document.createElement('button');
   clrTrBtn.className = 'btn warn';
-  clrTrBtn.style.cssText = 'font-size:8px;padding:2px 6px;margin-left:auto';
+  clrTrBtn.style.cssText = 'font-size:8px;padding:2px 6px';
   clrTrBtn.textContent = 'CLR';
   clrTrBtn.onclick = () => {
     tr.on.fill(false); tr.slot.fill(null);
     tr.freq.fill(null); tr.vol.fill(null); tr.pan.fill(null);
     renderSeq();
   };
-  hdr.appendChild(clrTrBtn);
+  ctrlWrap.appendChild(clrTrBtn);
 
+  hdr.appendChild(ctrlWrap);
   trackBox.appendChild(hdr);
 
   // ===== ON 行 (常に表示) =====
@@ -3204,6 +3219,8 @@ function buildPcmBankPanel() {
           recBtn.classList.remove('recording');
           recBtn.textContent = '⏺ REC → SLOT';
           recTimer.textContent = '';
+          const targetEl = document.querySelector(`#pcmSlotGrid [data-slot="${_recState.targetSlotIdx ?? 0}"]`);
+          if (targetEl) targetEl.classList.remove('recording-active');
           const blob = new Blob(_recState.chunks, { type: 'audio/webm' });
           const arrayBuf = await blob.arrayBuffer();
           try {
@@ -3231,6 +3248,10 @@ function buildPcmBankPanel() {
         _recState.mediaRecorder.start();
         recBtn.classList.add('recording');
         recBtn.textContent = '⏹ STOP REC';
+        // 対象スロット要素だけ発光
+        const targetEl = document.querySelector(`#pcmSlotGrid [data-slot="${empty}"]`);
+        if (targetEl) targetEl.classList.add('recording-active');
+        _recState.targetSlotIdx = empty;
         _recState.startTime = Date.now();
         _recState.timerInterval = setInterval(() => {
           const s = ((Date.now() - _recState.startTime) / 1000).toFixed(1);
@@ -3275,6 +3296,7 @@ function renderPcmToneBank() {
 
     const div = document.createElement('div');
     div.className = 'pcm-slot' + (isLoaded ? ' loaded' : '') + (isActive ? ' active-pcm' : '');
+    div.dataset.slot = s;
     div.title = isLoaded ? `S${s+1}: ${slot.name}` : `S${s+1}: 未読込`;
 
     const numEl = document.createElement('div');
@@ -3757,7 +3779,6 @@ function openWaveEditor(slotIdx) {
     const sampleStart = Math.floor(trimStart * totalSamples);
     const sampleLen   = Math.floor((trimEnd - trimStart) * totalSamples);
     if (sampleLen <= 0) { showToast('選択範囲が空です', 'warn'); return; }
-    if (!await mobileConfirm(`選択範囲 (${(trimStart * durationSec).toFixed(3)}s〜${(trimEnd * durationSec).toFixed(3)}s) を保持して前後をカットします。`)) return;
 
     // 新しいバッファを作成
     const newBuf = audioCtx.createBuffer(buf.numberOfChannels, sampleLen, sr);
