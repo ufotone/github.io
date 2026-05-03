@@ -137,22 +137,24 @@
     .pcm-slot-grid {
       display: grid;
       grid-template-columns: repeat(16, minmax(0, 1fr));
-      gap: 4px;
+      gap: 2px;
     }
     .pcm-slot {
-      background: #1a1006; border: 1px solid #553a1a;
-      border-radius: 4px; padding: 4px; cursor: pointer;
-      min-height: 50px; text-align: center;
-      display: flex; flex-direction: column; justify-content: center;
-      font-size: 8px;
+      background: #100c04; border: 1px solid #2a1a08;
+      border-radius: 3px; padding: 2px 3px; cursor: pointer;
+      height: 20px; text-align: center;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 8px; overflow: hidden;
     }
     .pcm-slot:hover { background: #251a0a; border-color: #8a6030; }
-    .pcm-slot.loaded { background: #2a1f10; border-color: #c4803a; }
-    .pcm-slot.active-pcm { background: #4a2f10; border-color: #f0c080; box-shadow: 0 0 6px #c4803a inset; }
-    .pcm-slot-num { font-size: 8px; color: #c4803a; font-weight: bold; }
-    .pcm-slot-name { font-size: 8px; color: #ddd; }
-    .pcm-slot-info { font-size: 7px; color: #888; }
-    .pcm-row-sep { grid-column: 1 / -1; height: 4px; }
+    .pcm-slot.loaded { background: #221808; border-color: #6a4820; }
+    .pcm-slot.active-pcm { background: #4a2f10; border-color: #f0c080; box-shadow: 0 0 5px #c4803a inset; }
+    .pcm-slot-num { display: none; }
+    .pcm-slot-name { font-size: 8px; color: #664422; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .pcm-slot.loaded .pcm-slot-name { color: #c4803a; }
+    .pcm-slot.active-pcm .pcm-slot-name { color: #f0e080; }
+    .pcm-slot-info { display: none; }
+    .pcm-row-sep { grid-column: 1 / -1; height: 2px; }
 
     /* ===== SSAW PANEL ===== */
     .sub-panel { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -471,7 +473,7 @@
       .app { padding: 4px; }
       .seq-grid, .seq-grid-custom { gap: 1px; grid-template-columns: 48px repeat(var(--seq-steps, 16), 1fr); }
       .seq-label { font-size: 8px; }
-      .pcm-slot-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .pcm-slot-grid { grid-template-columns: repeat(8, minmax(0, 1fr)); }
       .step-btn { height: 24px; }
       .note-select, .vol-input, .pan-input, .freq-input, .slot-select { font-size: 8px; }
       .mixer-ch { min-width: 56px; padding: 4px; }
@@ -605,13 +607,14 @@
     }
     #pianoKeys {
       position: relative; height: 52px; flex: 1; min-width: 0;
+      touch-action: none;
     }
     .pk-white {
       position: absolute; bottom: 0;
       width: calc(100% / 14 - 1px); height: 100%;
       background: #ddd; border: 1px solid #888;
       border-radius: 0 0 3px 3px; cursor: pointer;
-      box-sizing: border-box;
+      box-sizing: border-box; touch-action: none;
     }
     .pk-white:active, .pk-white.on { background: #fc8; }
     .pk-black {
@@ -619,7 +622,7 @@
       height: 55%; z-index: 2;
       background: #1a1a1a; border: 1px solid #000;
       border-radius: 0 0 2px 2px; cursor: pointer;
-      box-sizing: border-box;
+      box-sizing: border-box; touch-action: none;
     }
     .pk-black:active, .pk-black.on { background: #c4803a; }
     .pk-label {
@@ -1074,7 +1077,7 @@ const state = {
     seqData: createEmptySeqData(16),
   })),
   // SSAW params
-  subParams: { wave: 'sawtooth', length: 400, filterFreq: 6000, filterRes: 2, filterType: 'lowpass', envA: 5, envD: 150, envS: 60, envR: 300, voiceCount: 7, detune: 18, spread: 80, filtEnvOn: false, filtEnvAmt: 80, filtEnvA: 5, filtEnvD: 300, filtEnvR: 200 },
+  subParams: { wave: 'sawtooth', length: 400, filterFreq: 6000, filterRes: 2, filterType: 'lowpass', envA: 5, envD: 150, envS: 60, envR: 300, voiceCount: 5, detune: 18, spread: 80, filtEnvOn: false, filtEnvAmt: 80, filtEnvA: 5, filtEnvD: 300, filtEnvR: 200 },
   subToneBank: Array(50).fill(null),   // null=未使用
   subActiveTone: -1,
   // FX
@@ -1170,7 +1173,8 @@ let fxBusDly = null, fxBusChr = null;
 const activePcmSources = new Set();
 // PCM トラックごとにアクティブなソースを追跡（タイミング正確な停止用）
 const activePcmSourcesByTrack = Array(16).fill(null).map(() => new Set());
-let activeSubNode = null;
+let activeSubNode = null; // シーケンサーTIE用（最後に鳴らしたノードを参照）
+const activeSubNodes = new Map(); // 和音対応: noteName → node
 
 // =============================================
 // WSOLA タイムストレッチ (ピッチ不変)
@@ -1292,12 +1296,13 @@ const VOCODER_FREQS = (() => {
     lo * Math.pow(hi / lo, i / (n - 1))
   );
 })();
-const VOCODER_BW = 1.2; // Q値（帯域幅係数）
+const VOCODER_BW = 15; // Q値 — 高いほどバンドが狭くロボット感が強い
 
 const vcState = {
   enabled:    false,
   micStream:  null,
   micSource:  null,
+  micDryGain: null,   // マイクのドライ出力 → masterGainNode
   // 8バンド
   modFilters: [],   // BiquadFilter (modulator BPF)
   modAnalysers: [], // AnalyserNode
@@ -1309,7 +1314,7 @@ const vcState = {
   carrierSplitGain: null, // SSAWのmixGnからコピーを取るGain
   wet:    80,  // wet% (0-100)
   bypass: 10,  // bypass% 少量のドライSSAWを混ぜる
-  gain:   120, // マイク感度 0-200
+  gain:   180, // マイク感度 0-300
   rAFId:  null,
   envBuf: new Float32Array(VOCODER_BANDS), // 各バンドのエンベロープ値
   // CHORD SEQ連動
@@ -1332,7 +1337,7 @@ function initVocoderNodes() {
 
   // キャリア入力: SSAWのplaySubtractiveでmixGnをここに接続する
   vcState.carInputGain  = audioCtx.createGain();
-  vcState.carInputGain.gain.value = 1.0;
+  vcState.carInputGain.gain.value = 2.5;
 
   vcState.vocoderOutGain = audioCtx.createGain();
   vcState.vocoderOutGain.gain.value = vcState.wet / 100;
@@ -1349,7 +1354,8 @@ function initVocoderNodes() {
     const mf = audioCtx.createBiquadFilter();
     mf.type = 'bandpass'; mf.frequency.value = f; mf.Q.value = VOCODER_BW;
     const ma = audioCtx.createAnalyser();
-    ma.fftSize = 256; ma.smoothingTimeConstant = 0.6;
+    ma.fftSize = 512;
+    ma.smoothingTimeConstant = 0.0; // スムージングはJS側で行う
     mf.connect(ma);
     vcState.modFilters.push(mf);
     vcState.modAnalysers.push(ma);
@@ -1389,12 +1395,19 @@ async function vocoderMicOn() {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
     vcState.micStream = stream;
     vcState.micSource = audioCtx.createMediaStreamSource(stream);
-    // マイク → 各バンドモジュレーターフィルター
+    // マイク → 各バンドモジュレーターフィルター（エンベロープ検出用）
     const micGain = audioCtx.createGain();
     micGain.gain.value = vcState.gain / 100;
     vcState.micSource.connect(micGain);
     vcState.modFilters.forEach(f => micGain.connect(f));
     vcState._micGain = micGain;
+    // マイクのドライパス: WET=0のとき生マイク音がそのまま出る
+    // wet=100 → dry=0、wet=0 → dry=1
+    const micDryGain = audioCtx.createGain();
+    micDryGain.gain.value = 1 - vcState.wet / 100;
+    vcState.micSource.connect(micDryGain);
+    micDryGain.connect(masterGainNode);
+    vcState.micDryGain = micDryGain;
     vocoderStartRAF();
     vcState.enabled = true;
     updateVocoderUI();
@@ -1411,8 +1424,9 @@ function vocoderMicOff() {
     vcState.micStream.getTracks().forEach(t => t.stop());
     vcState.micStream = null;
   }
-  if (vcState.micSource) { try { vcState.micSource.disconnect(); } catch(e){} vcState.micSource = null; }
-  if (vcState._micGain)  { try { vcState._micGain.disconnect(); }  catch(e){} vcState._micGain = null; }
+  if (vcState.micSource)   { try { vcState.micSource.disconnect(); }   catch(e){} vcState.micSource = null; }
+  if (vcState._micGain)    { try { vcState._micGain.disconnect(); }    catch(e){} vcState._micGain = null; }
+  if (vcState.micDryGain)  { try { vcState.micDryGain.disconnect(); }  catch(e){} vcState.micDryGain = null; }
   // VCAをゼロに
   vcState.carVCAs.forEach(v => { if(v) v.gain.value = 0; });
   vcState.envBuf.fill(0);
@@ -1422,26 +1436,27 @@ function vocoderMicOff() {
 }
 
 // rAFループ: エンベロープ追跡 → VCA制御 + UIバー更新
-const _vcDataBuf = new Uint8Array(128);
+const _vcDataBuf = new Float32Array(512);
 function vocoderRAFTick() {
   if (!vcState.enabled) return;
-  const wScale = vcState.wet / 100;
   for (let i = 0; i < VOCODER_BANDS; i++) {
     const an = vcState.modAnalysers[i];
-    an.getByteTimeDomainData(_vcDataBuf);
-    // RMS 計算（短いバッファの先頭32サンプルで十分）
+    an.getFloatTimeDomainData(_vcDataBuf);
+    // RMS（全バッファ使用）
     let sum = 0;
-    for (let k = 0; k < 32; k++) {
-      const s = (_vcDataBuf[k] - 128) / 128;
-      sum += s * s;
+    const n = an.fftSize;
+    for (let k = 0; k < n; k++) { sum += _vcDataBuf[k] * _vcDataBuf[k]; }
+    const rms = Math.sqrt(sum / n);
+    // Attack速い・Release遅い非対称スムージング
+    const prev = vcState.envBuf[i];
+    vcState.envBuf[i] = rms > prev
+      ? prev * 0.3 + rms * 0.7   // attack: 速い
+      : prev * 0.85 + rms * 0.15; // release: 遅め
+    const gain = Math.min(5.0, vcState.envBuf[i] * (vcState.gain / 100) * 25);
+    if (vcState.carVCAs[i]) {
+      vcState.carVCAs[i].gain.setTargetAtTime(gain, audioCtx.currentTime, 0.008);
     }
-    const rms = Math.sqrt(sum / 32);
-    // スムージング
-    vcState.envBuf[i] = vcState.envBuf[i] * 0.7 + rms * 0.3;
-    const gain = Math.min(1.8, vcState.envBuf[i] * (vcState.gain / 100) * 6);
-    if (vcState.carVCAs[i]) vcState.carVCAs[i].gain.setTargetAtTime(gain, audioCtx.currentTime, 0.01);
   }
-  // UI バー更新（毎フレームは重いのでthrottle）
   updateVocoderBars();
   vcState.rAFId = requestAnimationFrame(vocoderRAFTick);
 }
@@ -1563,7 +1578,7 @@ function playVocoderCarrier(freq, when, dur) {
   if (!audioCtx || !vcState.enabled || !vcState.carInputGain) return;
   const p = state.subParams;
   const A = p.envA / 1000, D = p.envD / 1000, S = p.envS / 100, R = p.envR / 1000;
-  const nVoices = Math.max(1, Math.min(7, p.voiceCount ?? 1));
+  const nVoices = Math.max(1, Math.min(5, p.voiceCount ?? 1));
   const detuneCents = p.detune ?? 0;
   const noteLen = Math.max(dur - R, 0.01);
   const volScale = nVoices > 1 ? (0.5 + 0.5 / Math.sqrt(nVoices)) : 1.0;
@@ -1643,6 +1658,7 @@ function buildVocoderPanel() {
   };
   ctrlRow.appendChild(makeSlider('WET', 'wet', 0, 100, 1, '%', val => {
     if (vcState.vocoderOutGain) vcState.vocoderOutGain.gain.value = val / 100;
+    if (vcState.micDryGain)     vcState.micDryGain.gain.value = 1 - val / 100;
   }));
   ctrlRow.appendChild(makeSlider('MIC GAIN', 'gain', 10, 300, 5, '%', val => {
     if (vcState._micGain) vcState._micGain.gain.value = val / 100;
@@ -2012,22 +2028,25 @@ function _stopSubNode(node, fadeStart) {
   } catch(e) {}
 }
 
-function playSubtractive(freq, vol, when, tie, dur, portaMs) {
+// noteName: 和音対応のキー（省略時は"_seq"でシーケンサー用単音モード）
+function playSubtractive(freq, vol, when, tie, dur, portaMs, noteName) {
   if (!audioCtx) return;
+  const key = noteName ?? '_seq'; // Mapのキー
   const p = state.subParams;
   const A = p.envA / 1000, D = p.envD / 1000, S = p.envS / 100, R = p.envR / 1000;
   const v = (vol / 100) * (state.mix.sub / 100);
   const noteLen = (dur != null) ? Math.max(dur - R, 0.01) : p.length / 1000;
-  const nVoices = Math.max(1, Math.min(7, p.voiceCount ?? 1));
+  const nVoices = Math.max(1, Math.min(5, p.voiceCount ?? 1));
   const detuneCents = p.detune ?? 0;
   const spreadAmt = (p.spread ?? 0) / 100;
   const basePan = (state.mix.panSub ?? 0) / 100;
 
-  // TIE処理: 既存ノードの音程をスライドして継続
-  if (tie && activeSubNode) {
+  // TIE処理: 既存ノードの音程をスライドして継続（シーケンサー用）
+  const tieTarget = activeSubNodes.get(key) ?? activeSubNode;
+  if (tie && tieTarget) {
     try {
       const portaSec = Math.max(portaMs ? portaMs / 1000 : 0.005, 0);
-      activeSubNode.oscs.forEach((osc, i) => {
+      tieTarget.oscs.forEach((osc, i) => {
         const detHz = calcDetuneHz(freq, i, nVoices, detuneCents);
         osc.frequency.cancelScheduledValues(when);
         osc.frequency.setValueAtTime(osc.frequency.value, when);
@@ -2037,21 +2056,27 @@ function playSubtractive(freq, vol, when, tie, dur, portaMs) {
           osc.frequency.setValueAtTime(Math.max(1, detHz), when);
         }
       });
-      // ゲインは現在の sustainGain から再スケジュール
-      const curSustain = activeSubNode.sustainGain ?? (v * S);
-      activeSubNode.gn.gain.cancelScheduledValues(when);
-      activeSubNode.gn.gain.setValueAtTime(curSustain, when);
-      activeSubNode.gn.gain.setValueAtTime(curSustain, when + noteLen);
-      activeSubNode.gn.gain.linearRampToValueAtTime(0, when + noteLen + R);
-      activeSubNode.releaseAt = when + noteLen;
+      const curSustain = tieTarget.sustainGain ?? (v * S);
+      tieTarget.gn.gain.cancelScheduledValues(when);
+      tieTarget.gn.gain.setValueAtTime(curSustain, when);
+      tieTarget.gn.gain.setValueAtTime(curSustain, when + noteLen);
+      tieTarget.gn.gain.linearRampToValueAtTime(0, when + noteLen + R);
+      tieTarget.releaseAt = when + noteLen;
     } catch(e) {}
     return;
   }
 
-  // 既存ノードをクリックなしで停止
-  if (activeSubNode) {
-    _stopSubNode(activeSubNode, when);
-    activeSubNode = null;
+  // 同じノートが既に鳴っていたら停止（再トリガー）
+  const existingNode = activeSubNodes.get(key);
+  if (existingNode) {
+    _stopSubNode(existingNode, when);
+    activeSubNodes.delete(key);
+  }
+  // シーケンサー単音モード(_seq)では既存の全ノートも停止（モノフォニック）
+  if (key === '_seq') {
+    activeSubNodes.forEach((node) => { _stopSubNode(node, when); });
+    activeSubNodes.clear();
+    if (activeSubNode) { _stopSubNode(activeSubNode, when); activeSubNode = null; }
   }
 
   // フィルター
@@ -2095,14 +2120,24 @@ function playSubtractive(freq, vol, when, tie, dur, portaMs) {
   const mainPanner = audioCtx.createStereoPanner();
   mainPanner.pan.value = basePan;
   mixGn.connect(mainPanner);
-  mainPanner.connect(masterGainNode);
 
-  // VOCODER: SSAWをキャリアとして接続（vocoder有効時のみ）
+  // VOCODER: ON時はSSAWをmasterGainNodeに直接つながず carInputGain のみに送る
+  // OFF時は従来通りmasterGainNodeに直結
   if (vcState.enabled && vcState.carInputGain) {
-    try { mixGn.connect(vcState.carInputGain); } catch(e) {}
+    // キャリアとしてvocoderへ
+    mainPanner.connect(vcState.carInputGain);
+    // bypass分だけ直接出力（vcState.bypass=0なら完全にvocoderのみ）
+    if (vcState.bypass > 0) {
+      const bypassGain = audioCtx.createGain();
+      bypassGain.gain.value = vcState.bypass / 100;
+      mainPanner.connect(bypassGain);
+      bypassGain.connect(masterGainNode);
+    }
+  } else {
+    mainPanner.connect(masterGainNode);
   }
 
-  // FX sends
+  // FX sends（vocoder ON/OFF 両方で有効）
   if (fxBusRev)  { const sg = audioCtx.createGain(); sg.gain.value = (state.mix.sendRevSub ?? 0) / 100;  mainPanner.connect(sg); sg.connect(fxBusRev); }
   if (fxBusDist) { const sg = audioCtx.createGain(); sg.gain.value = (state.mix.sendDistSub ?? 0) / 100; mainPanner.connect(sg); sg.connect(fxBusDist); }
   if (fxBusComp) { const sg = audioCtx.createGain(); sg.gain.value = (state.mix.sendCompSub ?? 0) / 100; mainPanner.connect(sg); sg.connect(fxBusComp); }
@@ -2130,7 +2165,9 @@ function playSubtractive(freq, vol, when, tie, dur, portaMs) {
     oscs.push(osc);
   }
 
-  activeSubNode = { oscs, gn, filt, mixGn, sustainGain: vSus, releaseAt: when + noteLen };
+  const newNode = { oscs, gn, filt, mixGn, sustainGain: vSus, releaseAt: when + noteLen };
+  activeSubNodes.set(key, newNode);
+  activeSubNode = newNode; // TIE用に最後のノードを保持
 }
 
 // voiceインデックス i から実周波数を計算 (detuneCents = 全体の広がり幅cent)
@@ -2727,6 +2764,11 @@ function stopPlay() {
     try { activeSubNode.oscs.forEach(o => o.stop(audioCtx.currentTime + 0.05)); } catch(e){}
     activeSubNode = null;
   }
+  // 和音Mapもクリア
+  activeSubNodes.forEach(node => {
+    try { node.oscs.forEach(o => o.stop(audioCtx.currentTime + 0.05)); } catch(e){}
+  });
+  activeSubNodes.clear();
   // VOCODER: コードバッジをクリア
   vocoderSetChord([]);
   // インジケーター解除
@@ -5006,29 +5048,12 @@ function renderPcmToneBank() {
 
     const nameEl = document.createElement('div');
     nameEl.className = 'pcm-slot-name';
-    nameEl.textContent = isLoaded ? slot.name : '─ empty ─';
+    nameEl.textContent = isLoaded ? slot.name : `S${s+1}`;
     div.appendChild(nameEl);
 
     if (isLoaded) {
-      const infoEl = document.createElement('div');
-      infoEl.className = 'pcm-slot-info';
-      infoEl.textContent = `${slot.bits}b/${slot.sampleRate >= 1000 ? (slot.sampleRate / 1000).toFixed(0) + 'k' : slot.sampleRate}Hz`;
-      div.appendChild(infoEl);
-      const gainEl = document.createElement('div');
-      gainEl.className = 'pcm-slot-info';
-      gainEl.textContent = `gain:${slot.gain ?? 100}%  ${slot.slotSteps ?? 1}step`;
-      div.appendChild(gainEl);
-      if (slot.groupId) {
-        const midiToName = m => { const ns=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; return ns[m%12]+(Math.floor(m/12)-1); };
-        const grpEl = document.createElement('div');
-        grpEl.className = 'pcm-slot-info';
-        grpEl.style.color = '#f0c080';
-        const rootStr = slot.rootNote != null ? midiToName(slot.rootNote) : 'C4';
-        const loStr   = slot.loNote  != null ? midiToName(slot.loNote)   : 'C-1';
-        const hiStr   = slot.hiNote  != null ? midiToName(slot.hiNote)   : 'G9';
-        grpEl.textContent = `[${slot.groupId}] R:${rootStr} ${loStr}-${hiStr}`;
-        div.appendChild(grpEl);
-      }
+      // info非表示（CSSでdisplay:none）- titleに詳細情報を格納
+      div.title = `S${s+1}: ${slot.name} | ${slot.bits}b/${slot.sampleRate >= 1000 ? (slot.sampleRate / 1000).toFixed(0) + 'k' : slot.sampleRate}Hz | gain:${slot.gain ?? 100}% ${slot.slotSteps ?? 1}step${slot.groupId ? ` | [${slot.groupId}]` : ''}`;
     }
 
     div.onclick = () => {
@@ -6147,12 +6172,12 @@ function buildSubPanel() {
   waveRow.appendChild(waveSel);
   paramsBox.appendChild(waveRow);
 
-  // UNISON VOICES (1〜7)
+  // UNISON VOICES (1〜5)
   const voiceRow = makeSubRow('VOICES');
   const voiceSel = document.createElement('select');
-  [1,2,3,4,5,6,7].forEach(n => {
+  [1,2,3,4,5].forEach(n => {
     const opt = document.createElement('option'); opt.value = n;
-    opt.textContent = n === 1 ? '1 (mono)' : n + (n === 7 ? ' (supersaw)' : '');
+    opt.textContent = n === 1 ? '1 (mono)' : String(n);
     if ((state.subParams.voiceCount ?? 1) === n) opt.selected = true;
     voiceSel.appendChild(opt);
   });
@@ -6326,13 +6351,13 @@ function showSubSlotCtx(e, si) {
 // filtEnvA/D/R: ms
 const SUB_PRESETS = [
   // ユーロビート系
-  { wave:'sawtooth', length:400, filterFreq:1200, filterRes:3,  filterType:'lowpass', envA:5,  envD:150, envS:60, envR:300, voiceCount:7, detune:18, spread:80, filtEnvOn:true,  filtEnvAmt:85, filtEnvA:5,  filtEnvD:250, filtEnvR:180, _name:'EUROSAW'    },
+  { wave:'sawtooth', length:400, filterFreq:1200, filterRes:3,  filterType:'lowpass', envA:5,  envD:150, envS:60, envR:300, voiceCount:5, detune:18, spread:80, filtEnvOn:true,  filtEnvAmt:85, filtEnvA:5,  filtEnvD:250, filtEnvR:180, _name:'EUROSAW'    },
   { wave:'sawtooth', length:350, filterFreq:800,  filterRes:8,  filterType:'lowpass', envA:3,  envD:100, envS:50, envR:200, voiceCount:5, detune:12, spread:70, filtEnvOn:true,  filtEnvAmt:70, filtEnvA:3,  filtEnvD:180, filtEnvR:120, _name:'EURO5V'     },
-  { wave:'sawtooth', length:500, filterFreq:600,  filterRes:14, filterType:'lowpass', envA:8,  envD:200, envS:55, envR:400, voiceCount:7, detune:22, spread:90, filtEnvOn:true,  filtEnvAmt:90, filtEnvA:8,  filtEnvD:350, filtEnvR:250, _name:'FAT_SAW'    },
+  { wave:'sawtooth', length:500, filterFreq:600,  filterRes:14, filterType:'lowpass', envA:8,  envD:200, envS:55, envR:400, voiceCount:5, detune:22, spread:90, filtEnvOn:true,  filtEnvAmt:90, filtEnvA:8,  filtEnvD:350, filtEnvR:250, _name:'FAT_SAW'    },
   { wave:'sawtooth', length:300, filterFreq:2500, filterRes:6,  filterType:'lowpass', envA:2,  envD:80,  envS:40, envR:150, voiceCount:3, detune:8,  spread:60, filtEnvOn:false, filtEnvAmt:50, filtEnvA:3,  filtEnvD:120, filtEnvR:80,  _name:'THIN_LEAD'  },
   // トランス系
-  { wave:'sawtooth', length:600, filterFreq:2000, filterRes:4,  filterType:'lowpass', envA:10, envD:300, envS:70, envR:500, voiceCount:7, detune:15, spread:85, filtEnvOn:true,  filtEnvAmt:75, filtEnvA:10, filtEnvD:400, filtEnvR:300, _name:'TRN_LEAD'   },
-  { wave:'sawtooth', length:800, filterFreq:400,  filterRes:16, filterType:'lowpass', envA:60, envD:600, envS:50, envR:700, voiceCount:7, detune:20, spread:75, filtEnvOn:true,  filtEnvAmt:60, filtEnvA:60, filtEnvD:600, filtEnvR:500, _name:'SUPER_PAD'  },
+  { wave:'sawtooth', length:600, filterFreq:2000, filterRes:4,  filterType:'lowpass', envA:10, envD:300, envS:70, envR:500, voiceCount:5, detune:15, spread:85, filtEnvOn:true,  filtEnvAmt:75, filtEnvA:10, filtEnvD:400, filtEnvR:300, _name:'TRN_LEAD'   },
+  { wave:'sawtooth', length:800, filterFreq:400,  filterRes:16, filterType:'lowpass', envA:60, envD:600, envS:50, envR:700, voiceCount:5, detune:20, spread:75, filtEnvOn:true,  filtEnvAmt:60, filtEnvA:60, filtEnvD:600, filtEnvR:500, _name:'SUPER_PAD'  },
   { wave:'square',   length:400, filterFreq:1000, filterRes:5,  filterType:'lowpass', envA:4,  envD:120, envS:55, envR:250, voiceCount:5, detune:10, spread:65, filtEnvOn:true,  filtEnvAmt:65, filtEnvA:4,  filtEnvD:200, filtEnvR:150, _name:'SQ_UNISON'  },
   // ベース系
   { wave:'sawtooth', length:250, filterFreq:300,  filterRes:10, filterType:'lowpass', envA:1,  envD:60,  envS:20, envR:100, voiceCount:1, detune:0,  spread:0,  filtEnvOn:true,  filtEnvAmt:55, filtEnvA:1,  filtEnvD:80,  filtEnvR:60,  _name:'EURO_BASS'  },
@@ -7617,15 +7642,31 @@ function midiNoteOnTrigger(noteName, velocity) {
   } else {
     const hz = noteToHz(noteName);
     playSubtractive(hz, midiVelToVol(velocity), audioCtx.currentTime, false,
-      state.subParams.length / 1000);
+      state.subParams.length / 1000, undefined, noteName);
   }
 }
 
-// ノートオフ処理: GUI解除 + STEP RECの押鍵カウント管理
+// ノートオフ処理: GUI解除 + STEP RECの押鍵カウント管理 + SSAW和音リリース
 function midiNoteOffTrigger(noteName) {
   // GUIハイライト解除
   const el = document.querySelector(`[data-note="${noteName}"]`);
   if (el) el.classList.remove('on');
+
+  // SSAW 和音: そのノートだけリリース
+  const node = activeSubNodes.get(noteName);
+  if (node) {
+    const now = audioCtx ? audioCtx.currentTime : 0;
+    const R = (state.subParams.envR ?? 200) / 1000;
+    try {
+      node.gn.gain.cancelScheduledValues(now);
+      node.gn.gain.setValueAtTime(node.sustainGain ?? 0, now);
+      node.gn.gain.linearRampToValueAtTime(0, now + Math.max(R, 0.005));
+      node.oscs.forEach(o => { try { o.stop(now + Math.max(R, 0.005) + 0.01); } catch(e){} });
+    } catch(e) {}
+    activeSubNodes.delete(noteName);
+    // activeSubNode もこのノードを指していたらnullに
+    if (activeSubNode === node) activeSubNode = null;
+  }
 
   // STEP REC: 押鍵カウントを減らし、全離鍵でカーソルを進める
   if (samplerSeqRecMode && samplerSeqRecType === 'step') {
