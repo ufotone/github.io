@@ -814,18 +814,6 @@
     </div>
   </div>
 
-  <!-- VOCODER (collapsible) -->
-  <div class="panel" id="vocoderPanelWrap">
-    <div class="collapsible-header" id="vocoderPanelToggle">
-      <span class="small-title collapsible-title" style="margin:0;color:#5af">VOCODER</span>
-      <span class="collapsible-arrow collapsed" id="vocoderPanelArrow">&#9660;</span>
-      <span id="vocoderStatusBadge" class="vocoder-status" style="margin-left:6px">OFF</span>
-      <span id="vocoderChordBadge" class="vocoder-chord-badge" style="margin-left:8px"></span>
-    </div>
-    <div class="collapsible-body collapsed" id="vocoderPanelBody" style="margin-top:6px">
-      <div id="vocoderPanel"></div>
-    </div>
-  </div>
 
   <!-- SUPERSAW SYNTH (collapsible) -->
   <div class="panel" id="subPanelWrap">
@@ -883,6 +871,19 @@
       <span id="beatGroupTotal" style="font-size:9px;color:#666;margin-left:4px"></span>
     </div>
     <div id="seqContent"></div>
+  </div>
+
+  <!-- VOCODER (collapsible) -->
+  <div class="panel" id="vocoderPanelWrap">
+    <div class="collapsible-header" id="vocoderPanelToggle">
+      <span class="small-title collapsible-title" style="margin:0;color:#5af">VOCODER</span>
+      <span class="collapsible-arrow collapsed" id="vocoderPanelArrow">&#9660;</span>
+      <span id="vocoderStatusBadge" class="vocoder-status" style="margin-left:6px">OFF</span>
+      <span id="vocoderChordBadge" class="vocoder-chord-badge" style="margin-left:8px"></span>
+    </div>
+    <div class="collapsible-body collapsed" id="vocoderPanelBody" style="margin-top:6px">
+      <div id="vocoderPanel"></div>
+    </div>
   </div>
 
   <!-- PIANO KEYBOARD -->
@@ -1077,7 +1078,7 @@ const state = {
     seqData: createEmptySeqData(16),
   })),
   // SSAW params
-  subParams: { wave: 'sawtooth', length: 400, filterFreq: 6000, filterRes: 2, filterType: 'lowpass', envA: 5, envD: 150, envS: 60, envR: 300, voiceCount: 5, detune: 18, spread: 80, filtEnvOn: false, filtEnvAmt: 80, filtEnvA: 5, filtEnvD: 300, filtEnvR: 200 },
+  subParams: { wave: 'sawtooth', length: 400, filterFreq: 6000, filterRes: 2, filterType: 'lowpass', envA: 5, envD: 150, envS: 60, envR: 300, voiceCount: 7, detune: 18, spread: 80, filtEnvOn: false, filtEnvAmt: 80, filtEnvA: 5, filtEnvD: 300, filtEnvR: 200 },
   subToneBank: Array(50).fill(null),   // null=未使用
   subActiveTone: -1,
   // FX
@@ -1288,7 +1289,7 @@ function getDelaySeconds() {
 //       VCA.gain = Modulator Env × vocoderWet, rAFで更新
 //       CHORD SEQ連動: コードノートをSSAW多声キャリアのfreqに書き込む
 
-const VOCODER_BANDS = 8;
+const VOCODER_BANDS = 12;
 // 対数スケールで 200Hz〜7200Hz を8バンド
 const VOCODER_FREQS = (() => {
   const lo = 200, hi = 7200, n = VOCODER_BANDS;
@@ -1316,7 +1317,7 @@ const vcState = {
   bypass: 10,  // bypass% 少量のドライSSAWを混ぜる
   gain:   180, // マイク感度 0-300
   rAFId:  null,
-  envBuf: new Float32Array(VOCODER_BANDS), // 各バンドのエンベロープ値
+  envBuf: new Float32Array(12), // 各バンドのエンベロープ値
   // CHORD SEQ連動
   chordNotes: [],  // 現在鳴らすノート名の配列
   chordActive: false,
@@ -1399,7 +1400,14 @@ async function vocoderMicOn() {
     const micGain = audioCtx.createGain();
     micGain.gain.value = vcState.gain / 100;
     vcState.micSource.connect(micGain);
-    vcState.modFilters.forEach(f => micGain.connect(f));
+    // HPF: 低音の母音成分を削ってロボット感を強調
+    const micHpf = audioCtx.createBiquadFilter();
+    micHpf.type = 'highpass';
+    micHpf.frequency.value = 400;
+    micHpf.Q.value = 0.7;
+    micGain.connect(micHpf);
+    vcState._micHpf = micHpf;
+    vcState.modFilters.forEach(f => micHpf.connect(f));
     vcState._micGain = micGain;
     // マイクのドライパス: WET=0のとき生マイク音がそのまま出る
     // wet=100 → dry=0、wet=0 → dry=1
@@ -1426,6 +1434,7 @@ function vocoderMicOff() {
   }
   if (vcState.micSource)   { try { vcState.micSource.disconnect(); }   catch(e){} vcState.micSource = null; }
   if (vcState._micGain)    { try { vcState._micGain.disconnect(); }    catch(e){} vcState._micGain = null; }
+  if (vcState._micHpf)     { try { vcState._micHpf.disconnect(); }     catch(e){} vcState._micHpf = null; }
   if (vcState.micDryGain)  { try { vcState.micDryGain.disconnect(); }  catch(e){} vcState.micDryGain = null; }
   // VCAをゼロに
   vcState.carVCAs.forEach(v => { if(v) v.gain.value = 0; });
@@ -1578,7 +1587,7 @@ function playVocoderCarrier(freq, when, dur) {
   if (!audioCtx || !vcState.enabled || !vcState.carInputGain) return;
   const p = state.subParams;
   const A = p.envA / 1000, D = p.envD / 1000, S = p.envS / 100, R = p.envR / 1000;
-  const nVoices = Math.max(1, Math.min(5, p.voiceCount ?? 1));
+  const nVoices = Math.max(1, Math.min(7, p.voiceCount ?? 1));
   const detuneCents = p.detune ?? 0;
   const noteLen = Math.max(dur - R, 0.01);
   const volScale = nVoices > 1 ? (0.5 + 0.5 / Math.sqrt(nVoices)) : 1.0;
@@ -2036,7 +2045,7 @@ function playSubtractive(freq, vol, when, tie, dur, portaMs, noteName) {
   const A = p.envA / 1000, D = p.envD / 1000, S = p.envS / 100, R = p.envR / 1000;
   const v = (vol / 100) * (state.mix.sub / 100);
   const noteLen = (dur != null) ? Math.max(dur - R, 0.01) : p.length / 1000;
-  const nVoices = Math.max(1, Math.min(5, p.voiceCount ?? 1));
+  const nVoices = Math.max(1, Math.min(7, p.voiceCount ?? 1));
   const detuneCents = p.detune ?? 0;
   const spreadAmt = (p.spread ?? 0) / 100;
   const basePan = (state.mix.panSub ?? 0) / 100;
@@ -6172,12 +6181,12 @@ function buildSubPanel() {
   waveRow.appendChild(waveSel);
   paramsBox.appendChild(waveRow);
 
-  // UNISON VOICES (1〜5)
+  // UNISON VOICES (1〜7)
   const voiceRow = makeSubRow('VOICES');
   const voiceSel = document.createElement('select');
-  [1,2,3,4,5].forEach(n => {
+  [1,2,3,4,5,6,7].forEach(n => {
     const opt = document.createElement('option'); opt.value = n;
-    opt.textContent = n === 1 ? '1 (mono)' : String(n);
+    opt.textContent = n === 1 ? '1 (mono)' : n + (n === 7 ? ' (supersaw)' : '');
     if ((state.subParams.voiceCount ?? 1) === n) opt.selected = true;
     voiceSel.appendChild(opt);
   });
@@ -6351,13 +6360,13 @@ function showSubSlotCtx(e, si) {
 // filtEnvA/D/R: ms
 const SUB_PRESETS = [
   // ユーロビート系
-  { wave:'sawtooth', length:400, filterFreq:1200, filterRes:3,  filterType:'lowpass', envA:5,  envD:150, envS:60, envR:300, voiceCount:5, detune:18, spread:80, filtEnvOn:true,  filtEnvAmt:85, filtEnvA:5,  filtEnvD:250, filtEnvR:180, _name:'EUROSAW'    },
+  { wave:'sawtooth', length:400, filterFreq:1200, filterRes:3,  filterType:'lowpass', envA:5,  envD:150, envS:60, envR:300, voiceCount:7, detune:18, spread:80, filtEnvOn:true,  filtEnvAmt:85, filtEnvA:5,  filtEnvD:250, filtEnvR:180, _name:'EUROSAW'    },
   { wave:'sawtooth', length:350, filterFreq:800,  filterRes:8,  filterType:'lowpass', envA:3,  envD:100, envS:50, envR:200, voiceCount:5, detune:12, spread:70, filtEnvOn:true,  filtEnvAmt:70, filtEnvA:3,  filtEnvD:180, filtEnvR:120, _name:'EURO5V'     },
-  { wave:'sawtooth', length:500, filterFreq:600,  filterRes:14, filterType:'lowpass', envA:8,  envD:200, envS:55, envR:400, voiceCount:5, detune:22, spread:90, filtEnvOn:true,  filtEnvAmt:90, filtEnvA:8,  filtEnvD:350, filtEnvR:250, _name:'FAT_SAW'    },
+  { wave:'sawtooth', length:500, filterFreq:600,  filterRes:14, filterType:'lowpass', envA:8,  envD:200, envS:55, envR:400, voiceCount:7, detune:22, spread:90, filtEnvOn:true,  filtEnvAmt:90, filtEnvA:8,  filtEnvD:350, filtEnvR:250, _name:'FAT_SAW'    },
   { wave:'sawtooth', length:300, filterFreq:2500, filterRes:6,  filterType:'lowpass', envA:2,  envD:80,  envS:40, envR:150, voiceCount:3, detune:8,  spread:60, filtEnvOn:false, filtEnvAmt:50, filtEnvA:3,  filtEnvD:120, filtEnvR:80,  _name:'THIN_LEAD'  },
   // トランス系
-  { wave:'sawtooth', length:600, filterFreq:2000, filterRes:4,  filterType:'lowpass', envA:10, envD:300, envS:70, envR:500, voiceCount:5, detune:15, spread:85, filtEnvOn:true,  filtEnvAmt:75, filtEnvA:10, filtEnvD:400, filtEnvR:300, _name:'TRN_LEAD'   },
-  { wave:'sawtooth', length:800, filterFreq:400,  filterRes:16, filterType:'lowpass', envA:60, envD:600, envS:50, envR:700, voiceCount:5, detune:20, spread:75, filtEnvOn:true,  filtEnvAmt:60, filtEnvA:60, filtEnvD:600, filtEnvR:500, _name:'SUPER_PAD'  },
+  { wave:'sawtooth', length:600, filterFreq:2000, filterRes:4,  filterType:'lowpass', envA:10, envD:300, envS:70, envR:500, voiceCount:7, detune:15, spread:85, filtEnvOn:true,  filtEnvAmt:75, filtEnvA:10, filtEnvD:400, filtEnvR:300, _name:'TRN_LEAD'   },
+  { wave:'sawtooth', length:800, filterFreq:400,  filterRes:16, filterType:'lowpass', envA:60, envD:600, envS:50, envR:700, voiceCount:7, detune:20, spread:75, filtEnvOn:true,  filtEnvAmt:60, filtEnvA:60, filtEnvD:600, filtEnvR:500, _name:'SUPER_PAD'  },
   { wave:'square',   length:400, filterFreq:1000, filterRes:5,  filterType:'lowpass', envA:4,  envD:120, envS:55, envR:250, voiceCount:5, detune:10, spread:65, filtEnvOn:true,  filtEnvAmt:65, filtEnvA:4,  filtEnvD:200, filtEnvR:150, _name:'SQ_UNISON'  },
   // ベース系
   { wave:'sawtooth', length:250, filterFreq:300,  filterRes:10, filterType:'lowpass', envA:1,  envD:60,  envS:20, envR:100, voiceCount:1, detune:0,  spread:0,  filtEnvOn:true,  filtEnvAmt:55, filtEnvA:1,  filtEnvD:80,  filtEnvR:60,  _name:'EURO_BASS'  },
