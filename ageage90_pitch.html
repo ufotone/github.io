@@ -2951,7 +2951,7 @@ function scheduleStep() {
         }
         // SSAW出力: targetSsaw=trueなら各コードノートをplaySubtractiveで発音
         // (ボコーダーON時はplaySubtractive内部でcarInputGainに自動接続される)
-        if (cs.targetSsaw) {
+        if (seq.chordSeq.targetSsaw) {
           chordNotes.forEach(noteName => {
             playSubtractive(
               noteToHz(noteName), 80,
