@@ -7904,7 +7904,10 @@ function scheduleUIUpdate(updateFn) {
 
 // MIDIノートオン受信 → pianoTriggerと同等処理（GUIハイライト + 音声 + REC）
 // ===== 低レイテンシー版: オーディオ処理を最優先、UI更新は非同期化 =====
-function midiNoteOnTrigger(noteName, velocity) {
+function midiNoteOnTrigger(noteName, velocity, dest) {
+  // dest: 'ssaw' | 'pcm' | 'all'  省略時は 'ssaw'
+  const midiDest = dest ?? 'ssaw';
+
   // ===== CRITICAL PATH: オーディオ処理を最優先 =====
   if (!audioCtx) initAudio();
   if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -7924,8 +7927,10 @@ function midiNoteOnTrigger(noteName, velocity) {
     }
   }
 
-  // オーディオ生成（最速パス）
-  if (useSlotIdx != null && state.pcmToneBank[useSlotIdx]) {
+  const hasPcm = useSlotIdx != null && state.pcmToneBank[useSlotIdx];
+
+  // PCM再生 (dest=pcm or dest=all)
+  if ((midiDest === 'pcm' || midiDest === 'all') && hasPcm) {
     const hz = noteToHz(noteName);
     const playMidi = noteNameToMidi(noteName);
     const rate = pad.groupId ? semisToRate(useRootMidi, playMidi) : hz / C4_HZ;
@@ -7942,7 +7947,10 @@ function midiNoteOnTrigger(noteName, velocity) {
       gn.connect(masterGainNode);
       src.start(audioCtx.currentTime);
     }
-  } else {
+  }
+
+  // SSAW再生 (dest=ssaw or dest=all)
+  if (midiDest === 'ssaw' || midiDest === 'all') {
     const hz = noteToHz(noteName);
     playSubtractive(hz, midiVelToVol(velocity), audioCtx.currentTime, false,
       state.subParams.length / 1000, undefined, noteName);
@@ -8093,11 +8101,12 @@ function onMidiMessage(deviceId, e) {
   if (dev.channel !== 0 && dev.channel !== channel) return;
 
   const noteName = midiNoteToName(note);
+  const dest = dev.dest ?? 'ssaw';
 
   // 分岐を最小化
   if (type === 0x90) {
     if (velocity > 0) {
-      midiNoteOnTrigger(noteName, velocity);
+      midiNoteOnTrigger(noteName, velocity, dest);
     } else {
       midiNoteOffTrigger(noteName);
     }
@@ -8118,7 +8127,7 @@ function buildMidiDeviceList() {
   // ポート一覧を同期
   midiState.access.inputs.forEach((port, id) => {
     if (!existingIds.has(id)) {
-      const newDev = { id, name: port.name, port, active: false, channel: 0 };
+      const newDev = { id, name: port.name, port, active: false, channel: 0, dest: 'ssaw' };
       midiState.devices.push(newDev);
       midiDeviceMap.set(id, newDev); // Map更新
     }
@@ -8198,6 +8207,24 @@ function renderMidiPanel(panel) {
     chSel.onchange = (e) => { dev.channel = parseInt(e.target.value); };
     chWrap.appendChild(chLbl); chWrap.appendChild(chSel);
     row.appendChild(chWrap);
+
+    // 宛先選択
+    const destWrap = document.createElement('span');
+    destWrap.style.cssText = 'display:flex;align-items:center;gap:3px';
+    const destLbl = document.createElement('span');
+    destLbl.style.cssText = 'font-size:8px;color:#888';
+    destLbl.textContent = '宛先:';
+    const destSel = document.createElement('select');
+    destSel.className = 'midi-ch-select';
+    [['ssaw','SSAW'],['all','ALL'],['pcm','PCM']].forEach(([val,lbl]) => {
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = lbl;
+      if ((dev.dest ?? 'ssaw') === val) opt.selected = true;
+      destSel.appendChild(opt);
+    });
+    destSel.onchange = (e) => { dev.dest = e.target.value; };
+    destWrap.appendChild(destLbl); destWrap.appendChild(destSel);
+    row.appendChild(destWrap);
 
     // 状態ドット
     const dot = document.createElement('span');
