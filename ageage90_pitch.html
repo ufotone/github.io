@@ -191,6 +191,7 @@
     .tone-slot:hover { background: #2a2a2a; color: #ccc; }
     .tone-slot.stored { background: #1f2a30; border-color: #58a; color: #aef; }
     .tone-slot.active { background: #2a4a3a; border-color: #afe; color: #fff; }
+    .tone-slot.active-empty { background: #1a2a1a; border-color: #5a8; border-style: dashed; color: #8c8; }
 
     /* ===== BANK BAR ===== */
     .bank-bar {
@@ -6771,15 +6772,14 @@ function buildSubPanel() {
   bankHdr.appendChild(bt);
   const storeBtn = document.createElement('button');
   storeBtn.className = 'btn primary';
-  storeBtn.textContent = 'STORE → empty';
+  storeBtn.textContent = state.subActiveTone >= 0 ? `STORE → SLOT ${state.subActiveTone}` : 'STORE';
+  storeBtn.title = 'アクティブスロットに現在のパラメーターを保存 (スロットをクリックでアクティブ化)';
   storeBtn.onclick = async () => {
-    const active = state.subActiveTone;
-    let target = active >= 0 ? active : state.subToneBank.findIndex(s => s == null);
-    if (target < 0) { showToast('SSAW TONE BANK 満杯です', 'warn'); return; }
-    const nm = await mobilePrompt('音色名:', `slot${target}`);
+    const target = state.subActiveTone;
+    if (target < 0) { showToast('スロットをクリックしてアクティブにしてください', 'warn'); return; }
+    const nm = await mobilePrompt('音色名:', state.subToneBank[target]?._name || `slot${target}`);
     if (nm === null) return;
     state.subToneBank[target] = { ...JSON.parse(JSON.stringify(state.subParams)), _name: nm.slice(0, 8) };
-    state.subActiveTone = target;
     buildSubPanel();
     showToast(`SSAW SLOT ${target} 保存`, 'ok');
   };
@@ -6814,16 +6814,19 @@ function buildSubPanel() {
   for (let s = 0; s < 50; s++) {
     const tone = state.subToneBank[s];
     const slot = document.createElement('div');
-    slot.className = 'tone-slot' + (tone ? ' stored' : '') + (state.subActiveTone === s ? ' active' : '');
+    const isActive = state.subActiveTone === s;
+    slot.className = 'tone-slot' + (tone ? ' stored' : '') + (isActive && tone ? ' active' : '') + (isActive && !tone ? ' active-empty' : '');
     slot.textContent = tone ? `${s}:${(tone._name || '').slice(0,5)}` : s;
     slot.title = tone ? `SLOT ${s}: ${tone._name || ''}` : `SLOT ${s}: 空き`;
     slot.onclick = () => {
       if (tone) {
+        // storedスロット: ロード＆アクティブ化
         const { _name, ...params } = tone;
         Object.assign(state.subParams, JSON.parse(JSON.stringify(params)));
-        state.subActiveTone = s;
-        buildSubPanel();
       }
+      // 空きスロットでもアクティブ化（STOREの保存先として選択）
+      state.subActiveTone = s;
+      buildSubPanel();
     };
     slot.oncontextmenu = (e) => { e.preventDefault(); showSubSlotCtx(e, s); };
     slotGrid.appendChild(slot);
@@ -6832,9 +6835,15 @@ function buildSubPanel() {
 
   const actInfo = document.createElement('div');
   actInfo.style.cssText = 'font-size:9px;color:#aaa;margin-top:6px';
-  actInfo.textContent = state.subActiveTone >= 0
-    ? `Active: SLOT ${state.subActiveTone}` + (state.subToneBank[state.subActiveTone]?._name ? ` (${state.subToneBank[state.subActiveTone]._name})` : '')
-    : 'Active: なし (バンク未使用)';
+  if (state.subActiveTone >= 0) {
+    const sl = state.subToneBank[state.subActiveTone];
+    actInfo.style.color = sl ? '#aaa' : '#6a8';
+    actInfo.textContent = sl
+      ? `Active: SLOT ${state.subActiveTone}` + (sl._name ? ` (${sl._name})` : '') + ' — STORE で上書き保存'
+      : `Active: SLOT ${state.subActiveTone} (空き) — STORE で新規保存`;
+  } else {
+    actInfo.textContent = 'スロットをクリックして STORE 先を選択';
+  }
   bankBox.appendChild(actInfo);
 
   container.appendChild(bankBox);
