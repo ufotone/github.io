@@ -722,6 +722,10 @@
     .fade-ctrl-val.in  { color: #5af; }
     .fade-ctrl-val.out { color: #fa5; }
 
+    /* ===== WAVE EDITOR GATE ===== */
+    .gate-cell-on  { background:#1a4a10; border-color:#5f3 !important; color:#5f3; }
+    .gate-cell-off { background:#181818; border-color:#333 !important; color:#444; }
+
     /* ===== PCM SLOT 録音中発光 ===== */
     .pcm-slot.recording-active {
       border-color: #f55 !important;
@@ -755,7 +759,7 @@
     <div class="transport">
       <button id="playBtn" class="play-btn">▶ PLAY</button>
       <label style="font-size:9px;color:#888">BPM</label>
-      <input type="number" id="bpm" min="40" max="300" value="120" step="1">
+      <input type="number" id="bpm" min="40" max="350" value="150" step="1">
       <label style="font-size:9px;color:#888">SWING</label>
       <input type="number" id="swing" min="0" max="100" value="0" step="1" style="width:50px">
       <button class="btn" id="loopBtn">LOOP ON</button>
@@ -1066,7 +1070,7 @@ function semisToRate(rootMidi, playMidi) {
 
 // ===== STATE =====
 const state = {
-  bpm: 120,
+  bpm: 150,
   loop: true,
   swing: 0,           // 0〜100 (% off-beat delay)
   currentBank: 0,
@@ -5791,6 +5795,47 @@ function applyFadeToBuffer(audioBuf, fadeInSec, fadeOutSec) {
   }
 }
 
+// ===== GATE エフェクト適用 =====
+// AudioBuffer のサンプルをBPM同期で無音化（Gate）する。
+// subdivision: 分割単位 (4=4分, 8=8分, 16=16分, 32=32分, 64=64分, 0=手入力)
+// dutyCycle: 0.0〜1.0 (1ステップ中の発音割合)
+// pattern: boolean[] (各ステップのON/OFF、長さがgridCellsと一致する)
+// gateAttack: アタック時間(秒) 0〜
+// gateRelease: リリース時間(秒) 0〜
+function applyGateToBuffer(audioBuf, bpm, subdivision, dutyCycle, pattern, gateAttack, gateRelease) {
+  const sr = audioBuf.sampleRate;
+  const len = audioBuf.length;
+  // 1ステップのサンプル数
+  const stepSamples = (sr * 60) / (bpm * subdivision / 4);
+  const onSamples = Math.floor(stepSamples * dutyCycle);
+  const atkSamples = Math.floor((gateAttack  || 0) * sr);
+  const relSamples = Math.floor((gateRelease || 0) * sr);
+
+  for (let c = 0; c < audioBuf.numberOfChannels; c++) {
+    const data = audioBuf.getChannelData(c);
+    for (let i = 0; i < len; i++) {
+      const stepIdx = Math.floor(i / stepSamples);
+      const posInStep = i - stepIdx * stepSamples;
+      const patOn = pattern[stepIdx % pattern.length];
+
+      if (!patOn || posInStep >= onSamples) {
+        // OFF区間 — リリース
+        if (patOn && relSamples > 0) {
+          const relPos = posInStep - onSamples;
+          data[i] *= Math.max(0, 1 - relPos / relSamples);
+        } else {
+          data[i] = 0;
+        }
+      } else {
+        // ON区間 — アタック
+        if (atkSamples > 0 && posInStep < atkSamples) {
+          data[i] *= posInStep / atkSamples;
+        }
+      }
+    }
+  }
+}
+
 function openWaveEditor(slotIdx) {
   const slot = state.pcmToneBank[slotIdx];
   if (!slot || !slot.rawBuffer) { showToast('WAVEデータがありません', 'warn'); return; }
@@ -6200,6 +6245,298 @@ function openWaveEditor(slotIdx) {
 
   box.appendChild(invertRow);
 
+  // ===== GATE コントロール =====
+  // state
+  let gateEnabled    = false;
+  let gateSubdiv     = 16;   // 4/8/16/32/64 or 0=custom
+  let gateDuty       = 0.5;
+  let gateAtk        = 0.002;
+  let gateRel        = 0.005;
+  // pattern: trueでON。subdivの数だけ持つ（最大64）
+  const MAX_GATE_STEPS = 64;
+  let gatePattern    = Array(MAX_GATE_STEPS).fill(true);
+  let gateCustomBpm  = null; // null=現在BPMを使う
+
+  // GATE セクション外枠
+  const gateSection = document.createElement('div');
+  gateSection.style.cssText = 'background:#0d0d0d;border:1px solid #2a2a2a;border-radius:3px;padding:6px 8px;display:flex;flex-direction:column;gap:6px';
+
+  // ヘッダー行
+  const gateHdr = document.createElement('div');
+  gateHdr.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+
+  const gateToggle = document.createElement('button');
+  gateToggle.className = 'btn';
+  gateToggle.style.cssText = 'border-color:#5f3;color:#5f3;font-size:9px;padding:2px 9px;min-width:70px';
+  gateToggle.textContent = '⬡ GATE OFF';
+  gateToggle.onclick = () => {
+    gateEnabled = !gateEnabled;
+    gateToggle.textContent = gateEnabled ? '⬡ GATE ON' : '⬡ GATE OFF';
+    gateToggle.style.cssText = gateEnabled
+      ? 'border-color:#5f3;color:#fff;background:#0a2a05;font-size:9px;padding:2px 9px;min-width:70px'
+      : 'border-color:#5f3;color:#5f3;font-size:9px;padding:2px 9px;min-width:70px';
+    gateControls.style.display = gateEnabled ? 'flex' : 'none';
+  };
+  gateHdr.appendChild(gateToggle);
+
+  const gateHdrInfo = document.createElement('span');
+  gateHdrInfo.style.cssText = 'font-size:9px;color:#555';
+  gateHdrInfo.textContent = 'BPM同期でサンプルを細切れに';
+  gateHdr.appendChild(gateHdrInfo);
+  gateSection.appendChild(gateHdr);
+
+  // コントロール本体（GATE OFF時は非表示）
+  const gateControls = document.createElement('div');
+  gateControls.style.cssText = 'display:none;flex-direction:column;gap:6px';
+
+  // --- 1行目: SUBDIV / BPM ---
+  const gateRow1 = document.createElement('div');
+  gateRow1.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+
+  const subdivLabel = document.createElement('span');
+  subdivLabel.style.cssText = 'font-size:9px;color:#aaa;min-width:52px';
+  subdivLabel.textContent = 'SUBDIV:';
+  gateRow1.appendChild(subdivLabel);
+
+  // 分割ボタン群
+  const subdivBtns = {};
+  [4, 8, 16, 32, 64].forEach(n => {
+    const b = document.createElement('button');
+    b.className = 'btn' + (n === 16 ? ' active' : '');
+    b.style.cssText = n === 16
+      ? 'border-color:#c4803a;color:#fc8;font-size:9px;padding:2px 7px'
+      : 'font-size:9px;padding:2px 7px';
+    b.textContent = n === 4 ? '♩4分' : n === 8 ? '♪8分' : n === 16 ? '♬16分' : n === 32 ? '32分' : '64分';
+    b.onclick = () => {
+      gateSubdiv = n;
+      Object.entries(subdivBtns).forEach(([k, btn]) => {
+        const on = parseInt(k) === n;
+        btn.className = 'btn' + (on ? ' active' : '');
+        btn.style.cssText = on
+          ? 'border-color:#c4803a;color:#fc8;font-size:9px;padding:2px 7px'
+          : 'font-size:9px;padding:2px 7px';
+      });
+      rebuildGatePattern();
+    };
+    subdivBtns[n] = b;
+    gateRow1.appendChild(b);
+  });
+
+  // BPM表示/上書き
+  const bpmLabel = document.createElement('span');
+  bpmLabel.style.cssText = 'font-size:9px;color:#aaa;margin-left:8px';
+  bpmLabel.textContent = 'BPM:';
+  const bpmInput = document.createElement('input');
+  bpmInput.type = 'number';
+  bpmInput.value = state.bpm;
+  bpmInput.min = '40'; bpmInput.max = '300';
+  bpmInput.style.cssText = 'background:#1a1a1a;border:1px solid #333;color:#fc8;font-size:9px;font-family:monospace;width:50px;padding:1px 4px;border-radius:2px';
+  bpmInput.title = '空欄にすると現在BPMを使用';
+  bpmInput.oninput = () => {
+    const v = parseInt(bpmInput.value);
+    gateCustomBpm = (!isNaN(v) && v >= 40 && v <= 300) ? v : null;
+    rebuildGatePattern();
+  };
+  gateRow1.appendChild(bpmLabel);
+  gateRow1.appendChild(bpmInput);
+  gateControls.appendChild(gateRow1);
+
+  // --- 2行目: DUTY / ATTACK / RELEASE ---
+  const gateRow2 = document.createElement('div');
+  gateRow2.style.cssText = 'display:flex;align-items:center;gap:6px;flex-wrap:wrap';
+
+  function makeGateSlider(label, min, max, step, initVal, fmt, onchange) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;align-items:center;gap:4px;flex:1;min-width:140px';
+    const lbl = document.createElement('span');
+    lbl.style.cssText = 'font-size:9px;color:#aaa;min-width:54px;flex-shrink:0';
+    lbl.textContent = label;
+    const sl = document.createElement('input');
+    sl.type = 'range'; sl.min = min; sl.max = max; sl.step = step;
+    sl.value = initVal; sl.style.cssText = 'flex:1;accent-color:#5f3';
+    const val = document.createElement('span');
+    val.style.cssText = 'font-size:9px;color:#5f3;font-family:monospace;min-width:42px;text-align:right';
+    val.textContent = fmt(parseFloat(initVal));
+    sl.oninput = () => { onchange(parseFloat(sl.value)); val.textContent = fmt(parseFloat(sl.value)); };
+    wrap.appendChild(lbl); wrap.appendChild(sl); wrap.appendChild(val);
+    return wrap;
+  }
+
+  gateRow2.appendChild(makeGateSlider('DUTY:', '5', '95', '1', '50',
+    v => Math.round(v) + '%', v => { gateDuty = v / 100; updateGatePatternDisplay(); }));
+  gateRow2.appendChild(makeGateSlider('ATK:', '0', '50', '1', '2',
+    v => (v).toFixed(0) + 'ms', v => { gateAtk = v / 1000; }));
+  gateRow2.appendChild(makeGateSlider('REL:', '0', '50', '1', '5',
+    v => (v).toFixed(0) + 'ms', v => { gateRel = v / 1000; }));
+  gateControls.appendChild(gateRow2);
+
+  // --- 3行目: パターングリッド ---
+  const gateRow3 = document.createElement('div');
+  gateRow3.style.cssText = 'display:flex;flex-direction:column;gap:3px';
+
+  const patLabelRow = document.createElement('div');
+  patLabelRow.style.cssText = 'display:flex;align-items:center;gap:6px';
+  const patLabel = document.createElement('span');
+  patLabel.style.cssText = 'font-size:9px;color:#aaa';
+  patLabel.textContent = 'PATTERN:';
+  const patAllBtn = document.createElement('button');
+  patAllBtn.className = 'btn'; patAllBtn.textContent = 'ALL ON';
+  patAllBtn.style.cssText = 'font-size:8px;padding:1px 6px';
+  patAllBtn.onclick = () => { for(let i=0;i<gateSubdiv;i++) gatePattern[i]=true; updateGatePatternDisplay(); };
+  const patNoneBtn = document.createElement('button');
+  patNoneBtn.className = 'btn warn'; patNoneBtn.textContent = 'ALL OFF';
+  patNoneBtn.style.cssText = 'font-size:8px;padding:1px 6px';
+  patNoneBtn.onclick = () => { for(let i=0;i<gateSubdiv;i++) gatePattern[i]=false; updateGatePatternDisplay(); };
+  const patAltBtn = document.createElement('button');
+  patAltBtn.className = 'btn'; patAltBtn.textContent = '交互';
+  patAltBtn.style.cssText = 'font-size:8px;padding:1px 6px;border-color:#5af;color:#5af';
+  patAltBtn.onclick = () => { for(let i=0;i<gateSubdiv;i++) gatePattern[i]=(i%2===0); updateGatePatternDisplay(); };
+  const pat3_4Btn = document.createElement('button');
+  pat3_4Btn.className = 'btn'; pat3_4Btn.textContent = '3/4';
+  pat3_4Btn.style.cssText = 'font-size:8px;padding:1px 6px;border-color:#fa5;color:#fa5';
+  pat3_4Btn.onclick = () => { for(let i=0;i<gateSubdiv;i++) gatePattern[i]=(i%4!==3); updateGatePatternDisplay(); };
+  const patStutterBtn = document.createElement('button');
+  patStutterBtn.className = 'btn'; patStutterBtn.textContent = 'スタッター';
+  patStutterBtn.style.cssText = 'font-size:8px;padding:1px 6px;border-color:#f5a;color:#f5a';
+  patStutterBtn.onclick = () => {
+    // 最初の半分でどんどん細かくなるパターン
+    const steps = gateSubdiv;
+    const half = Math.floor(steps / 2);
+    for (let i = 0; i < steps; i++) {
+      const b = i < half ? (i % 2 === 0) : (i % 4 === 0 || i % 4 === 2);
+      gatePattern[i] = b;
+    }
+    updateGatePatternDisplay();
+  };
+  patLabelRow.appendChild(patLabel);
+  patLabelRow.appendChild(patAllBtn);
+  patLabelRow.appendChild(patNoneBtn);
+  patLabelRow.appendChild(patAltBtn);
+  patLabelRow.appendChild(pat3_4Btn);
+  patLabelRow.appendChild(patStutterBtn);
+  gateRow3.appendChild(patLabelRow);
+
+  // パターンセルグリッド
+  const patGrid = document.createElement('div');
+  patGrid.style.cssText = 'display:flex;gap:2px;flex-wrap:wrap;padding:4px 0';
+
+  function rebuildGatePattern() {
+    // ステップ数変更時に余剰部はそのまま保持
+    updateGatePatternDisplay();
+  }
+
+  function updateGatePatternDisplay() {
+    patGrid.innerHTML = '';
+    const steps = Math.max(4, Math.min(MAX_GATE_STEPS, gateSubdiv));
+    // セル幅を画面幅に合わせて計算
+    const cellW = Math.max(14, Math.min(22, Math.floor((box.offsetWidth - 40) / steps) - 2));
+    for (let i = 0; i < steps; i++) {
+      const cell = document.createElement('div');
+      const isOn = gatePattern[i] !== false;
+      // 4ステップごとにグループ区切りマーカー
+      const isBeat = (i % 4 === 0);
+      cell.style.cssText = `
+        width:${cellW}px; height:22px;
+        background:${isOn ? '#1a4a10' : '#181818'};
+        border:1px solid ${isOn ? '#5f3' : '#333'};
+        ${isBeat && i > 0 ? 'border-left:2px solid #c4803a !important;' : ''}
+        border-radius:2px; cursor:pointer; flex-shrink:0;
+        display:flex; align-items:center; justify-content:center;
+        font-size:7px; color:${isOn ? '#5f3' : '#444'};
+        user-select:none;
+      `;
+      cell.textContent = isOn ? '█' : '·';
+      cell.title = `ステップ${i+1} (${isOn?'ON':'OFF'})`;
+      cell.onclick = () => {
+        gatePattern[i] = !gatePattern[i];
+        updateGatePatternDisplay();
+      };
+      patGrid.appendChild(cell);
+    }
+    // ステップ数ラベル
+    patStepsInfo.textContent = `${steps} steps  (1step = ${((60/( (gateCustomBpm||state.bpm) * gateSubdiv/4))*1000).toFixed(1)}ms)`;
+  }
+
+  const patStepsInfo = document.createElement('span');
+  patStepsInfo.style.cssText = 'font-size:8px;color:#555;margin-top:1px';
+
+  gateRow3.appendChild(patGrid);
+  gateRow3.appendChild(patStepsInfo);
+  gateControls.appendChild(gateRow3);
+
+  // --- 4行目: プレビュー & 適用ボタン ---
+  const gateRow4 = document.createElement('div');
+  gateRow4.style.cssText = 'display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-top:4px;border-top:1px solid #1e1e1e';
+
+  const gatePreviewBtn = document.createElement('button');
+  gatePreviewBtn.className = 'btn primary';
+  gatePreviewBtn.textContent = '▶ GATE試聴 (選択範囲)';
+  gatePreviewBtn.onclick = () => {
+    if (!audioCtx) initAudio();
+    const sampleStart = Math.floor(trimStart * totalSamples);
+    const sampleLen   = Math.floor((trimEnd - trimStart) * totalSamples);
+    if (sampleLen <= 0) return;
+    const tmpBuf = audioCtx.createBuffer(buf.numberOfChannels, sampleLen, sr);
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const s = buf.getChannelData(c), d = tmpBuf.getChannelData(c);
+      for (let i = 0; i < sampleLen; i++) d[i] = s[sampleStart + i];
+    }
+    applyFadeToBuffer(tmpBuf, fadeInSec, fadeOutSec);
+    if (isReversed) reverseBuffer(tmpBuf);
+    if (isPolarInv) invertPolarityBuffer(tmpBuf);
+    const useBpm = gateCustomBpm || state.bpm;
+    applyGateToBuffer(tmpBuf, useBpm, gateSubdiv, gateDuty, gatePattern.slice(0, gateSubdiv), gateAtk, gateRel);
+    const src2 = audioCtx.createBufferSource();
+    src2.buffer = tmpBuf;
+    src2.connect(audioCtx.destination);
+    src2.start();
+  };
+  gateRow4.appendChild(gatePreviewBtn);
+
+  const gateApplyBtn = document.createElement('button');
+  gateApplyBtn.className = 'btn active';
+  gateApplyBtn.style.cssText = 'border-color:#5f3;color:#9f6;margin-left:auto';
+  gateApplyBtn.textContent = '⬡ GATE適用して確定';
+  gateApplyBtn.onclick = async () => {
+    const sampleStart = Math.floor(trimStart * totalSamples);
+    const sampleLen   = Math.floor((trimEnd - trimStart) * totalSamples);
+    if (sampleLen <= 0) { showToast('選択範囲が空です', 'warn'); return; }
+    const newBuf = audioCtx.createBuffer(buf.numberOfChannels, sampleLen, sr);
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const s = buf.getChannelData(c), d = newBuf.getChannelData(c);
+      for (let i = 0; i < sampleLen; i++) d[i] = s[sampleStart + i];
+    }
+    applyFadeToBuffer(newBuf, fadeInSec, fadeOutSec);
+    if (isReversed) reverseBuffer(newBuf);
+    if (isPolarInv) invertPolarityBuffer(newBuf);
+    const useBpm = gateCustomBpm || state.bpm;
+    applyGateToBuffer(newBuf, useBpm, gateSubdiv, gateDuty, gatePattern.slice(0, gateSubdiv), gateAtk, gateRel);
+    slot.rawBuffer = newBuf;
+    slot.buffer = null;
+    slot.stretchedBuffer = null;
+    const stepDur = (60 / state.bpm) / 4;
+    slot.slotSteps = Math.max(1, Math.round(newBuf.duration / stepDur));
+    applyPcmSlotBits(slotIdx);
+    renderPcmToneBank();
+    if (state.currentSeqTab === 'pcmseq') renderSeq();
+    const patDesc = `GATE/${gateSubdiv}分 DUTY:${Math.round(gateDuty*100)}% BPM:${useBpm}`;
+    showToast(`S${slotIdx+1} GATE適用完了: ${newBuf.duration.toFixed(3)}s [${patDesc}]`, 'ok', 3000);
+    bg.remove();
+  };
+  gateRow4.appendChild(gateApplyBtn);
+
+  const gateNote = document.createElement('span');
+  gateNote.style.cssText = 'font-size:8px;color:#444;margin-left:4px';
+  gateNote.textContent = '※ rawBufferに書き込み（破壊的）';
+  gateRow4.appendChild(gateNote);
+  gateControls.appendChild(gateRow4);
+
+  gateSection.appendChild(gateControls);
+  box.appendChild(gateSection);
+
+  // 初期パターン表示
+  setTimeout(() => updateGatePatternDisplay(), 0);
+
   // スライダーの秒表示をトリム変更時にも同期
   const origUpdateInfo = updateInfo;
   // trimStart/trimEnd 変更後に呼ばれる updateInfo をフックして秒値を再計算
@@ -6280,6 +6617,10 @@ function openWaveEditor(slotIdx) {
     applyFadeToBuffer(newBuf, fadeInSec, fadeOutSec);
     if (isReversed) reverseBuffer(newBuf);
     if (isPolarInv) invertPolarityBuffer(newBuf);
+    if (gateEnabled) {
+      const useBpm = gateCustomBpm || state.bpm;
+      applyGateToBuffer(newBuf, useBpm, gateSubdiv, gateDuty, gatePattern.slice(0, gateSubdiv), gateAtk, gateRel);
+    }
 
     slot.rawBuffer = newBuf;
     slot.buffer = null;
@@ -6292,7 +6633,8 @@ function openWaveEditor(slotIdx) {
     const fadeDesc = (fadeInSec > 0 || fadeOutSec > 0)
       ? ` [FI:${fadeInSec.toFixed(2)}s FO:${fadeOutSec.toFixed(2)}s]` : '';
     const revDesc = [isReversed ? 'REV' : '', isPolarInv ? 'INV' : ''].filter(Boolean).join('+');
-    showToast(`S${slotIdx+1} カット完了: ${newBuf.duration.toFixed(3)}s${fadeDesc}${revDesc ? ' [' + revDesc + ']' : ''}`, 'ok', 3000);
+    const gateDesc = gateEnabled ? ` [GATE/${gateSubdiv}分 DUTY:${Math.round(gateDuty*100)}%]` : '';
+    showToast(`S${slotIdx+1} カット完了: ${newBuf.duration.toFixed(3)}s${fadeDesc}${revDesc ? ' [' + revDesc + ']' : ''}${gateDesc}`, 'ok', 3000);
     bg.remove();
   };
   ctrlRow.appendChild(trimApplyBtn);
@@ -6321,6 +6663,10 @@ function openWaveEditor(slotIdx) {
     applyFadeToBuffer(tmpBuf, fadeInSec, fadeOutSec);
     if (isReversed) reverseBuffer(tmpBuf);
     if (isPolarInv) invertPolarityBuffer(tmpBuf);
+    if (gateEnabled) {
+      const useBpm = gateCustomBpm || state.bpm;
+      applyGateToBuffer(tmpBuf, useBpm, gateSubdiv, gateDuty, gatePattern.slice(0, gateSubdiv), gateAtk, gateRel);
+    }
     downloadWav(tmpBuf, `${slot.name}_trim.wav`);
     showToast('WAV書き出し完了', 'ok');
   };
