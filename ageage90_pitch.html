@@ -206,6 +206,9 @@
     }
     .bank-btn:hover { background: #2a2a2a; color: #ccc; }
     .bank-btn.active { background: #2a4a3a; border-color: #afe; color: #fff; }
+    /* パターンデータが存在するスロット: 明るい背景＋アクセントカラー */
+    .bank-btn.stored { background: #252010; border-color: #6a5020; color: #c4803a; }
+    .bank-btn.stored:hover { background: #2e2818; border-color: #a07838; color: #e09848; }
 
     /* ===== TRANSPORT ===== */
     .transport {
@@ -3156,12 +3159,30 @@ function activateSeqTab(stabId) {
 }
 
 // ===== BANK BAR =====
+// バンクにパターンデータが1ステップでも入っているか判定
+function bankHasPattern(bi) {
+  const b = state.banks[bi];
+  if (!b || !b.seqData) return false;
+  const sd = b.seqData;
+  // SSAW
+  if (sd.sub && sd.sub.on && sd.sub.on.some(v => v)) return true;
+  // PCM 16ch
+  if (sd.pcm && sd.pcm.some(ch => ch.on && ch.on.some(v => v))) return true;
+  // Sampler
+  if (sd.samplerSeq && sd.samplerSeq.some(ch => ch.on && ch.on.some(v => v))) return true;
+  // Chord
+  if (sd.chordSeq && sd.chordSeq.steps && sd.chordSeq.steps.some(s => s.on)) return true;
+  return false;
+}
+
 function buildBankBar() {
   const bar = document.getElementById('bankBar');
   bar.innerHTML = '';
   for (let i = 0; i < 100; i++) {
     const btn = document.createElement('button');
-    btn.className = 'bank-btn' + (i === state.currentBank ? ' active' : '');
+    const isActive = i === state.currentBank;
+    const isStored = !isActive && bankHasPattern(i);
+    btn.className = 'bank-btn' + (isActive ? ' active' : '') + (isStored ? ' stored' : '');
     btn.textContent = (i+1).toString().padStart(2, '0');
     btn.onclick = () => {
       state.currentBank = i;
@@ -4610,6 +4631,8 @@ function closeChordPicker() {
 //
 // コード表記: Am=Aマイナー, E=Eメジャー(ドミナント), etc.
 
+// CHORD_PRESETS: chords[] = コード進行（1コード1要素）
+// 各コードを別パターン（bank）の先頭ステップに書き込む新方式
 const CHORD_PRESETS = [
   {
     id: 'eurobeat_am_classic',
@@ -4617,24 +4640,11 @@ const CHORD_PRESETS = [
     key: 'Am',
     prog: 'Am → F → C → G',
     desc: '王道Aマイナー循環。哀愁と疾走感の基本形。',
-    steps: [
-      // 4ステップ × 4 = 16step (各コード4step)
+    chords: [
       { root:'A', type:'min',  octave:4, inv:0 }, // Am
-      { root:'A', type:'min',  octave:4, inv:0 },
-      { root:'A', type:'min',  octave:4, inv:0 },
-      { root:'A', type:'min',  octave:4, inv:0 },
       { root:'F', type:'maj',  octave:4, inv:0 }, // F
-      { root:'F', type:'maj',  octave:4, inv:0 },
-      { root:'F', type:'maj',  octave:4, inv:0 },
-      { root:'F', type:'maj',  octave:4, inv:0 },
       { root:'C', type:'maj',  octave:4, inv:0 }, // C
-      { root:'C', type:'maj',  octave:4, inv:0 },
-      { root:'C', type:'maj',  octave:4, inv:0 },
-      { root:'C', type:'maj',  octave:4, inv:0 },
       { root:'G', type:'maj',  octave:4, inv:0 }, // G
-      { root:'G', type:'maj',  octave:4, inv:0 },
-      { root:'G', type:'maj',  octave:4, inv:0 },
-      { root:'G', type:'maj',  octave:4, inv:0 },
     ],
   },
   {
@@ -4643,23 +4653,11 @@ const CHORD_PRESETS = [
     key: 'Am',
     prog: 'Am → Em → F → E7',
     desc: '疾走感MAX。E7ドミナントの緊張感がユーロビートらしい解決感を生む。',
-    steps: [
+    chords: [
       { root:'A', type:'min',  octave:4, inv:0 }, // Am
-      { root:'A', type:'min',  octave:4, inv:0 },
-      { root:'A', type:'min',  octave:4, inv:0 },
-      { root:'A', type:'min',  octave:4, inv:0 },
       { root:'E', type:'min',  octave:4, inv:0 }, // Em
-      { root:'E', type:'min',  octave:4, inv:0 },
-      { root:'E', type:'min',  octave:4, inv:0 },
-      { root:'E', type:'min',  octave:4, inv:0 },
       { root:'F', type:'maj',  octave:4, inv:0 }, // F
-      { root:'F', type:'maj',  octave:4, inv:0 },
-      { root:'F', type:'maj',  octave:4, inv:0 },
-      { root:'F', type:'maj',  octave:4, inv:0 },
-      { root:'E', type:'7',    octave:4, inv:0 }, // E7 (ドミナント)
-      { root:'E', type:'7',    octave:4, inv:0 },
-      { root:'E', type:'7',    octave:4, inv:0 },
-      { root:'E', type:'7',    octave:4, inv:0 },
+      { root:'E', type:'7',    octave:4, inv:0 }, // E7
     ],
   },
   {
@@ -4668,23 +4666,11 @@ const CHORD_PRESETS = [
     key: 'Am',
     prog: 'F → G → Am → E',
     desc: 'サビの盛り上がり定番。Fから始まるサブドミナント→ドミナント解決。感情爆発。',
-    steps: [
+    chords: [
       { root:'F', type:'maj',  octave:4, inv:0 }, // F
-      { root:'F', type:'maj',  octave:4, inv:0 },
-      { root:'F', type:'maj',  octave:4, inv:0 },
-      { root:'F', type:'maj',  octave:4, inv:0 },
       { root:'G', type:'maj',  octave:4, inv:0 }, // G
-      { root:'G', type:'maj',  octave:4, inv:0 },
-      { root:'G', type:'maj',  octave:4, inv:0 },
-      { root:'G', type:'maj',  octave:4, inv:0 },
       { root:'A', type:'min',  octave:4, inv:0 }, // Am
-      { root:'A', type:'min',  octave:4, inv:0 },
-      { root:'A', type:'min',  octave:4, inv:0 },
-      { root:'A', type:'min',  octave:4, inv:0 },
-      { root:'E', type:'maj',  octave:4, inv:0 }, // E (マジョール解決)
-      { root:'E', type:'maj',  octave:4, inv:0 },
-      { root:'E', type:'maj',  octave:4, inv:0 },
-      { root:'E', type:'maj',  octave:4, inv:0 },
+      { root:'E', type:'maj',  octave:4, inv:0 }, // E
     ],
   },
   {
@@ -4693,23 +4679,11 @@ const CHORD_PRESETS = [
     key: 'Dm',
     prog: 'Dm → Bb → C → A',
     desc: 'Dマイナーの切ない疾走系。BbメジャーとAドミナントのコンビが泣けるユーロビート。',
-    steps: [
+    chords: [
       { root:'D', type:'min',  octave:4, inv:0 }, // Dm
-      { root:'D', type:'min',  octave:4, inv:0 },
-      { root:'D', type:'min',  octave:4, inv:0 },
-      { root:'D', type:'min',  octave:4, inv:0 },
       { root:'A#', type:'maj', octave:3, inv:0 }, // Bb
-      { root:'A#', type:'maj', octave:3, inv:0 },
-      { root:'A#', type:'maj', octave:3, inv:0 },
-      { root:'A#', type:'maj', octave:3, inv:0 },
       { root:'C', type:'maj',  octave:4, inv:0 }, // C
-      { root:'C', type:'maj',  octave:4, inv:0 },
-      { root:'C', type:'maj',  octave:4, inv:0 },
-      { root:'C', type:'maj',  octave:4, inv:0 },
-      { root:'A', type:'maj',  octave:3, inv:0 }, // A (ドミナント)
-      { root:'A', type:'maj',  octave:3, inv:0 },
-      { root:'A', type:'maj',  octave:3, inv:0 },
-      { root:'A', type:'maj',  octave:3, inv:0 },
+      { root:'A', type:'maj',  octave:3, inv:0 }, // A
     ],
   },
   {
@@ -4718,48 +4692,28 @@ const CHORD_PRESETS = [
     key: 'Am',
     prog: 'Am → G → F → E',
     desc: '下降コード進行。Am→G→F→Eの半音階下降。ストリングスが映える哀愁ユーロ。',
-    steps: [
+    chords: [
       { root:'A', type:'min',  octave:4, inv:0 }, // Am
-      { root:'A', type:'min',  octave:4, inv:0 },
-      { root:'A', type:'min',  octave:4, inv:0 },
-      { root:'A', type:'min',  octave:4, inv:0 },
       { root:'G', type:'maj',  octave:3, inv:0 }, // G
-      { root:'G', type:'maj',  octave:3, inv:0 },
-      { root:'G', type:'maj',  octave:3, inv:0 },
-      { root:'G', type:'maj',  octave:3, inv:0 },
       { root:'F', type:'maj',  octave:3, inv:0 }, // F
-      { root:'F', type:'maj',  octave:3, inv:0 },
-      { root:'F', type:'maj',  octave:3, inv:0 },
-      { root:'F', type:'maj',  octave:3, inv:0 },
       { root:'E', type:'maj',  octave:3, inv:0 }, // E
-      { root:'E', type:'maj',  octave:3, inv:0 },
-      { root:'E', type:'maj',  octave:3, inv:0 },
-      { root:'E', type:'maj',  octave:3, inv:0 },
     ],
   },
   {
     id: 'eurobeat_am_climax',
     name: 'Climax',
     key: 'Am',
-    prog: 'F→C→G→Am→Dm→Am→E→E',
-    desc: '感動のクライマックス8コード。F→C→G→Am→Dm→Am→E→Eの大展開。涙必至。',
-    steps: [
-      { root:'F', type:'maj',  octave:4, inv:0 }, // F  (2step)
-      { root:'F', type:'maj',  octave:4, inv:0 },
-      { root:'C', type:'maj',  octave:4, inv:0 }, // C  (2step)
-      { root:'C', type:'maj',  octave:4, inv:0 },
-      { root:'G', type:'maj',  octave:4, inv:0 }, // G  (2step)
-      { root:'G', type:'maj',  octave:4, inv:0 },
-      { root:'A', type:'min',  octave:4, inv:0 }, // Am (2step)
-      { root:'A', type:'min',  octave:4, inv:0 },
-      { root:'D', type:'min',  octave:4, inv:0 }, // Dm (2step)
-      { root:'D', type:'min',  octave:4, inv:0 },
-      { root:'A', type:'min',  octave:4, inv:0 }, // Am (2step)
-      { root:'A', type:'min',  octave:4, inv:0 },
-      { root:'E', type:'7',    octave:4, inv:0 }, // E7 (4step ←溜め)
-      { root:'E', type:'7',    octave:4, inv:0 },
-      { root:'E', type:'7',    octave:4, inv:0 },
-      { root:'E', type:'7',    octave:4, inv:0 },
+    prog: 'F→C→G→Am→Dm→Am→E7→E7',
+    desc: '感動のクライマックス8コード。F→C→G→Am→Dm→Am→E7×2の大展開。涙必至。',
+    chords: [
+      { root:'F', type:'maj',  octave:4, inv:0 }, // F
+      { root:'C', type:'maj',  octave:4, inv:0 }, // C
+      { root:'G', type:'maj',  octave:4, inv:0 }, // G
+      { root:'A', type:'min',  octave:4, inv:0 }, // Am
+      { root:'D', type:'min',  octave:4, inv:0 }, // Dm
+      { root:'A', type:'min',  octave:4, inv:0 }, // Am
+      { root:'E', type:'7',    octave:4, inv:0 }, // E7
+      { root:'E', type:'7',    octave:4, inv:0 }, // E7 (溜め)
     ],
   },
   {
@@ -4768,40 +4722,49 @@ const CHORD_PRESETS = [
     key: 'Cm',
     prog: 'Cm → Ab → Eb → G',
     desc: 'Cマイナーのナイトランサウンド。Abがリゾート感、Gドミナントで再加速。',
-    steps: [
+    chords: [
       { root:'C', type:'min',  octave:4, inv:0 }, // Cm
-      { root:'C', type:'min',  octave:4, inv:0 },
-      { root:'C', type:'min',  octave:4, inv:0 },
-      { root:'C', type:'min',  octave:4, inv:0 },
       { root:'G#', type:'maj', octave:3, inv:0 }, // Ab(G#)
-      { root:'G#', type:'maj', octave:3, inv:0 },
-      { root:'G#', type:'maj', octave:3, inv:0 },
-      { root:'G#', type:'maj', octave:3, inv:0 },
       { root:'D#', type:'maj', octave:4, inv:0 }, // Eb(D#)
-      { root:'D#', type:'maj', octave:4, inv:0 },
-      { root:'D#', type:'maj', octave:4, inv:0 },
-      { root:'D#', type:'maj', octave:4, inv:0 },
-      { root:'G', type:'maj',  octave:4, inv:0 }, // G (ドミナント)
-      { root:'G', type:'maj',  octave:4, inv:0 },
-      { root:'G', type:'maj',  octave:4, inv:0 },
-      { root:'G', type:'maj',  octave:4, inv:0 },
+      { root:'G', type:'maj',  octave:4, inv:0 }, // G
     ],
   },
 ];
 
-// プリセットを現在のシーケンスに適用する
-// stepLen が 16以外の場合: 16stepをループして埋める or 切り詰める
-function applyChordPreset(preset, cs, len) {
-  const base = preset.steps; // 16 steps
-  for (let i = 0; i < len; i++) {
-    const src = base[i % base.length];
-    const s = cs.steps[i];
-    s.on     = true;
-    s.root   = src.root;
-    s.type   = src.type;
-    s.octave = src.octave;
-    s.inv    = src.inv ?? 0;
+// プリセット適用: 1コード = 1パターン（bank）方式
+// 現在のbankから始まり、コード数分の連続するbankに各コードを書き込む
+// 各bankのchordSeqの先頭ステップ(step[0])のみON、残りはOFF
+function applyChordPreset(preset) {
+  const chords = preset.chords;
+  const startBank = state.currentBank;
+  const endBank   = startBank + chords.length - 1;
+
+  if (endBank >= state.banks.length) {
+    showToast(`バンク数が足りません (必要: ${chords.length}個、Bank${startBank+1}～)`, 'warn', 3000);
+    return false;
   }
+
+  chords.forEach((chord, ci) => {
+    const bankIdx = startBank + ci;
+    const bank = state.banks[bankIdx];
+
+    // bankのchordSeqを確保
+    ensureChordSeq(bank.seqData, bank.stepLen);
+    const cs = bank.seqData.chordSeq;
+
+    // 全ステップをOFF
+    cs.steps.forEach(s => { s.on = false; });
+
+    // 先頭ステップにコードをセット
+    const s0 = cs.steps[0];
+    s0.on     = true;
+    s0.root   = chord.root;
+    s0.type   = chord.type;
+    s0.octave = chord.octave;
+    s0.inv    = chord.inv ?? 0;
+  });
+
+  return true;
 }
 
 // プリセット選択ポップアップ
@@ -4816,7 +4779,7 @@ function openChordPresetPopup(e, cs, len, onApply) {
 
   const title = document.createElement('div');
   title.className = 'chord-preset-popup-title';
-  title.innerHTML = '🎵 CHORD PRESETS <span style="font-size:8px;color:#666;font-weight:normal">Japanese Eurobeat</span>';
+  title.innerHTML = '🎵 CHORD PRESETS <span style="font-size:8px;color:#666;font-weight:normal">1コード=1パターン展開 | 現在 Bank' + (state.currentBank+1) + ' 〜</span>';
   popup.appendChild(title);
 
   const list = document.createElement('div');
@@ -4850,17 +4813,18 @@ function openChordPresetPopup(e, cs, len, onApply) {
     descEl.textContent = preset.desc;
     item.appendChild(descEl);
 
-    // ノートプレビュー（最初の4コード分）
-    const notesPrev = [];
-    const seen = new Set();
-    for (const s of preset.steps) {
-      const key = `${s.root}${s.type}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        const ns = buildChordNotes(s.root, s.type, s.octave, s.inv ?? 0);
-        notesPrev.push(`${s.root}${CHORD_TYPES[s.type]?.label}[${ns.join(' ')}]`);
-      }
-    }
+    // ノートプレビュー（全コード）
+    const notesPrev = preset.chords.map(s => {
+      const ns = buildChordNotes(s.root, s.type, s.octave, s.inv ?? 0);
+      return `${s.root}${CHORD_TYPES[s.type]?.label ?? s.type}[${ns.join(' ')}]`;
+    });
+    // バンク展開先情報
+    const startB = state.currentBank + 1;
+    const endB   = startB + preset.chords.length - 1;
+    const bankInfoEl = document.createElement('div');
+    bankInfoEl.style.cssText = 'font-size:8px;color:#a88fc8;margin-top:2px;';
+    bankInfoEl.textContent = `Bank ${startB} 〜 ${endB} に展開 (${preset.chords.length}パターン)`;
+    item.appendChild(bankInfoEl);
     const notesEl = document.createElement('div');
     notesEl.className = 'chord-preset-item-notes';
     notesEl.textContent = notesPrev.join('  ');
@@ -5006,19 +4970,26 @@ function renderChordSeq(content, seq, len, beatHeads) {
   presetBar.appendChild(presetLbl);
 
   // プリセットボタン (コンパクト表示)
+  // 新方式: 1コード=1パターン。現在のbankからコード数分のbankに書き込む
   CHORD_PRESETS.forEach((preset, idx) => {
     const btn = document.createElement('button');
     btn.className = 'chord-preset-btn';
-    btn.title = `${preset.prog}\n${preset.desc}`;
+    const startB = state.currentBank + 1;
+    const endB   = startB + preset.chords.length - 1;
+    btn.title = `${preset.prog}\n${preset.desc}\nBank ${startB}〜${endB} に展開`;
     btn.innerHTML =
       `<span class="preset-name">${idx + 1}. ${preset.name}</span>` +
-      `<span class="preset-prog">${preset.key} / ${preset.prog.split('→')[0].trim()}…</span>`;
+      `<span class="preset-prog">${preset.key} / ${preset.prog.split('→')[0].trim()}… (${preset.chords.length}pat)</span>`;
     btn.onclick = (e) => {
       e.stopPropagation();
-      // 確認なしで即適用 (小さいボタンなので詳細はツールチップで)
-      applyChordPreset(preset, cs, len);
-      renderSeq();
-      showToast(`PRESET: ${preset.name} (${preset.prog})`, 'ok', 2000);
+      const start = state.currentBank + 1;
+      const end   = start + preset.chords.length - 1;
+      const ok = applyChordPreset(preset);
+      if (ok) {
+        buildBankBar();
+        renderSeq();
+        showToast(`PRESET: ${preset.name} → Bank${start}〜${end} (${preset.chords.length}パターン)`, 'ok', 2500);
+      }
     };
     presetBar.appendChild(btn);
   });
@@ -5032,9 +5003,14 @@ function renderChordSeq(content, seq, len, beatHeads) {
   detailBtn.onclick = (e) => {
     e.stopPropagation();
     openChordPresetPopup(e, cs, len, (preset) => {
-      applyChordPreset(preset, cs, len);
-      renderSeq();
-      showToast(`PRESET: ${preset.name} (${preset.prog})`, 'ok', 2000);
+      const start = state.currentBank + 1;
+      const end   = start + preset.chords.length - 1;
+      const ok = applyChordPreset(preset);
+      if (ok) {
+        buildBankBar();
+        renderSeq();
+        showToast(`PRESET: ${preset.name} → Bank${start}〜${end} (${preset.chords.length}パターン)`, 'ok', 2500);
+      }
     });
   };
   presetBar.appendChild(detailBtn);
