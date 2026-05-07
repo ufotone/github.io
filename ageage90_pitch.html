@@ -5838,6 +5838,10 @@ function openWaveEditor(slotIdx) {
   let trimStart = 0.0;
   let trimEnd   = 1.0;
 
+  // ズーム表示範囲 (0.0〜1.0の正規化値)
+  let viewStart = 0.0;
+  let viewEnd   = 1.0;
+
   // フェード (秒)
   let fadeInSec  = 0.0;
   let fadeOutSec = 0.0;
@@ -5887,7 +5891,130 @@ function openWaveEditor(slotIdx) {
   }
   updateInfo();
 
-  // 波形 Canvas
+  // ===== ズームコントロール行 =====
+  const zoomRow = document.createElement('div');
+  zoomRow.style.cssText = 'display:flex;align-items:center;gap:5px;padding:4px 0 2px 0;flex-wrap:wrap';
+
+  const zoomLabel = document.createElement('span');
+  zoomLabel.style.cssText = 'font-size:9px;color:#888;min-width:40px;letter-spacing:1px';
+  zoomLabel.textContent = 'ZOOM:';
+  zoomRow.appendChild(zoomLabel);
+
+  // ズームイン
+  const zoomInBtn = document.createElement('button');
+  zoomInBtn.className = 'btn';
+  zoomInBtn.style.cssText = 'font-size:11px;padding:2px 9px;font-weight:bold;letter-spacing:0';
+  zoomInBtn.title = 'ズームイン (中心にズーム)';
+  zoomInBtn.textContent = '🔍+';
+  zoomInBtn.onclick = () => {
+    const center = (viewStart + viewEnd) / 2;
+    const half = (viewEnd - viewStart) / 2 / 2; // 半分に縮小
+    const minSpan = 0.01; // 最大ズーム = 1%
+    const newHalf = Math.max(half, minSpan / 2);
+    viewStart = Math.max(0, center - newHalf);
+    viewEnd   = Math.min(1, center + newHalf);
+    updateZoomDisplay();
+    drawWaveformWithRegions();
+  };
+
+  // ズームアウト
+  const zoomOutBtn = document.createElement('button');
+  zoomOutBtn.className = 'btn';
+  zoomOutBtn.style.cssText = 'font-size:11px;padding:2px 9px;font-weight:bold;letter-spacing:0';
+  zoomOutBtn.title = 'ズームアウト';
+  zoomOutBtn.textContent = '🔍-';
+  zoomOutBtn.onclick = () => {
+    const center = (viewStart + viewEnd) / 2;
+    const half = (viewEnd - viewStart) / 2 * 2; // 2倍に拡大
+    viewStart = Math.max(0, center - half);
+    viewEnd   = Math.min(1, center + half);
+    updateZoomDisplay();
+    drawWaveformWithRegions();
+  };
+
+  // ズームリセット
+  const zoomResetBtn = document.createElement('button');
+  zoomResetBtn.className = 'btn';
+  zoomResetBtn.style.cssText = 'font-size:9px;padding:2px 7px';
+  zoomResetBtn.title = '全体表示に戻す';
+  zoomResetBtn.textContent = 'FIT';
+  zoomResetBtn.onclick = () => {
+    viewStart = 0; viewEnd = 1;
+    updateZoomDisplay();
+    drawWaveformWithRegions();
+  };
+
+  // 選択範囲にズーム
+  const zoomSelBtn = document.createElement('button');
+  zoomSelBtn.className = 'btn';
+  zoomSelBtn.style.cssText = 'font-size:9px;padding:2px 7px;border-color:#5a8;color:#afe';
+  zoomSelBtn.title = '選択範囲にズーム';
+  zoomSelBtn.textContent = '✂ SEL FIT';
+  zoomSelBtn.onclick = () => {
+    if (trimEnd - trimStart < 0.001) return;
+    const pad = (trimEnd - trimStart) * 0.05;
+    viewStart = Math.max(0, trimStart - pad);
+    viewEnd   = Math.min(1, trimEnd   + pad);
+    updateZoomDisplay();
+    drawWaveformWithRegions();
+  };
+
+  // スクロール（左）
+  const scrollLBtn = document.createElement('button');
+  scrollLBtn.className = 'btn';
+  scrollLBtn.style.cssText = 'font-size:11px;padding:2px 8px';
+  scrollLBtn.title = '左へスクロール';
+  scrollLBtn.textContent = '◀';
+  scrollLBtn.onclick = () => {
+    const span = viewEnd - viewStart;
+    const shift = span * 0.25;
+    if (viewStart - shift < 0) { viewEnd = Math.min(1, span); viewStart = 0; }
+    else { viewStart -= shift; viewEnd -= shift; }
+    updateZoomDisplay();
+    drawWaveformWithRegions();
+  };
+
+  // スクロール（右）
+  const scrollRBtn = document.createElement('button');
+  scrollRBtn.className = 'btn';
+  scrollRBtn.style.cssText = 'font-size:11px;padding:2px 8px';
+  scrollRBtn.title = '右へスクロール';
+  scrollRBtn.textContent = '▶';
+  scrollRBtn.onclick = () => {
+    const span = viewEnd - viewStart;
+    const shift = span * 0.25;
+    if (viewEnd + shift > 1) { viewStart = Math.max(0, 1 - span); viewEnd = 1; }
+    else { viewStart += shift; viewEnd += shift; }
+    updateZoomDisplay();
+    drawWaveformWithRegions();
+  };
+
+  // ズーム倍率表示
+  const zoomValEl = document.createElement('span');
+  zoomValEl.style.cssText = 'font-size:9px;color:#fc8;min-width:44px;text-align:right';
+  zoomValEl.textContent = 'x1.0';
+
+  // スクロールバー同期コールバック（後で設定）
+  let _syncScrollBarFn = null;
+
+  function updateZoomDisplay() {
+    const span = viewEnd - viewStart;
+    const mag = span > 0 ? (1 / span) : 1;
+    zoomValEl.textContent = `x${mag.toFixed(mag < 10 ? 1 : 0)}`;
+    const tStart = (viewStart * durationSec).toFixed(3);
+    const tEnd   = (viewEnd   * durationSec).toFixed(3);
+    zoomValEl.title = `表示範囲: ${tStart}s 〜 ${tEnd}s`;
+    if (_syncScrollBarFn) _syncScrollBarFn();
+  }
+
+  zoomRow.appendChild(scrollLBtn);
+  zoomRow.appendChild(zoomInBtn);
+  zoomRow.appendChild(zoomOutBtn);
+  zoomRow.appendChild(scrollRBtn);
+  zoomRow.appendChild(zoomResetBtn);
+  zoomRow.appendChild(zoomSelBtn);
+  zoomRow.appendChild(zoomValEl);
+  box.appendChild(zoomRow);
   const canvasWrap = document.createElement('div');
   canvasWrap.className = 'wave-canvas-wrap';
   const canvas = document.createElement('canvas');
@@ -5936,16 +6063,22 @@ function openWaveEditor(slotIdx) {
       ctx2.stroke();
     }
 
+    // ズーム: 表示サンプル範囲
+    const vStartSmp = Math.floor(viewStart * totalSamples);
+    const vEndSmp   = Math.ceil(viewEnd   * totalSamples);
+    const visibleSamples = Math.max(1, vEndSmp - vStartSmp);
+
     // 波形
     const chData = buf.getChannelData(0);
-    const step = Math.max(1, Math.floor(totalSamples / W));
+    const step = Math.max(1, Math.floor(visibleSamples / W));
     ctx2.strokeStyle = isPolarInv ? '#f88' : '#5a8';
     ctx2.lineWidth = 1;
     ctx2.beginPath();
     for (let x = 0; x < W; x++) {
-      // 逆再生プレビュー: サンプルインデックスを逆順で読む
-      const srcX = isReversed ? (W - 1 - x) : x;
-      const idx = Math.floor(srcX / W * totalSamples);
+      // ズーム範囲内のサンプル位置
+      const fracInView = x / W;
+      const srcFrac = isReversed ? (1 - fracInView) : fracInView;
+      const idx = vStartSmp + Math.floor(srcFrac * visibleSamples);
       let min = 1, max = -1;
       for (let j = 0; j < step; j++) {
         let v = chData[Math.min(idx + j, totalSamples - 1)];
@@ -5961,27 +6094,37 @@ function openWaveEditor(slotIdx) {
     }
     ctx2.stroke();
 
-    // トリム領域ハイライト (外側をダーク)
-    const lx = trimStart * W;
-    const rx = trimEnd   * W;
+    // トリム領域ハイライト — ズーム内での座標に変換
+    const viewSpan = viewEnd - viewStart;
+    // trimStart/trimEnd をビュー内ピクセルに変換 (ビュー外はクランプ)
+    const ts_inView = Math.max(0, Math.min(1, (trimStart - viewStart) / viewSpan));
+    const te_inView = Math.max(0, Math.min(1, (trimEnd   - viewStart) / viewSpan));
+    const lx = ts_inView * W;
+    const rx = te_inView * W;
     ctx2.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx2.fillRect(0, 0, lx, H);
-    ctx2.fillRect(rx, 0, W - rx, H);
+    if (lx > 0)   ctx2.fillRect(0,  0, lx, H);
+    if (rx < W)   ctx2.fillRect(rx, 0, W - rx, H);
 
     // 選択範囲ライン
-    ctx2.strokeStyle = '#5af';
-    ctx2.lineWidth = 1;
-    ctx2.setLineDash([4, 3]);
-    ctx2.beginPath(); ctx2.moveTo(lx, 0); ctx2.lineTo(lx, H); ctx2.stroke();
-    ctx2.strokeStyle = '#fa5';
-    ctx2.beginPath(); ctx2.moveTo(rx, 0); ctx2.lineTo(rx, H); ctx2.stroke();
+    if (trimStart >= viewStart && trimStart <= viewEnd) {
+      ctx2.strokeStyle = '#5af';
+      ctx2.lineWidth = 1;
+      ctx2.setLineDash([4, 3]);
+      ctx2.beginPath(); ctx2.moveTo(lx, 0); ctx2.lineTo(lx, H); ctx2.stroke();
+    }
+    if (trimEnd >= viewStart && trimEnd <= viewEnd) {
+      ctx2.strokeStyle = '#fa5';
+      ctx2.lineWidth = 1;
+      ctx2.setLineDash([4, 3]);
+      ctx2.beginPath(); ctx2.moveTo(rx, 0); ctx2.lineTo(rx, H); ctx2.stroke();
+    }
     ctx2.setLineDash([]);
 
-    // ハンドル位置をCSSで更新
-    lHandle.style.left = `calc(${trimStart * 100}% - 2px)`;
-    rHandle.style.right = `calc(${(1 - trimEnd) * 100}% - 2px)`;
-    trimRegion.style.left  = `${trimStart * 100}%`;
-    trimRegion.style.width = `${(trimEnd - trimStart) * 100}%`;
+    // ハンドル位置をCSSで更新（ビュー内座標で）
+    lHandle.style.left  = `calc(${ts_inView * 100}% - 2px)`;
+    rHandle.style.right = `calc(${(1 - te_inView) * 100}% - 2px)`;
+    trimRegion.style.left  = `${ts_inView * 100}%`;
+    trimRegion.style.width = `${(te_inView - ts_inView) * 100}%`;
 
     // フェードイン・フェードアウトのオーバーレイ描画
     const selDurSec = (trimEnd - trimStart) * durationSec;
@@ -6036,7 +6179,7 @@ function openWaveEditor(slotIdx) {
       }
     }
   }
-  drawWaveform();
+  drawWaveform(); // 初期描画 (この時点では regions 未定義のため drawWaveform を直接呼ぶ)
 
   // ===== ドラッグでトリム操作 =====
   let dragging = null; // 'left' | 'right' | 'canvas'
@@ -6045,7 +6188,10 @@ function openWaveEditor(slotIdx) {
   function getRelX(e) {
     const rect = canvasWrap.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const fracInCanvas = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    // ビュー内のフラクションをフルバッファ座標に変換
+    const viewSpan = viewEnd - viewStart;
+    return viewStart + fracInCanvas * viewSpan;
   }
 
   function onDragStart(e, type) {
@@ -6063,7 +6209,7 @@ function openWaveEditor(slotIdx) {
     } else if (dragging === 'right') {
       trimEnd = Math.min(1, Math.max(trimStart + 0.001, x));
     }
-    drawWaveform();
+    drawWaveformWithRegions();
     updateInfo();
     e.preventDefault();
   }
@@ -6096,12 +6242,32 @@ function openWaveEditor(slotIdx) {
   window.addEventListener('mouseup',   onDragEnd);
   window.addEventListener('touchend',  onDragEnd);
 
+  // ===== マウスホイールでズーム =====
+  canvasWrap.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = canvasWrap.getBoundingClientRect();
+    const fracInCanvas = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const viewSpan = viewEnd - viewStart;
+    const pivotFrac = viewStart + fracInCanvas * viewSpan; // ズームの中心点（バッファ正規化）
+    const factor = e.deltaY < 0 ? 0.6 : 1.6667; // ズームイン/アウト
+    const newSpan = Math.min(1, Math.max(0.005, viewSpan * factor));
+    viewStart = Math.max(0, pivotFrac - fracInCanvas * newSpan);
+    viewEnd   = viewStart + newSpan;
+    if (viewEnd > 1) { viewEnd = 1; viewStart = Math.max(0, 1 - newSpan); }
+    updateZoomDisplay();
+    drawWaveformWithRegions();
+  }, { passive: false });
+
   // クリーンアップ
   bg.addEventListener('remove', () => {
     window.removeEventListener('mousemove', onDragMove);
     window.removeEventListener('touchmove',  onDragMove);
     window.removeEventListener('mouseup',   onDragEnd);
     window.removeEventListener('touchend',  onDragEnd);
+    window.removeEventListener('mousemove', onRegMove);
+    window.removeEventListener('mouseup',   onRegEnd);
+    window.removeEventListener('touchmove', onRegMove);
+    window.removeEventListener('touchend',  onRegEnd);
   });
 
   // ===== フェードイン・フェードアウト コントロール =====
@@ -6134,7 +6300,7 @@ function openWaveEditor(slotIdx) {
       foVal.textContent = fadeOutSec.toFixed(2) + 's';
     }
     fiVal.textContent = fadeInSec.toFixed(2) + 's';
-    drawWaveform();
+    drawWaveformWithRegions();
   };
   fiGroup.appendChild(fiLabel);
   fiGroup.appendChild(fiSlider);
@@ -6163,7 +6329,7 @@ function openWaveEditor(slotIdx) {
       fiVal.textContent = fadeInSec.toFixed(2) + 's';
     }
     foVal.textContent = fadeOutSec.toFixed(2) + 's';
-    drawWaveform();
+    drawWaveformWithRegions();
   };
   foGroup.appendChild(foLabel);
   foGroup.appendChild(foSlider);
@@ -6178,7 +6344,7 @@ function openWaveEditor(slotIdx) {
     fadeInSec = 0; fadeOutSec = 0;
     fiSlider.value = '0'; foSlider.value = '0';
     fiVal.textContent = '0.00s'; foVal.textContent = '0.00s';
-    drawWaveform();
+    drawWaveformWithRegions();
   };
 
   fadeRow.appendChild(fiGroup);
@@ -6207,7 +6373,7 @@ function openWaveEditor(slotIdx) {
     revBtn.style.cssText = isReversed
       ? 'border-color:#c8f;color:#fff;background:#2a1a3a;font-size:9px;padding:2px 9px'
       : 'border-color:#a8c;color:#c8f;font-size:9px;padding:2px 9px';
-    drawWaveform();
+    drawWaveformWithRegions();
   };
   invertRow.appendChild(revBtn);
 
@@ -6223,7 +6389,7 @@ function openWaveEditor(slotIdx) {
     polarBtn.style.cssText = isPolarInv
       ? 'border-color:#f88;color:#fff;background:#3a1a1a;font-size:9px;padding:2px 9px'
       : 'border-color:#a55;color:#f88;font-size:9px;padding:2px 9px';
-    drawWaveform();
+    drawWaveformWithRegions();
   };
   invertRow.appendChild(polarBtn);
 
@@ -6735,31 +6901,113 @@ function openWaveEditor(slotIdx) {
     if (regions.length === 0) return;
     const ctx2 = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height;
+    const viewSpan = viewEnd - viewStart;
     regions.forEach((r, idx) => {
-      const x1 = Math.round(r.start * W);
-      const x2 = Math.round(r.end   * W);
+      // バッファ正規化 → ビュー内フラクション → ピクセル
+      const x1 = Math.round(((r.start - viewStart) / viewSpan) * W);
+      const x2 = Math.round(((r.end   - viewStart) / viewSpan) * W);
+      if (x2 < 0 || x1 > W) return; // ビュー外はスキップ
+      const cx1 = Math.max(0, x1), cx2 = Math.min(W, x2);
       // 区画塗り
       ctx2.fillStyle = `hsla(${100 + idx * 47},70%,40%,0.18)`;
-      ctx2.fillRect(x1, 0, x2 - x1, H);
+      ctx2.fillRect(cx1, 0, cx2 - cx1, H);
       // 境界線
       ctx2.strokeStyle = `hsl(${100 + idx * 47},80%,55%)`;
       ctx2.lineWidth = 1;
       ctx2.setLineDash([3, 2]);
-      ctx2.beginPath(); ctx2.moveTo(x1, 0); ctx2.lineTo(x1, H); ctx2.stroke();
-      ctx2.beginPath(); ctx2.moveTo(x2, 0); ctx2.lineTo(x2, H); ctx2.stroke();
+      if (x1 >= 0 && x1 <= W) { ctx2.beginPath(); ctx2.moveTo(x1, 0); ctx2.lineTo(x1, H); ctx2.stroke(); }
+      if (x2 >= 0 && x2 <= W) { ctx2.beginPath(); ctx2.moveTo(x2, 0); ctx2.lineTo(x2, H); ctx2.stroke(); }
       ctx2.setLineDash([]);
       // 番号ラベル
       ctx2.fillStyle = `hsl(${100 + idx * 47},80%,65%)`;
       ctx2.font = 'bold 9px monospace';
       ctx2.textAlign = 'left';
-      ctx2.fillText(`#${idx + 1}`, x1 + 3, H - 4);
+      ctx2.fillText(`#${idx + 1}`, Math.max(3, cx1 + 3), H - 4);
     });
   }
 
-  // ---- 波形上ドラッグで区画追加 ----
-  let regDragStart = null;
+  // ---- 区画追加ドラッグ ON/OFF ----
+  let sliceMode = false; // false=SLICE OFF (デフォルト), true=SLICE ON (ドラッグで区画追加)
+
+  // REGION SLICER ヘッダー行 (GATE OFFと同じレイアウト: ボタン左 + タイトル右)
+  // regTitleEl はすでに regSection の先頭にある → ヘッダー行に置き換える
+  const regHdrRow = document.createElement('div');
+  regHdrRow.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+  regSection.insertBefore(regHdrRow, regTitleEl); // regTitleEl の直前に挿入
+  regHdrRow.appendChild(regTitleEl);              // regTitleEl を regHdrRow 内へ移動
+
+  const sliceToggleBtn = document.createElement('button');
+  sliceToggleBtn.className = 'btn';
+  sliceToggleBtn.style.cssText = 'border-color:#888;color:#888;font-size:9px;padding:2px 9px;min-width:80px';
+  sliceToggleBtn.textContent = '✦ SLICE OFF';
+  regHdrRow.insertBefore(sliceToggleBtn, regTitleEl); // ボタンをタイトルの左に
+
+  function applySliceMode() {
+    if (sliceMode) {
+      // SLICE ON: オーバーレイ有効、スクロールバー非表示
+      regOverlay.style.display = '';
+      scrollBarWrap.style.display = 'none';
+      sliceToggleBtn.className = 'btn active';
+      sliceToggleBtn.style.cssText = 'border-color:#6f3;color:#af6;background:#0a2005;font-size:9px;padding:2px 9px;min-width:80px';
+      sliceToggleBtn.textContent = '✦ SLICE ON';
+    } else {
+      // SLICE OFF: オーバーレイ無効、スクロールバー表示、Regionを全削除
+      regions = [];
+      renderRegionList();
+      regOverlay.style.display = 'none';
+      scrollBarWrap.style.display = '';
+      sliceToggleBtn.className = 'btn';
+      sliceToggleBtn.style.cssText = 'border-color:#888;color:#888;font-size:9px;padding:2px 9px;min-width:80px';
+      sliceToggleBtn.textContent = '✦ SLICE OFF';
+      drawWaveformWithRegions();
+    }
+  }
+  sliceToggleBtn.onclick = () => { sliceMode = !sliceMode; applySliceMode(); };
+
+  // ===== スクロールバー (SLICE OFF 時のみ表示) =====
+  const scrollBarWrap = document.createElement('div');
+  scrollBarWrap.style.cssText = 'display:block;padding:4px 0 2px 0';
+
+  const scrollBarLabel = document.createElement('div');
+  scrollBarLabel.style.cssText = 'font-size:8px;color:#555;margin-bottom:2px;letter-spacing:1px';
+  scrollBarLabel.textContent = 'SCROLL (ズーム表示範囲)';
+
+  const scrollBarInput = document.createElement('input');
+  scrollBarInput.type = 'range';
+  scrollBarInput.min = '0';
+  scrollBarInput.max = '1000';
+  scrollBarInput.step = '1';
+  scrollBarInput.value = '0';
+  scrollBarInput.style.cssText = 'width:100%;accent-color:#5a8;height:14px;cursor:pointer';
+  scrollBarInput.title = 'ズーム表示範囲をスクロール';
+
+  function syncScrollBar() {
+    const viewSpan = viewEnd - viewStart;
+    if (viewSpan >= 1) { scrollBarInput.value = '0'; return; }
+    // viewStart の最大値 = 1 - viewSpan
+    const maxStart = 1 - viewSpan;
+    scrollBarInput.value = Math.round((viewStart / maxStart) * 1000);
+  }
+
+  scrollBarInput.oninput = () => {
+    const viewSpan = viewEnd - viewStart;
+    if (viewSpan >= 1) return;
+    const maxStart = 1 - viewSpan;
+    const newStart = (parseInt(scrollBarInput.value) / 1000) * maxStart;
+    viewStart = Math.max(0, Math.min(maxStart, newStart));
+    viewEnd   = viewStart + viewSpan;
+    updateZoomDisplay();
+    drawWaveformWithRegions();
+  };
+
+  scrollBarWrap.appendChild(scrollBarLabel);
+  scrollBarWrap.appendChild(scrollBarInput);
+  regSection.insertBefore(scrollBarWrap, regHint);
+
+  // updateZoomDisplay から呼べるように登録
+  _syncScrollBarFn = syncScrollBar;
   const regOverlay = document.createElement('div');
-  regOverlay.style.cssText = 'position:absolute;inset:0;cursor:crosshair;z-index:15';
+  regOverlay.style.cssText = 'position:absolute;inset:0;cursor:crosshair;z-index:15;display:none';
   canvasWrap.appendChild(regOverlay);
 
   // プレビュー矩形
@@ -6771,20 +7019,27 @@ function openWaveEditor(slotIdx) {
   function getRegRelX(e) {
     const rect = canvasWrap.getBoundingClientRect();
     const cx = e.touches ? e.touches[0].clientX : e.clientX;
-    return Math.max(0, Math.min(1, (cx - rect.left) / rect.width));
+    const fracInCanvas = Math.max(0, Math.min(1, (cx - rect.left) / rect.width));
+    // ビュー内フラクション → バッファ正規化座標
+    const viewSpan = viewEnd - viewStart;
+    return viewStart + fracInCanvas * viewSpan;
   }
 
   regOverlay.addEventListener('mousedown', e => {
     regDragStart = getRegRelX(e);
     regPreview.style.display = 'block';
-    regPreview.style.left  = `${regDragStart * 100}%`;
+    const viewSpan = viewEnd - viewStart;
+    const fracInCanvas = (regDragStart - viewStart) / viewSpan;
+    regPreview.style.left  = `${fracInCanvas * 100}%`;
     regPreview.style.width = '0';
     e.stopPropagation();
   });
   regOverlay.addEventListener('touchstart', e => {
     regDragStart = getRegRelX(e);
     regPreview.style.display = 'block';
-    regPreview.style.left  = `${regDragStart * 100}%`;
+    const viewSpan = viewEnd - viewStart;
+    const fracInCanvas = (regDragStart - viewStart) / viewSpan;
+    regPreview.style.left  = `${fracInCanvas * 100}%`;
     regPreview.style.width = '0';
     e.stopPropagation();
   }, { passive: true });
@@ -6794,8 +7049,11 @@ function openWaveEditor(slotIdx) {
     const x = getRegRelX(e);
     const l = Math.min(regDragStart, x);
     const r = Math.max(regDragStart, x);
-    regPreview.style.left  = `${l * 100}%`;
-    regPreview.style.width = `${(r - l) * 100}%`;
+    const viewSpan = viewEnd - viewStart;
+    const lFrac = (l - viewStart) / viewSpan;
+    const rFrac = (r - viewStart) / viewSpan;
+    regPreview.style.left  = `${Math.max(0, lFrac) * 100}%`;
+    regPreview.style.width = `${Math.min(1, rFrac - Math.max(0, lFrac)) * 100}%`;
   }
   function onRegEnd(e) {
     if (regDragStart === null) return;
@@ -6804,7 +7062,7 @@ function openWaveEditor(slotIdx) {
     const r = Math.max(regDragStart, x);
     regDragStart = null;
     regPreview.style.display = 'none';
-    if (r - l < 0.005) return; // 極小ドラッグは無視
+    if (r - l < 0.002) return; // 極小ドラッグは無視
     regions.push({ start: l, end: r });
     // 開始時刻順にソート
     regions.sort((a, b) => a.start - b.start);
@@ -6876,6 +7134,7 @@ function openWaveEditor(slotIdx) {
   regSection.appendChild(regBtnRow);
 
   box.appendChild(regSection);
+  box.insertBefore(regSection, gateSection); // REGION SLICER を GATE の上に移動
 
   // イベントリスナー破棄にregリスナーも追加
   bg.addEventListener('remove', () => {
@@ -6888,8 +7147,8 @@ function openWaveEditor(slotIdx) {
   bg.appendChild(box);
   document.body.appendChild(bg);
 
-  // 背景クリックで閉じる
-  bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
+  // 背景クリックで閉じる（無効化：明示的に閉じるボタンを押すまで閉じない）
+  // bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
 
   // イベントリスナー破棄
   const origRemove = bg.remove.bind(bg);
