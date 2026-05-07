@@ -730,6 +730,18 @@
     .gate-cell-on  { background:#1a4a10; border-color:#5f3 !important; color:#5f3; }
     .gate-cell-off { background:#181818; border-color:#333 !important; color:#444; }
 
+    /* ===== WAVE EDITOR SLICE / REGION ===== */
+    .slice-section {
+      background: #0e1a0e; border: 1px solid #2a4a2a; border-radius: 4px;
+      padding: 8px 10px; display: flex; flex-direction: column; gap: 6px;
+    }
+    .slice-title {
+      font-size: 9px; color: #6f3; letter-spacing: 2px; font-weight: bold;
+    }
+    .slice-ctrl-row {
+      display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    }
+
     /* ===== PCM SLOT 録音中発光 ===== */
     .pcm-slot.recording-active {
       border-color: #f55 !important;
@@ -6665,6 +6677,213 @@ function openWaveEditor(slotIdx) {
   exportRow.appendChild(tipEl);
 
   box.appendChild(exportRow);
+
+  // ===== マニュアル区画登録 =====
+  // 区画リスト: [{ start: 0.0〜1.0, end: 0.0〜1.0 }, ...]
+  let regions = [];
+
+  const regSection = document.createElement('div');
+  regSection.className = 'slice-section';
+
+  const regTitleEl = document.createElement('div');
+  regTitleEl.className = 'slice-title';
+  regTitleEl.textContent = '✦ REGION SLICER — 区画を指定してバンクに登録';
+  regSection.appendChild(regTitleEl);
+
+  const regHint = document.createElement('div');
+  regHint.style.cssText = 'font-size:8px;color:#555';
+  regHint.textContent = '波形上でドラッグして区画を追加。リスト行をクリックで削除。';
+  regSection.appendChild(regHint);
+
+  // ---- 区画リスト表示 ----
+  const regListEl = document.createElement('div');
+  regListEl.style.cssText = 'display:flex;flex-direction:column;gap:2px;max-height:80px;overflow-y:auto';
+  regSection.appendChild(regListEl);
+
+  // ---- カウント表示 ----
+  const regCountEl = document.createElement('span');
+  regCountEl.style.cssText = 'font-size:9px;color:#6f3';
+  regCountEl.textContent = '区画: 0';
+
+  function renderRegionList() {
+    regListEl.innerHTML = '';
+    regCountEl.textContent = `区画: ${regions.length}`;
+    regions.forEach((r, idx) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:9px;font-family:monospace;' +
+        'background:#0a1a0a;border:1px solid #2a4a2a;border-radius:2px;padding:2px 6px;cursor:pointer';
+      row.title = 'クリックで削除';
+      const startSec = (r.start * durationSec).toFixed(3);
+      const endSec   = (r.end   * durationSec).toFixed(3);
+      const lenSec   = ((r.end - r.start) * durationSec).toFixed(3);
+      row.innerHTML = `<span style="color:#6f3;min-width:20px">#${idx + 1}</span>` +
+        `<span style="color:#aaa">${startSec}s → ${endSec}s</span>` +
+        `<span style="color:#555;margin-left:auto">${lenSec}s</span>` +
+        `<span style="color:#533;font-size:8px">✕</span>`;
+      row.onclick = () => {
+        regions.splice(idx, 1);
+        renderRegionList();
+        drawWaveformWithRegions();
+      };
+      regListEl.appendChild(row);
+    });
+  }
+
+  // ---- 区画を波形上に描画 ----
+  function drawWaveformWithRegions() {
+    drawWaveform();
+    if (regions.length === 0) return;
+    const ctx2 = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    regions.forEach((r, idx) => {
+      const x1 = Math.round(r.start * W);
+      const x2 = Math.round(r.end   * W);
+      // 区画塗り
+      ctx2.fillStyle = `hsla(${100 + idx * 47},70%,40%,0.18)`;
+      ctx2.fillRect(x1, 0, x2 - x1, H);
+      // 境界線
+      ctx2.strokeStyle = `hsl(${100 + idx * 47},80%,55%)`;
+      ctx2.lineWidth = 1;
+      ctx2.setLineDash([3, 2]);
+      ctx2.beginPath(); ctx2.moveTo(x1, 0); ctx2.lineTo(x1, H); ctx2.stroke();
+      ctx2.beginPath(); ctx2.moveTo(x2, 0); ctx2.lineTo(x2, H); ctx2.stroke();
+      ctx2.setLineDash([]);
+      // 番号ラベル
+      ctx2.fillStyle = `hsl(${100 + idx * 47},80%,65%)`;
+      ctx2.font = 'bold 9px monospace';
+      ctx2.textAlign = 'left';
+      ctx2.fillText(`#${idx + 1}`, x1 + 3, H - 4);
+    });
+  }
+
+  // ---- 波形上ドラッグで区画追加 ----
+  let regDragStart = null;
+  const regOverlay = document.createElement('div');
+  regOverlay.style.cssText = 'position:absolute;inset:0;cursor:crosshair;z-index:15';
+  canvasWrap.appendChild(regOverlay);
+
+  // プレビュー矩形
+  const regPreview = document.createElement('div');
+  regPreview.style.cssText = 'position:absolute;top:0;bottom:0;background:rgba(100,255,100,0.12);' +
+    'border:1px dashed #6f3;pointer-events:none;display:none';
+  canvasWrap.appendChild(regPreview);
+
+  function getRegRelX(e) {
+    const rect = canvasWrap.getBoundingClientRect();
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    return Math.max(0, Math.min(1, (cx - rect.left) / rect.width));
+  }
+
+  regOverlay.addEventListener('mousedown', e => {
+    regDragStart = getRegRelX(e);
+    regPreview.style.display = 'block';
+    regPreview.style.left  = `${regDragStart * 100}%`;
+    regPreview.style.width = '0';
+    e.stopPropagation();
+  });
+  regOverlay.addEventListener('touchstart', e => {
+    regDragStart = getRegRelX(e);
+    regPreview.style.display = 'block';
+    regPreview.style.left  = `${regDragStart * 100}%`;
+    regPreview.style.width = '0';
+    e.stopPropagation();
+  }, { passive: true });
+
+  function onRegMove(e) {
+    if (regDragStart === null) return;
+    const x = getRegRelX(e);
+    const l = Math.min(regDragStart, x);
+    const r = Math.max(regDragStart, x);
+    regPreview.style.left  = `${l * 100}%`;
+    regPreview.style.width = `${(r - l) * 100}%`;
+  }
+  function onRegEnd(e) {
+    if (regDragStart === null) return;
+    const x = getRegRelX(e.changedTouches ? { clientX: e.changedTouches[0].clientX } : e);
+    const l = Math.min(regDragStart, x);
+    const r = Math.max(regDragStart, x);
+    regDragStart = null;
+    regPreview.style.display = 'none';
+    if (r - l < 0.005) return; // 極小ドラッグは無視
+    regions.push({ start: l, end: r });
+    // 開始時刻順にソート
+    regions.sort((a, b) => a.start - b.start);
+    renderRegionList();
+    drawWaveformWithRegions();
+  }
+  window.addEventListener('mousemove', onRegMove);
+  window.addEventListener('mouseup',   onRegEnd);
+  window.addEventListener('touchmove', onRegMove, { passive: true });
+  window.addEventListener('touchend',  onRegEnd);
+
+  // ---- ボタン行 ----
+  const regBtnRow = document.createElement('div');
+  regBtnRow.className = 'slice-ctrl-row';
+
+  regBtnRow.appendChild(regCountEl);
+
+  const regClearBtn = document.createElement('button');
+  regClearBtn.className = 'btn warn';
+  regClearBtn.textContent = '✕ 全削除';
+  regClearBtn.onclick = () => { regions = []; renderRegionList(); drawWaveformWithRegions(); };
+  regBtnRow.appendChild(regClearBtn);
+
+  const regRegisterBtn = document.createElement('button');
+  regRegisterBtn.className = 'btn active';
+  regRegisterBtn.style.cssText = 'border-color:#6f3;color:#af6;margin-left:auto';
+  regRegisterBtn.textContent = '✦ 区画をバンクに登録';
+  regRegisterBtn.onclick = async () => {
+    if (regions.length === 0) { showToast('区画がありません。波形上でドラッグして追加してください', 'warn'); return; }
+    const emptySlots = [];
+    for (let i = 0; i < 128; i++) {
+      if (state.pcmToneBank[i] === null) emptySlots.push(i);
+      if (emptySlots.length >= regions.length) break;
+    }
+    if (emptySlots.length < regions.length) {
+      const ok = await mobileConfirm(`空きスロットが ${emptySlots.length} 個しかありません（${regions.length} 区画）。空き分だけ登録しますか?`);
+      if (!ok) return;
+    }
+    const stepDur = (60 / state.bpm) / 4;
+    const nReg = Math.min(regions.length, emptySlots.length);
+    const _defSR = state.pcmDefaultSampleRate > 0 ? Math.min(state.pcmDefaultSampleRate, sr) : sr;
+    for (let idx = 0; idx < nReg; idx++) {
+      const r = regions[idx];
+      const sampleStart = Math.floor(r.start * totalSamples);
+      const sampleLen   = Math.floor((r.end - r.start) * totalSamples);
+      if (sampleLen <= 0) continue;
+      const regBuf = audioCtx.createBuffer(buf.numberOfChannels, sampleLen, sr);
+      for (let c = 0; c < buf.numberOfChannels; c++) {
+        const s = buf.getChannelData(c), d = regBuf.getChannelData(c);
+        for (let i = 0; i < sampleLen; i++) d[i] = s[sampleStart + i];
+      }
+      const targetSlot = emptySlots[idx];
+      const regName    = `${slot.name}_${idx + 1}`.slice(0, 12);
+      const slotSteps  = Math.max(1, Math.round(regBuf.duration / stepDur));
+      state.pcmToneBank[targetSlot] = {
+        rawBuffer: regBuf, buffer: null, stretchedBuffer: null,
+        bits: 16, sampleRate: _defSR, name: regName,
+        gain: 100, slotSteps, initialSlotSteps: slotSteps,
+      };
+      applyPcmSlotBits(targetSlot);
+    }
+    state.pcmActiveToneSlot = emptySlots[0];
+    renderPcmToneBank();
+    if (state.currentSeqTab === 'pcmseq') renderSeq();
+    showToast(`${nReg} 区画を S${emptySlots[0]+1}〜S${emptySlots[nReg-1]+1} に登録しました`, 'ok', 4000);
+    bg.remove();
+  };
+  regBtnRow.appendChild(regRegisterBtn);
+  regSection.appendChild(regBtnRow);
+
+  box.appendChild(regSection);
+
+  // イベントリスナー破棄にregリスナーも追加
+  bg.addEventListener('remove', () => {
+    window.removeEventListener('mousemove', onRegMove);
+    window.removeEventListener('mouseup',   onRegEnd);
+    window.removeEventListener('touchmove', onRegMove);
+    window.removeEventListener('touchend',  onRegEnd);
+  });
 
   bg.appendChild(box);
   document.body.appendChild(bg);
