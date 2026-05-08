@@ -136,25 +136,25 @@
     /* ===== PCM TONE BANK ===== */
     .pcm-slot-grid {
       display: grid;
-      grid-template-columns: repeat(16, minmax(0, 1fr));
-      gap: 2px;
+      grid-template-columns: repeat(25, minmax(0, 1fr));
+      gap: 1px;
     }
     .pcm-slot {
       background: #100c04; border: 1px solid #2a1a08;
-      border-radius: 3px; padding: 2px 3px; cursor: pointer;
-      height: 20px; text-align: center;
+      border-radius: 2px; padding: 0 2px; cursor: pointer;
+      height: 18px; text-align: center;
       display: flex; align-items: center; justify-content: center;
-      font-size: 8px; overflow: hidden;
+      font-size: 7px; overflow: hidden;
     }
     .pcm-slot:hover { background: #251a0a; border-color: #8a6030; }
     .pcm-slot.loaded { background: #221808; border-color: #6a4820; }
-    .pcm-slot.active-pcm { background: #4a2f10; border-color: #f0c080; box-shadow: 0 0 5px #c4803a inset; }
+    .pcm-slot.active-pcm { background: #4a2f10; border-color: #f0c080; box-shadow: 0 0 4px #c4803a inset; }
     .pcm-slot-num { display: none; }
-    .pcm-slot-name { font-size: 8px; color: #664422; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .pcm-slot-name { font-size: 7px; color: #664422; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
     .pcm-slot.loaded .pcm-slot-name { color: #c4803a; }
     .pcm-slot.active-pcm .pcm-slot-name { color: #f0e080; }
     .pcm-slot-info { display: none; }
-    .pcm-row-sep { grid-column: 1 / -1; height: 2px; }
+    .pcm-row-sep { display: none; }
 
     /* ===== SSAW PANEL ===== */
     .sub-panel { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -196,7 +196,7 @@
     /* ===== BANK BAR ===== */
     .bank-bar {
       display: grid;
-      grid-template-columns: repeat(20, minmax(0, 1fr));
+      grid-template-columns: repeat(40, minmax(0, 1fr));
       gap: 2px;
     }
     .bank-btn {
@@ -477,7 +477,7 @@
       .app { padding: 4px; }
       .seq-grid, .seq-grid-custom { gap: 1px; grid-template-columns: 48px repeat(var(--seq-steps, 16), 1fr); }
       .seq-label { font-size: 8px; }
-      .pcm-slot-grid { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+      .pcm-slot-grid { grid-template-columns: repeat(13, minmax(0, 1fr)); }
       .step-btn { height: 24px; }
       .note-select, .vol-input, .pan-input, .freq-input, .slot-select { font-size: 8px; }
       .mixer-ch { min-width: 56px; padding: 4px; }
@@ -789,6 +789,7 @@
       <div class="small-title" style="margin:0">PATTERN</div>
       <span id="bankBarArrow" style="font-size:9px;color:#c4803a;transition:transform 0.2s">▼</span>
       <span id="bankBarCurLabel" style="font-size:9px;color:#888;margin-left:2px"></span>
+      <button class="btn warn" id="bankClearAllBtn" style="margin-left:auto;font-size:9px;padding:2px 7px" title="全PATTERNスロットをクリア" onclick="event.stopPropagation()">CLEAR ALL</button>
     </div>
     <div id="bankBarWrap" style="margin-top:5px">
       <div id="bankBar" class="bank-bar"></div>
@@ -1057,7 +1058,7 @@ function resolveSlotByGroup(groupId, noteName) {
   if (!groupId) return null;
   const midiNote = noteNameToMidi(noteName);
   const candidates = [];
-  for (let i = 0; i < 128; i++) {
+  for (let i = 0; i < 200; i++) {
     const s = state.pcmToneBank[i];
     if (!s || s.groupId !== groupId) continue;
     candidates.push({ idx: i, slot: s });
@@ -1091,8 +1092,8 @@ const state = {
   swing: 0,           // 0〜100 (% off-beat delay)
   currentBank: 0,
   currentSeqTab: 'pcmseq',
-  // 16 banks
-  banks: Array(100).fill(null).map((_, bi) => ({
+  // 200 banks
+  banks: Array(200).fill(null).map((_, bi) => ({
     stepLen: 16,
     beatGroups: [4, 4, 4, 4],
     seqData: createEmptySeqData(16),
@@ -1120,8 +1121,8 @@ const state = {
     pcm: Array(16).fill(null).map(() => ({ vol: 80, pan: 0, sendRev: 0, sendDist: 0, sendComp: 0, sendDly: 0, sendChr: 0 }))
   },
   // PCM TONE BANK 64スロット
-  pcmToneBank: Array(128).fill(null),
-  pcmSlotColors: Array(128).fill(null),
+  pcmToneBank: Array(200).fill(null),
+  pcmSlotColors: Array(200).fill(null),
   pcmActiveToneSlot: -1,
   // PCM登録時のデフォルトサンプリングレート (0 = 元のまま)
   pcmDefaultSampleRate: 16000,
@@ -2312,7 +2313,7 @@ function applyPcmSlotStretch(slotIdx) {
 
 // BPM変更時に全ロード済みスロットのstretchedBufferを再構築
 function rebuildAllStretchedBuffers() {
-  for (let i = 0; i < 128; i++) {
+  for (let i = 0; i < 200; i++) {
     if (state.pcmToneBank[i]?.buffer) applyPcmSlotStretch(i);
   }
 }
@@ -2333,7 +2334,7 @@ function releasePcmSlot(slotIdx) {
 }
 
 function releaseAllPcmSlots() {
-  for (let i = 0; i < 128; i++) releasePcmSlot(i);
+  for (let i = 0; i < 200; i++) releasePcmSlot(i);
   activePcmSources.forEach(src => { try { src.stop(); } catch (e) {} });
   activePcmSources.clear();
 }
@@ -3190,7 +3191,7 @@ function bankHasPattern(bi) {
 function buildBankBar() {
   const bar = document.getElementById('bankBar');
   bar.innerHTML = '';
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 200; i++) {
     const btn = document.createElement('button');
     const isActive = i === state.currentBank;
     const isStored = !isActive && bankHasPattern(i);
@@ -3222,6 +3223,20 @@ function buildBankBar() {
       wrap.style.display  = open ? '' : 'none';
       arrow.style.transform = open ? '' : 'rotate(-90deg)';
     };
+    const clearAllBtn = document.getElementById('bankClearAllBtn');
+    if (clearAllBtn) {
+      clearAllBtn.onclick = async (e) => {
+        e.stopPropagation();
+        if (!await mobileConfirm('全200スロットのパターンをクリアします。よろしいですか?')) return;
+        for (let i = 0; i < 200; i++) {
+          state.banks[i] = { stepLen: 16, beatGroups: [4,4,4,4], seqData: createEmptySeqData(16) };
+        }
+        state.currentBank = 0;
+        buildBankBar();
+        renderSeq();
+        showToast('全PATTERNをクリアしました', 'ok');
+      };
+    }
   }
   // DOMContentLoaded後に実行
   if (document.readyState === 'loading') {
@@ -3593,7 +3608,7 @@ function renderPcmTrack(parent, seq, t, len, beatHeads) {
       defOpt.value = ''; defOpt.textContent = 'ACT';
       if (tr.slot[i] == null) defOpt.selected = true;
       sel.appendChild(defOpt);
-      for (let s = 0; s < 128; s++) {
+      for (let s = 0; s < 200; s++) {
         const opt = document.createElement('option');
         opt.value = s;
         const sd = state.pcmToneBank[s];
@@ -5354,7 +5369,7 @@ function renderPcmToneBank() {
   const grid = document.getElementById('pcmSlotGrid');
   if (!grid) return;
   grid.innerHTML = '';
-  for (let s = 0; s < 128; s++) {
+  for (let s = 0; s < 200; s++) {
     if (s > 0 && s % 16 === 0) {
       const sep = document.createElement('div');
       sep.className = 'pcm-row-sep';
@@ -7093,7 +7108,7 @@ function openWaveEditor(slotIdx) {
   regRegisterBtn.onclick = async () => {
     if (regions.length === 0) { showToast('区画がありません。波形上でドラッグして追加してください', 'warn'); return; }
     const emptySlots = [];
-    for (let i = 0; i < 128; i++) {
+    for (let i = 0; i < 200; i++) {
       if (state.pcmToneBank[i] === null) emptySlots.push(i);
       if (emptySlots.length >= regions.length) break;
     }
@@ -7135,6 +7150,292 @@ function openWaveEditor(slotIdx) {
 
   box.appendChild(regSection);
   box.insertBefore(regSection, gateSection); // REGION SLICER を GATE の上に移動
+
+  // ===== FX RENDER セクション =====
+  const fxRenderSection = document.createElement('div');
+  fxRenderSection.style.cssText = 'background:#0e0e1a;border:1px solid #2a2a4a;border-radius:4px;padding:8px 10px;display:flex;flex-direction:column;gap:6px';
+
+  let fxRenderEnabled = false;
+
+  const fxRenderHdr = document.createElement('div');
+  fxRenderHdr.style.cssText = 'display:flex;align-items:center;gap:8px';
+
+  const fxRenderToggle = document.createElement('button');
+  fxRenderToggle.className = 'btn';
+  fxRenderToggle.style.cssText = 'font-size:8px;padding:1px 8px;min-width:36px';
+  fxRenderToggle.textContent = 'OFF';
+
+  const fxRenderTitleEl = document.createElement('span');
+  fxRenderTitleEl.style.cssText = 'font-size:10px;letter-spacing:2px;color:#a8f;font-weight:bold';
+  fxRenderTitleEl.textContent = '🎛 FX RENDER';
+
+  const fxRenderInfo = document.createElement('span');
+  fxRenderInfo.style.cssText = 'font-size:8px;color:#555;margin-left:4px';
+  fxRenderInfo.textContent = 'エフェクトをオフラインバウンスしてPCM BANKに書き戻す';
+
+  fxRenderHdr.appendChild(fxRenderToggle);
+  fxRenderHdr.appendChild(fxRenderTitleEl);
+  fxRenderHdr.appendChild(fxRenderInfo);
+  fxRenderSection.appendChild(fxRenderHdr);
+
+  const fxRenderControls = document.createElement('div');
+  fxRenderControls.style.cssText = 'display:none;flex-direction:column;gap:6px';
+
+  // FX センドレベル (Rev / Dly / Chr / Dist / Comp)
+  const fxSendConfigs = [
+    { key: 'rev',  label: 'REV',  color: '#a8f', defaultVal: Math.round(state.fx.revWet)  },
+    { key: 'dly',  label: 'DLY',  color: '#5af', defaultVal: 50                            },
+    { key: 'chr',  label: 'CHR',  color: '#5fa', defaultVal: 0                             },
+    { key: 'dist', label: 'DIST', color: '#fa5', defaultVal: Math.round(state.fx.distWet) },
+    { key: 'comp', label: 'COMP', color: '#f85', defaultVal: Math.round(state.fx.compWet) },
+  ];
+  const fxSendVals = {};
+  fxSendConfigs.forEach(cfg => { fxSendVals[cfg.key] = cfg.defaultVal; });
+
+  const sendRow = document.createElement('div');
+  sendRow.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;padding:4px 0';
+
+  fxSendConfigs.forEach(cfg => {
+    const col = document.createElement('div');
+    col.style.cssText = 'display:flex;flex-direction:column;gap:2px;align-items:center;min-width:44px';
+    const lbl = document.createElement('span');
+    lbl.style.cssText = `font-size:8px;color:${cfg.color};letter-spacing:1px`;
+    lbl.textContent = cfg.label;
+    const sl = document.createElement('input');
+    sl.type = 'range'; sl.min = '0'; sl.max = '100'; sl.step = '1';
+    sl.value = cfg.defaultVal;
+    sl.style.cssText = `width:44px;accent-color:${cfg.color};writing-mode:vertical-lr;direction:rtl;height:60px`;
+    const valEl = document.createElement('span');
+    valEl.style.cssText = `font-size:8px;color:${cfg.color};font-family:monospace`;
+    valEl.textContent = cfg.defaultVal + '%';
+    sl.oninput = () => { fxSendVals[cfg.key] = parseInt(sl.value); valEl.textContent = sl.value + '%'; };
+    col.appendChild(lbl); col.appendChild(sl); col.appendChild(valEl);
+    sendRow.appendChild(col);
+  });
+  fxRenderControls.appendChild(sendRow);
+
+  // テール時間 / 無音しきい値
+  const fxParamRow = document.createElement('div');
+  fxParamRow.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+
+  let fxTailSec = Math.max(0.5, state.fx.revDecay);
+  let fxTrimThreshDB = -60;
+
+  function makeFxParamInput(labelText, val, min, max, step, unit, onChange) {
+    const lbl = document.createElement('span');
+    lbl.style.cssText = 'font-size:9px;color:#aaa';
+    lbl.textContent = labelText;
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.min = min; inp.max = max; inp.step = step;
+    inp.value = val;
+    inp.style.cssText = 'background:#1a1a1a;border:1px solid #333;color:#fc8;font-size:9px;font-family:monospace;width:56px;padding:1px 4px;border-radius:2px;-moz-appearance:textfield';
+    inp.oninput = () => { const v = parseFloat(inp.value); if (!isNaN(v)) onChange(v); };
+    const u = document.createElement('span');
+    u.style.cssText = 'font-size:9px;color:#555';
+    u.textContent = unit;
+    return [lbl, inp, u];
+  }
+
+  makeFxParamInput('テール:', fxTailSec.toFixed(1), '0.1', '10', '0.1', 's',
+    v => { fxTailSec = v; }).forEach(el => fxParamRow.appendChild(el));
+
+  const sepEl = document.createElement('span');
+  sepEl.style.cssText = 'color:#333;margin:0 4px';
+  sepEl.textContent = '|';
+  fxParamRow.appendChild(sepEl);
+
+  makeFxParamInput('無音しきい値:', fxTrimThreshDB, '-96', '-20', '1', 'dBFS',
+    v => { fxTrimThreshDB = v; }).forEach(el => fxParamRow.appendChild(el));
+
+  fxRenderControls.appendChild(fxParamRow);
+
+  // レンダリング本体
+  async function doFxRender() {
+    if (!audioCtx) initAudio();
+    const sampleStart = Math.floor(trimStart * totalSamples);
+    const sampleLen   = Math.floor((trimEnd - trimStart) * totalSamples);
+    if (sampleLen <= 0) { showToast('選択範囲が空です', 'warn'); return null; }
+
+    // 選択範囲をコピーしてフェード/リバース/極性反転を適用
+    const srcBuf = audioCtx.createBuffer(buf.numberOfChannels, sampleLen, sr);
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const s = buf.getChannelData(c), d = srcBuf.getChannelData(c);
+      for (let i = 0; i < sampleLen; i++) d[i] = s[sampleStart + i];
+    }
+    applyFadeToBuffer(srcBuf, fadeInSec, fadeOutSec);
+    if (isReversed) reverseBuffer(srcBuf);
+    if (isPolarInv) invertPolarityBuffer(srcBuf);
+
+    const tailLen  = Math.floor(fxTailSec * sr);
+    const totalLen = sampleLen + tailLen;
+    const nCh      = srcBuf.numberOfChannels;
+    const offCtx   = new OfflineAudioContext(nCh, totalLen, sr);
+
+    const offSrc = offCtx.createBufferSource();
+    offSrc.buffer = srcBuf;
+
+    // ドライ
+    const dryGain = offCtx.createGain();
+    dryGain.gain.value = 1.0;
+    offSrc.connect(dryGain);
+    dryGain.connect(offCtx.destination);
+
+    // Reverb (合成IR)
+    if (fxSendVals.rev > 0) {
+      const send = offCtx.createGain(); send.gain.value = fxSendVals.rev / 100;
+      const conv = offCtx.createConvolver();
+      const irLen = Math.max(1, Math.floor(sr * Math.max(0.1, state.fx.revDecay)));
+      const ir = offCtx.createBuffer(2, irLen, sr);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = ir.getChannelData(ch);
+        for (let i = 0; i < irLen; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / irLen, 2);
+      }
+      conv.buffer = ir;
+      const wet = offCtx.createGain(); wet.gain.value = state.fx.revWet / 100;
+      offSrc.connect(send); send.connect(conv); conv.connect(wet); wet.connect(offCtx.destination);
+    }
+
+    // Delay (BPM同期)
+    if (fxSendVals.dly > 0) {
+      const send = offCtx.createGain(); send.gain.value = fxSendVals.dly / 100;
+      const dlyNode = offCtx.createDelay(2.0);
+      const beatSec = 60 / state.bpm;
+      const dlyTimeMap = { '1': beatSec, '2': beatSec / 2, '3': beatSec / 4, '4': beatSec * 0.75 };
+      dlyNode.delayTime.value = dlyTimeMap[String(state.fx.delaySync)] ?? (beatSec / 4);
+      const fbGain = offCtx.createGain(); fbGain.gain.value = Math.min(0.95, state.fx.delayFb / 100);
+      const outG = offCtx.createGain(); outG.gain.value = 0.8;
+      offSrc.connect(send); send.connect(dlyNode);
+      dlyNode.connect(fbGain); fbGain.connect(dlyNode);
+      dlyNode.connect(outG); outG.connect(offCtx.destination);
+    }
+
+    // Chorus
+    if (fxSendVals.chr > 0) {
+      const send = offCtx.createGain(); send.gain.value = fxSendVals.chr / 100;
+      const chrDly = offCtx.createDelay(0.05); chrDly.delayTime.value = 0.02;
+      const lfo = offCtx.createOscillator();
+      lfo.frequency.value = Math.max(0.1, state.fx.chorusRate / 10);
+      const depth = offCtx.createGain(); depth.gain.value = Math.max(0.001, (state.fx.chorusDepth || 5) / 1000);
+      lfo.connect(depth); depth.connect(chrDly.delayTime); lfo.start();
+      const outG = offCtx.createGain(); outG.gain.value = 0.8;
+      offSrc.connect(send); send.connect(chrDly); chrDly.connect(outG); outG.connect(offCtx.destination);
+    }
+
+    // Distortion
+    if (fxSendVals.dist > 0) {
+      const send = offCtx.createGain(); send.gain.value = fxSendVals.dist / 100;
+      const shaper = offCtx.createWaveShaper();
+      shaper.curve = buildDistCurve(state.fx.distDrive);
+      shaper.oversample = '4x';
+      const tone = offCtx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = state.fx.distTone;
+      const wet = offCtx.createGain(); wet.gain.value = state.fx.distWet / 100;
+      offSrc.connect(send); send.connect(shaper); shaper.connect(tone); tone.connect(wet); wet.connect(offCtx.destination);
+    }
+
+    // Compressor
+    if (fxSendVals.comp > 0) {
+      const send = offCtx.createGain(); send.gain.value = fxSendVals.comp / 100;
+      const comp = offCtx.createDynamicsCompressor();
+      comp.threshold.value = state.fx.compThresh;
+      comp.ratio.value = state.fx.compRatio;
+      comp.attack.value = state.fx.compAttack;
+      comp.release.value = state.fx.compRelease;
+      const wet = offCtx.createGain(); wet.gain.value = state.fx.compWet / 100;
+      offSrc.connect(send); send.connect(comp); comp.connect(wet); wet.connect(offCtx.destination);
+    }
+
+    offSrc.start(0);
+    const rendered = await offCtx.startRendering();
+
+    // 末尾無音自動トリム
+    const threshLin = Math.pow(10, fxTrimThreshDB / 20);
+    let lastNonSilent = 0;
+    for (let i = rendered.length - 1; i >= 0; i--) {
+      let peak = 0;
+      for (let c2 = 0; c2 < rendered.numberOfChannels; c2++)
+        peak = Math.max(peak, Math.abs(rendered.getChannelData(c2)[i]));
+      if (peak > threshLin) { lastNonSilent = i; break; }
+    }
+    const trimmedLen = Math.min(lastNonSilent + Math.floor(sr * 0.02) + 1, rendered.length);
+    const outBuf = audioCtx.createBuffer(rendered.numberOfChannels, trimmedLen, rendered.sampleRate);
+    for (let c2 = 0; c2 < rendered.numberOfChannels; c2++) {
+      const sd = rendered.getChannelData(c2), dd = outBuf.getChannelData(c2);
+      for (let i = 0; i < trimmedLen; i++) dd[i] = sd[i];
+    }
+    return outBuf;
+  }
+
+  // ボタン行
+  const fxBtnRow = document.createElement('div');
+  fxBtnRow.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding-top:4px;border-top:1px solid #1e1e2e';
+
+  const fxPreviewBtn = document.createElement('button');
+  fxPreviewBtn.className = 'btn primary';
+  fxPreviewBtn.textContent = '▶ FX試聴';
+  fxPreviewBtn.onclick = async () => {
+    fxPreviewBtn.disabled = true;
+    const origText = fxPreviewBtn.textContent;
+    fxPreviewBtn.textContent = '...レンダリング中...';
+    try {
+      const outBuf = await doFxRender();
+      if (!outBuf) return;
+      const prev = audioCtx.createBufferSource();
+      prev.buffer = outBuf;
+      prev.connect(audioCtx.destination);
+      prev.start();
+      showToast(`FX試聴: ${outBuf.duration.toFixed(2)}s`, 'ok', 1500);
+    } catch (e) {
+      showToast('FXレンダリングエラー: ' + e.message, 'error');
+    } finally {
+      fxPreviewBtn.disabled = false;
+      fxPreviewBtn.textContent = origText;
+    }
+  };
+
+  const fxApplyBtn = document.createElement('button');
+  fxApplyBtn.className = 'btn active';
+  fxApplyBtn.style.cssText = 'margin-left:auto;border-color:#a8f;color:#c8f';
+  fxApplyBtn.textContent = '🎛 FX適用 → PCM BANKに登録';
+  fxApplyBtn.onclick = async () => {
+    fxApplyBtn.disabled = true;
+    const origText = fxApplyBtn.textContent;
+    fxApplyBtn.textContent = '...レンダリング中...';
+    try {
+      const outBuf = await doFxRender();
+      if (!outBuf) { fxApplyBtn.disabled = false; fxApplyBtn.textContent = origText; return; }
+      slot.rawBuffer = outBuf;
+      slot.buffer = null;
+      slot.stretchedBuffer = null;
+      const stepDur = (60 / state.bpm) / 4;
+      slot.slotSteps = Math.max(1, Math.round(outBuf.duration / stepDur));
+      applyPcmSlotBits(slotIdx);
+      renderPcmToneBank();
+      if (state.currentSeqTab === 'pcmseq') renderSeq();
+      const activeKeys = fxSendConfigs
+        .filter(c => fxSendVals[c.key] > 0)
+        .map(c => `${c.label}:${fxSendVals[c.key]}%`).join(' ');
+      showToast(`S${slotIdx + 1} FX RENDER完了: ${outBuf.duration.toFixed(3)}s [${activeKeys || 'DRY'}]`, 'ok', 4000);
+      bg.remove();
+    } catch (e) {
+      showToast('FXレンダリングエラー: ' + e.message, 'error');
+      fxApplyBtn.disabled = false;
+      fxApplyBtn.textContent = origText;
+    }
+  };
+
+  fxBtnRow.appendChild(fxPreviewBtn);
+  fxBtnRow.appendChild(fxApplyBtn);
+  fxRenderControls.appendChild(fxBtnRow);
+  fxRenderSection.appendChild(fxRenderControls);
+
+  fxRenderToggle.onclick = () => {
+    fxRenderEnabled = !fxRenderEnabled;
+    fxRenderControls.style.display = fxRenderEnabled ? 'flex' : 'none';
+    fxRenderToggle.textContent = fxRenderEnabled ? 'ON' : 'OFF';
+    fxRenderToggle.className = fxRenderEnabled ? 'btn active' : 'btn';
+  };
+
+  box.insertBefore(fxRenderSection, gateSection);
 
   // イベントリスナー破棄にregリスナーも追加
   bg.addEventListener('remove', () => {
@@ -7776,7 +8077,7 @@ function applyConfig(cfg) {
   if (cfg.currentBank != null) state.currentBank = cfg.currentBank;
 
   if (Array.isArray(cfg.banks)) {
-    state.banks = cfg.banks.slice(0, 16).map(b => {
+    state.banks = cfg.banks.slice(0, 200).map(b => {
       const sl = b.stepLen || 16;
       const empty = createEmptySeqData(sl);
       const sd = b.seqData || {};
@@ -7852,7 +8153,7 @@ function applyConfig(cfg) {
       }
       return { stepLen: sl, beatGroups: Array.isArray(b.beatGroups) && b.beatGroups.length > 0 ? b.beatGroups : [4,4,4,4], seqData: empty };
     });
-    while (state.banks.length < 16) {
+    while (state.banks.length < 200) {
       state.banks.push({ stepLen: 16, beatGroups: [4,4,4,4], seqData: createEmptySeqData(16) });
     }
   }
@@ -8004,7 +8305,7 @@ function audioBufToWavAb(audioBuf) {
 async function savePcmToneBank() {
   const slots = [];
   let done = 0, failed = 0;
-  for (let i = 0; i < 128; i++) {
+  for (let i = 0; i < 200; i++) {
     const slot = state.pcmToneBank[i];
     if (!slot || !slot.rawBuffer) continue;
     try {
@@ -8546,7 +8847,7 @@ function showSamplerPadMenu(e, padIdx) {
   directTitle.style.cssText = 'padding:3px 10px;font-size:8px;color:#888;letter-spacing:1px';
   directTitle.textContent = '── 直接スロット指定 ──';
   samplerCtxMenu.appendChild(directTitle);
-  for (let s = 0; s < 128; s++) {
+  for (let s = 0; s < 200; s++) {
     const slot = state.pcmToneBank[s];
     if (!slot) continue;
     hasAny = true;
