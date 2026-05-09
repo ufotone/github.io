@@ -4400,6 +4400,33 @@ const CHORD_TYPES = {
   'm6':    { intervals: [0, 3, 7, 9],      label: 'm6'    },
   '9':     { intervals: [0, 4, 7, 10, 14], label: '9th'   },
   'power': { intervals: [0, 7],            label: '5th'   },
+  'min9':    { intervals: [0, 3, 7, 10, 14],     label: 'min9'      },
+  '7sus4':   { intervals: [0, 5, 7, 10],         label: '7sus4'     },
+  'maj_no5': { intervals: [0, 4],                label: 'maj(no5)'  },
+  '7no3':    { intervals: [0, 7, 10],            label: '7(no3)'    },
+  'add13':   { intervals: [0, 4, 7, 9],          label: 'add13'     },
+  // テンション系
+  'maj9':    { intervals: [0, 4, 7, 11, 14],     label: 'maj9'      },
+  'maj13':   { intervals: [0, 4, 7, 11, 14, 21], label: 'maj13'     },
+  '13':      { intervals: [0, 4, 7, 10, 14, 21], label: '13th'      },
+  '11':      { intervals: [0, 4, 7, 10, 14, 17], label: '11th'      },
+  'm11':     { intervals: [0, 3, 7, 10, 14, 17], label: 'm11'       },
+  'm13':     { intervals: [0, 3, 7, 10, 14, 21], label: 'm13'       },
+  // オルタード・変化系
+  '7b9':     { intervals: [0, 4, 7, 10, 13],     label: '7♭9'       },
+  '7s9':     { intervals: [0, 4, 7, 10, 15],     label: '7♯9'       },
+  '7b5':     { intervals: [0, 4, 6, 10],         label: '7♭5'       },
+  '7s5':     { intervals: [0, 4, 8, 10],         label: '7♯5'       },
+  'alt':     { intervals: [0, 4, 8, 10, 13],     label: '7alt'      },
+  // no系・省略系
+  'min_no5': { intervals: [0, 3],                label: 'min(no5)'  },
+  'maj7no5': { intervals: [0, 4, 11],            label: 'maj7(no5)' },
+  '7no5':    { intervals: [0, 4, 10],            label: '7(no5)'    },
+  // その他
+  'aug7':    { intervals: [0, 4, 8, 10],         label: 'aug7'      },
+  'augmaj7': { intervals: [0, 4, 8, 11],         label: 'augmaj7'   },
+  'majadd11':{ intervals: [0, 4, 7, 17],         label: 'add11'     },
+  'minadd9': { intervals: [0, 3, 7, 14],         label: 'minadd9'   },
 };
 
 const CHORD_ROOTS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -4741,6 +4768,74 @@ const CHORD_PRESETS = [
       { root:'A', type:'min',  octave:4, inv:0 }, // Am
       { root:'E', type:'7',    octave:4, inv:0 }, // E7
       { root:'E', type:'7',    octave:4, inv:0 }, // E7 (溜め)
+    ],
+  },
+  {
+    id: 'emg_cmaj7_aadd13_progression',
+    name: 'Em/G→Cmaj7→Aadd13',
+    key: 'Em',
+    prog: 'Em/G→Cmaj7→Aadd13→Dadd13/F#→Em7→Cmaj7/G→Dmaj7→Dmaj7/F#',
+    desc: '転回形を巧みに使った上昇感のある8コード。add13の色彩とベース動線が美しい。',
+    chords: [
+      { root:'E', type:'min',   octave:4, inv:1 }, // Em/G   (第1転回: Gベース)
+      { root:'C', type:'maj7',  octave:4, inv:0 }, // Cmaj7
+      { root:'A', type:'add13', octave:4, inv:0 }, // Aadd13
+      { root:'D', type:'add13', octave:4, inv:1 }, // Dadd13/F# (第1転回: F#ベース)
+      { root:'E', type:'m7',    octave:4, inv:0 }, // Em7
+      { root:'C', type:'maj7',  octave:4, inv:2 }, // Cmaj7/G  (第2転回: Gベース)
+      { root:'D', type:'maj7',  octave:4, inv:0 }, // Dmaj7
+      { root:'D', type:'maj7',  octave:4, inv:1 }, // Dmaj7/F# (第1転回: F#ベース)
+    ],
+  },
+  {
+    id: 'fm_abmaj_cm_progression',
+    name: 'Fm→Ab→Cm→Bb',
+    key: 'Fm',
+    prog: 'Fm→Abmaj→Cm→Bbmaj→Ebmaj7→Fm7→Abmaj7→Bbmaj',
+    desc: 'Fマイナーの哀愁8コード。EbとAbのフラット系が生む重厚でドラマチックな進行。',
+    chords: [
+      { root:'F',  type:'min',  octave:4, inv:0 }, // Fm
+      { root:'G#', type:'maj',  octave:3, inv:0 }, // Ab(G#)maj
+      { root:'C',  type:'min',  octave:4, inv:0 }, // Cm
+      { root:'A#', type:'maj',  octave:3, inv:0 }, // Bb(A#)maj
+      { root:'D#', type:'maj7', octave:4, inv:0 }, // Eb(D#)maj7
+      { root:'F',  type:'m7',   octave:4, inv:0 }, // Fm7
+      { root:'G#', type:'maj7', octave:3, inv:0 }, // Ab(G#)maj7
+      { root:'A#', type:'maj',  octave:3, inv:0 }, // Bb(A#)maj
+    ],
+  },
+  {
+    id: 'e7no3_gmaj7_progression',
+    name: 'E7(no3)→Gmaj7',
+    key: 'Am',
+    prog: 'E7(no3)→Gmaj7→Dsus4→E7sus4→Cmajadd9→Csus2→D/A→E7sus4',
+    desc: '浮遊感と開放感が共存する8コード。no3・add9・転回形で彩る幻想的な進行。',
+    chords: [
+      { root:'E', type:'7no3',   octave:4, inv:0 }, // E7(no3)
+      { root:'G', type:'maj7',   octave:4, inv:0 }, // Gmaj7
+      { root:'D', type:'sus4',   octave:4, inv:0 }, // Dsus4
+      { root:'E', type:'7sus4',  octave:4, inv:0 }, // E7(sus4)
+      { root:'C', type:'add9',   octave:4, inv:0 }, // Cmajadd9
+      { root:'C', type:'sus2',   octave:4, inv:0 }, // Csus2
+      { root:'D', type:'maj',    octave:4, inv:2 }, // Dmaj/A (第2転回=Aベース)
+      { root:'E', type:'7sus4',  octave:4, inv:0 }, // E7(sus4)
+    ],
+  },
+  {
+    id: 'fmaj_emin_progression',
+    name: 'F→Em/G→Am9',
+    key: 'Am',
+    prog: 'Fmaj→Em/G→Am9→E7sus4→Fmaj→Em/G→Esus4→E(no5)',
+    desc: '浮遊感のある8コード進行。Em/G転回・Am9・E7sus4の色彩感が特徴。',
+    chords: [
+      { root:'F', type:'maj',     octave:4, inv:0 }, // Fmaj
+      { root:'E', type:'min',     octave:4, inv:1 }, // Em/G (第1転回)
+      { root:'A', type:'min9',    octave:4, inv:0 }, // Am9
+      { root:'E', type:'7sus4',   octave:4, inv:0 }, // E7(sus4)
+      { root:'F', type:'maj',     octave:4, inv:0 }, // Fmaj
+      { root:'E', type:'min',     octave:4, inv:1 }, // Em/G (第1転回)
+      { root:'E', type:'sus4',    octave:4, inv:0 }, // Esus4
+      { root:'E', type:'maj_no5', octave:4, inv:0 }, // Emaj(no5)
     ],
   },
   {
