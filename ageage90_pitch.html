@@ -589,6 +589,11 @@
     .sampler-pad-name { font-size: 9px; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .sampler-pad-info { font-size: 7px; color: #888; }
     .sampler-pad-empty { font-size: 8px; color: #444; font-style: italic; }
+    .sampler-pad.ssaw-pad { border-color: #5a8; background: #0d1a10; }
+    .sampler-pad.ssaw-pad:hover { border-color: #afe; }
+    .sampler-pad.ssaw-pad.active-pad { border-color: #afe; background: #152a1a; box-shadow: 0 0 5px #5a844 inset; }
+    .sampler-pad-ssaw { font-size: 9px; color: #5a8; font-weight: bold; letter-spacing: 1px; }
+    .sampler-pad-ssaw-sub { font-size: 7px; color: #3a6; }
 
     /* ===== PIANO KEYBOARD ===== */
     #pianoWrap {
@@ -3010,7 +3015,13 @@ function scheduleStep() {
             if (resolved) { useSlotIdx = resolved.idx; useRootMidi = resolved.slot.rootNote ?? 60; }
             else useSlotIdx = null;
           }
-          if (useSlotIdx == null) return;
+          if (useSlotIdx == null) {
+            if (pad.useSsaw) {
+              const hz = noteToHz(noteName);
+              playSubtractive(hz, volPct / 100, swungTime, false, null, 0, `_smplssaw${p}_${noteName}`);
+            }
+            return;
+          }
           const slot = state.pcmToneBank[useSlotIdx];
           if (!slot) return;
           const buf = slot.buffer ?? slot.rawBuffer;
@@ -4016,7 +4027,7 @@ function highlightStepRecCursor() {
   // 全トラックのステップカーソルハイライトをリセット
   document.querySelectorAll('.step-rec-cursor').forEach(el => el.classList.remove('step-rec-cursor'));
   if (!samplerSeqRecMode || samplerSeqRecType !== 'step') return;
-  // アクティブパッドのカーソル位置をハイライト
+  if (samplerActivePad < 0) return; // SSAW PADはステップREC対象外
   const el = document.querySelector(`[data-track-id="smpseq${samplerActivePad}_on_${stepRecCursor}"]`);
   if (el) el.classList.add('step-rec-cursor');
 }
@@ -4183,7 +4194,7 @@ function renderSamplerSeq(content, seq, len, beatHeads) {
       restBtn.title = '現在ステップをOFF（休符）にして次ステップへ';
       restBtn.onclick = () => {
         const seq = getSeqData();
-        if (seq.samplerSeq && seq.samplerSeq[samplerActivePad]) {
+        if (samplerActivePad >= 0 && seq.samplerSeq && seq.samplerSeq[samplerActivePad]) {
           seq.samplerSeq[samplerActivePad].on[stepRecCursor] = false;
         }
         advanceStepRecCursor(len);
@@ -4207,7 +4218,7 @@ function renderSamplerSeq(content, seq, len, beatHeads) {
       clrStepBtn.title = '現在ステップをクリア(ON=OFF, NOTE=C4)して次へ';
       clrStepBtn.onclick = () => {
         const seq = getSeqData();
-        if (seq.samplerSeq && seq.samplerSeq[samplerActivePad]) {
+        if (samplerActivePad >= 0 && seq.samplerSeq && seq.samplerSeq[samplerActivePad]) {
           const str = seq.samplerSeq[samplerActivePad];
           str.on[stepRecCursor]   = false;
           str.note[stepRecCursor] = 'C4';
@@ -8752,25 +8763,8 @@ function resizeStepLen(bank, newLen) {
 // PCM SAMPLER
 // ============================================================================
 // 4パッド: { slotIdx: null=未割当, name }
-const samplerPads = [
-  { slotIdx: null, groupId: null },
-  { slotIdx: null, groupId: null },
-  { slotIdx: null, groupId: null },
-  { slotIdx: null, groupId: null },
-  { slotIdx: null, groupId: null },
-  { slotIdx: null, groupId: null },
-  { slotIdx: null, groupId: null },
-  { slotIdx: null, groupId: null },
-  { slotIdx: null, groupId: null },
-  { slotIdx: null, groupId: null },
-  { slotIdx: null, groupId: null },
-  { slotIdx: null, groupId: null },
-  { slotIdx: null, groupId: null },
-  { slotIdx: null, groupId: null },
-  { slotIdx: null, groupId: null },
-  { slotIdx: null, groupId: null }
-];
-let samplerActivePad = 0; // 選択中パッド番号
+const samplerPads = Array.from({ length: 16 }, () => ({ slotIdx: null, groupId: null, useSsaw: false }));
+let samplerActivePad = -1; // -1 = SSAW PAD、0〜15 = PCM PAD 1〜16
 let samplerSeqRecMode = false;      // 録音モード ON/OFF
 let samplerSeqRecType = 'realtime'; // 'realtime' | 'step'
 let stepRecCursor = 0;              // ステップレコーディング カーソル位置
@@ -8780,6 +8774,32 @@ function buildSamplerPanel() {
   const panel = document.getElementById('samplerPanel');
   if (!panel) return;
   panel.innerHTML = '';
+
+  // ===== SSAW PAD 0 (専用・常時SSAW) =====
+  const ssawPadDiv = document.createElement('div');
+  ssawPadDiv.className = 'sampler-pad ssaw-pad' + (samplerActivePad === -1 ? ' active-pad' : '');
+  ssawPadDiv.style.minWidth = '60px';
+  const ssawNumEl = document.createElement('div');
+  ssawNumEl.className = 'sampler-pad-num';
+  ssawNumEl.style.color = '#5a8';
+  ssawNumEl.textContent = 'SSAW';
+  ssawPadDiv.appendChild(ssawNumEl);
+  const ssawLblEl = document.createElement('div');
+  ssawLblEl.className = 'sampler-pad-ssaw';
+  ssawLblEl.textContent = '◈ PAD 0';
+  ssawPadDiv.appendChild(ssawLblEl);
+  const ssawSubEl = document.createElement('div');
+  ssawSubEl.className = 'sampler-pad-ssaw-sub';
+  ssawSubEl.textContent = 'SuperSAW Synth';
+  ssawPadDiv.appendChild(ssawSubEl);
+  ssawPadDiv.onclick = () => { samplerActivePad = -1; buildSamplerPanel(); };
+  panel.appendChild(ssawPadDiv);
+
+  // 区切り
+  const sepDiv = document.createElement('div');
+  sepDiv.style.cssText = 'width:1px;background:#333;align-self:stretch;margin:0 2px;flex-shrink:0';
+  panel.appendChild(sepDiv);
+
   samplerPads.forEach((pad, i) => {
     const slot = pad.slotIdx != null ? state.pcmToneBank[pad.slotIdx] : null;
     const div = document.createElement('div');
@@ -8953,14 +8973,16 @@ function showSamplerPadMenu(e, padIdx) {
   // 割当解除
   const clearItem = document.createElement('div');
   clearItem.className = 'ctx-item';
-  clearItem.textContent = '✕ 割当解除（スロット＆グループ）';
+  clearItem.textContent = '✕ 割当解除（スロット＆グループ）→ 無音';
   clearItem.onclick = () => {
     samplerPads[padIdx].slotIdx = null;
     samplerPads[padIdx].groupId = null;
+    samplerPads[padIdx].useSsaw = false;
     samplerCtxMenu.style.display = 'none';
     buildSamplerPanel();
   };
   samplerCtxMenu.appendChild(clearItem);
+
 
   // グループID設定
   const grpItem = document.createElement('div');
@@ -8991,6 +9013,12 @@ function showSamplerPadMenu(e, padIdx) {
   directTitle.style.cssText = 'padding:3px 10px;font-size:8px;color:#888;letter-spacing:1px';
   directTitle.textContent = '── 直接スロット指定 ──';
   samplerCtxMenu.appendChild(directTitle);
+
+  // スクロールコンテナ
+  const slotScrollWrap = document.createElement('div');
+  slotScrollWrap.style.cssText = 'max-height:200px;overflow-y:auto;overflow-x:hidden;';
+
+  let hasAny = false;
   for (let s = 0; s < 200; s++) {
     const slot = state.pcmToneBank[s];
     if (!slot) continue;
@@ -8999,14 +9027,17 @@ function showSamplerPadMenu(e, padIdx) {
     item.className = 'ctx-item';
     const isCur = samplerPads[padIdx].slotIdx === s;
     item.style.color = isCur ? '#f0c080' : '#ddd';
+    if (isCur) item.style.background = '#1e1600';
+    item.textContent = `S${String(s + 1).padStart(2, '0')}: ${slot.name}`;
     item.onclick = () => {
       samplerPads[padIdx].slotIdx = s;
-      samplerPads[padIdx].groupId = null; // 直接指定時はグループ解除
+      samplerPads[padIdx].groupId = null;
+      samplerPads[padIdx].useSsaw = false;
       samplerActivePad = padIdx;
       samplerCtxMenu.style.display = 'none';
       buildSamplerPanel();
     };
-    samplerCtxMenu.appendChild(item);
+    slotScrollWrap.appendChild(item);
   }
 
   if (!hasAny) {
@@ -9014,13 +9045,19 @@ function showSamplerPadMenu(e, padIdx) {
     none.className = 'ctx-item';
     none.style.color = '#555';
     none.textContent = '（ロード済みスロットなし）';
-    samplerCtxMenu.appendChild(none);
+    slotScrollWrap.appendChild(none);
   }
+  samplerCtxMenu.appendChild(slotScrollWrap);
 
+  // メニュー表示・位置調整（画面下に収まるよう上方向にも開く）
   samplerCtxMenu.style.display = 'block';
+  samplerCtxMenu.style.maxHeight = (window.innerHeight - 40) + 'px';
+  samplerCtxMenu.style.overflowY = 'auto';
   const cx = e.clientX ?? 0, cy = e.clientY ?? 0;
-  samplerCtxMenu.style.left = Math.min(cx, window.innerWidth - 220) + 'px';
-  samplerCtxMenu.style.top  = Math.min(cy, window.innerHeight - 300) + 'px';
+  const menuH = samplerCtxMenu.offsetHeight || 300;
+  const menuW = samplerCtxMenu.offsetWidth  || 220;
+  samplerCtxMenu.style.left = Math.min(cx, window.innerWidth  - menuW - 4) + 'px';
+  samplerCtxMenu.style.top  = Math.min(cy, window.innerHeight - menuH - 4) + 'px';
 }
 
 // ============================================================================
@@ -9166,48 +9203,50 @@ function midiNoteOnTrigger(noteName, velocity, dest) {
   if (!audioCtx) initAudio();
   if (audioCtx.state === 'suspended') audioCtx.resume();
 
-  const pad = samplerPads[samplerActivePad];
-  let useSlotIdx = pad.slotIdx;
-  let useRootMidi = 60;
-
-  // グループモード解決
-  if (pad.groupId) {
-    const resolved = resolveSlotByGroup(pad.groupId, noteName);
-    if (resolved) {
-      useSlotIdx = resolved.idx;
-      useRootMidi = resolved.slot.rootNote ?? 60;
-    } else {
-      useSlotIdx = null;
-    }
-  }
-
-  const hasPcm = useSlotIdx != null && state.pcmToneBank[useSlotIdx];
-
-  // PCM再生 (dest=pcm or dest=all)
-  if ((midiDest === 'pcm' || midiDest === 'all') && hasPcm) {
-    const hz = noteToHz(noteName);
-    const playMidi = noteNameToMidi(noteName);
-    const rate = pad.groupId ? semisToRate(useRootMidi, playMidi) : hz / C4_HZ;
-    const slot = state.pcmToneBank[useSlotIdx];
-    const buf = slot.buffer ?? slot.rawBuffer;
-    if (buf) {
-      const src = audioCtx.createBufferSource();
-      const gn = audioCtx.createGain();
-      src.buffer = buf;
-      src.playbackRate.value = rate;
-      const vol = velocity > 0 ? midiVelToVol(velocity) : 80;
-      gn.gain.value = (slot.gain ?? 100) / 100 * (vol / 100) * 0.8;
-      src.connect(gn);
-      gn.connect(masterGainNode);
-      src.start(audioCtx.currentTime);
-    }
-  }
-
-  // SSAW再生 (dest=ssaw or dest=all)
-  if (midiDest === 'ssaw' || midiDest === 'all') {
+  // SSAW PAD 0 が選択中 → 常にSSAW発音
+  if (samplerActivePad === -1) {
     const hz = noteToHz(noteName);
     playSubtractive(hz, midiVelToVol(velocity), audioCtx.currentTime, false,
       state.subParams.length / 1000, undefined, noteName);
+  } else {
+    const pad = samplerPads[samplerActivePad];
+    let useSlotIdx = pad.slotIdx;
+    let useRootMidi = 60;
+
+    // グループモード解決
+    if (pad.groupId) {
+      const resolved = resolveSlotByGroup(pad.groupId, noteName);
+      if (resolved) {
+        useSlotIdx = resolved.idx;
+        useRootMidi = resolved.slot.rootNote ?? 60;
+      } else {
+        useSlotIdx = null;
+      }
+    }
+
+    const hasPcm = useSlotIdx != null && state.pcmToneBank[useSlotIdx];
+
+    // PCM再生 (dest=pcm or dest=all)
+    if ((midiDest === 'pcm' || midiDest === 'all') && hasPcm) {
+      const hz = noteToHz(noteName);
+      const playMidi = noteNameToMidi(noteName);
+      const rate = pad.groupId ? semisToRate(useRootMidi, playMidi) : hz / C4_HZ;
+      const slot = state.pcmToneBank[useSlotIdx];
+      const buf = slot.buffer ?? slot.rawBuffer;
+      if (buf) {
+        const src = audioCtx.createBufferSource();
+        const gn = audioCtx.createGain();
+        src.buffer = buf;
+        src.playbackRate.value = rate;
+        const vol = velocity > 0 ? midiVelToVol(velocity) : 80;
+        gn.gain.value = (slot.gain ?? 100) / 100 * (vol / 100) * 0.8;
+        src.connect(gn);
+        gn.connect(masterGainNode);
+        src.start(audioCtx.currentTime);
+      }
+    }
+
+    // スロット未割当のPADは無音（SSAW PAD 0のみSSAW発音）
   }
 
   // ===== UI更新は非同期化（レイテンシー削減） =====
