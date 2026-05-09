@@ -7429,17 +7429,38 @@ function openWaveEditor(slotIdx) {
   fxRenderControls.appendChild(fxBtnRow);
   fxRenderSection.appendChild(fxRenderControls);
 
+  // FX/MIXER の WET 項目: { stateKey, audioApplyFn }
+  const fxWetTargets = [
+    { key: 'revWet',  apply: v => { if (reverbWetGain) reverbWetGain.gain.value = v / 100; } },
+    { key: 'distWet', apply: v => { if (distWetGain)   distWetGain.gain.value   = v / 100; } },
+    { key: 'compWet', apply: v => { if (compWetGain)   compWetGain.gain.value   = v / 100; } },
+  ];
+  // ON前の元の WET 値を退避
+  const fxWetOrig = {};
+  fxWetTargets.forEach(t => { fxWetOrig[t.key] = state.fx[t.key]; });
+
   fxRenderToggle.onclick = () => {
     fxRenderEnabled = !fxRenderEnabled;
     fxRenderControls.style.display = fxRenderEnabled ? 'flex' : 'none';
     fxRenderToggle.textContent = fxRenderEnabled ? 'ON' : 'OFF';
     fxRenderToggle.className = fxRenderEnabled ? 'btn active' : 'btn';
-    const targetVal = fxRenderEnabled ? 100 : 0;
-    fxSendConfigs.forEach(cfg => {
-      fxSendVals[cfg.key] = targetVal;
-      cfg._sl.value = targetVal;
-      cfg._valEl.textContent = targetVal + '%';
-    });
+
+    if (fxRenderEnabled) {
+      // 元の値を保存してから 100 にセット
+      fxWetTargets.forEach(t => {
+        fxWetOrig[t.key] = state.fx[t.key];
+        state.fx[t.key] = 100;
+        t.apply(100);
+      });
+    } else {
+      // 元の値に戻す
+      fxWetTargets.forEach(t => {
+        state.fx[t.key] = fxWetOrig[t.key];
+        t.apply(fxWetOrig[t.key]);
+      });
+    }
+    // FX/MIXER パネルの UI を再描画
+    buildFxPanel();
   };
 
   box.insertBefore(fxRenderSection, gateSection);
@@ -7465,6 +7486,14 @@ function openWaveEditor(slotIdx) {
     window.removeEventListener('touchmove',  onDragMove);
     window.removeEventListener('mouseup',   onDragEnd);
     window.removeEventListener('touchend',  onDragEnd);
+    // FX RENDER が ON のまま閉じた場合、FX/MIXER の WET 値を元に戻す
+    if (fxRenderEnabled) {
+      fxWetTargets.forEach(t => {
+        state.fx[t.key] = fxWetOrig[t.key];
+        t.apply(fxWetOrig[t.key]);
+      });
+      buildFxPanel();
+    }
     origRemove();
   };
 }
