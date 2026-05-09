@@ -177,15 +177,15 @@
     /* ===== SSAW TONE BANK ===== */
     .tone-slot-grid {
       display: grid;
-      grid-template-columns: repeat(10, minmax(0, 1fr));
-      gap: 3px;
-      max-height: 110px;
+      grid-template-columns: repeat(25, minmax(0, 1fr));
+      gap: 2px;
+      max-height: 60px;
       overflow-y: auto;
     }
     .tone-slot {
-      width: auto; height: 26px;
+      width: auto; height: 18px;
       background: #1a1a1a; border: 1px solid #333;
-      color: #888; font-size: 9px; cursor: pointer;
+      color: #888; font-size: 7px; cursor: pointer;
       border-radius: 2px; display: flex; align-items: center; justify-content: center;
     }
     .tone-slot:hover { background: #2a2a2a; color: #ccc; }
@@ -5453,6 +5453,108 @@ function buildPcmBankPanel() {
         showToast('マイクアクセスエラー: ' + err.message, 'error', 4000);
       }
     }
+  };
+
+  // ===== REC PATTERN ボタン =====
+  const recPatBtn = document.createElement('button');
+  recPatBtn.className = 'btn';
+  recPatBtn.id = 'pcmRecPatBtn';
+  recPatBtn.title = '現在のパターンを1ループ録音してPCMスロットに保存';
+  recPatBtn.textContent = '⏺ REC PATTERN';
+  recPatBtn.style.cssText = 'border-color:#a55;color:#f88;margin-left:6px;';
+  const recPatTimer = document.createElement('span');
+  recPatTimer.id = 'pcmRecPatTimer';
+  recPatTimer.style.cssText = 'font-size:9px;color:#f88;margin-left:4px;min-width:36px;display:inline-block;';
+  recPatTimer.textContent = '';
+  hdr.appendChild(recPatBtn);
+  hdr.appendChild(recPatTimer);
+
+  let _recPatState = { mediaRecorder: null, chunks: [], timerInterval: null, wasPlaying: false };
+
+  recPatBtn.onclick = async () => {
+    // 録音中なら手動停止
+    if (_recPatState.mediaRecorder && _recPatState.mediaRecorder.state === 'recording') {
+      _recPatState.mediaRecorder.stop();
+      return;
+    }
+    const empty = state.pcmToneBank.findIndex(s => s == null);
+    if (empty < 0) { showToast('全スロットが埋まっています', 'warn'); return; }
+    if (!audioCtx) initAudio();
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+    // masterGainNode → MediaStreamDestination でキャプチャ
+    const dest = audioCtx.createMediaStreamDestination();
+    masterGainNode.connect(dest);
+
+    _recPatState.chunks = [];
+    _recPatState.wasPlaying = isPlaying;
+
+    const mr = new MediaRecorder(dest.stream);
+    _recPatState.mediaRecorder = mr;
+    mr.ondataavailable = e => { if (e.data.size > 0) _recPatState.chunks.push(e.data); };
+    mr.onstop = async () => {
+      clearInterval(_recPatState.timerInterval);
+      try { masterGainNode.disconnect(dest); } catch(_) {}
+      recPatBtn.style.cssText = 'border-color:#a55;color:#f88;margin-left:6px;';
+      recPatBtn.textContent = '⏺ REC PATTERN';
+      recPatTimer.textContent = '';
+      // 再生していなかった場合は停止
+      if (!_recPatState.wasPlaying) stopPlay();
+
+      const blob = new Blob(_recPatState.chunks, { type: 'audio/webm' });
+      const arrayBuf = await blob.arrayBuffer();
+      try {
+        const decoded = await audioCtx.decodeAudioData(arrayBuf);
+        const slotIdx = state.pcmToneBank.findIndex(s => s == null);
+        if (slotIdx < 0) { showToast('スロットが満杯です', 'warn'); return; }
+        const stepDur = (60 / state.bpm) / 4;
+        const slotSteps = Math.max(1, Math.round(decoded.duration / stepDur));
+        const name = `PAT${String(slotIdx+1).padStart(2,'0')}`;
+        if (state.pcmToneBank[slotIdx]) releasePcmSlot(slotIdx);
+        const _sr = state.pcmDefaultSampleRate > 0 ? Math.min(state.pcmDefaultSampleRate, decoded.sampleRate) : decoded.sampleRate;
+        state.pcmToneBank[slotIdx] = {
+          rawBuffer: decoded, buffer: null, stretchedBuffer: null,
+          bits: 16, sampleRate: _sr,
+          name, gain: 100, slotSteps, initialSlotSteps: slotSteps,
+        };
+        applyPcmSlotBits(slotIdx);
+        state.pcmActiveToneSlot = slotIdx;
+        renderPcmToneBank();
+        if (state.currentSeqTab === 'pcmseq') renderSeq();
+        const _srInfo = _sr < decoded.sampleRate ? ` [↓${(_sr/1000).toFixed(1)}k]` : '';
+        showToast(`S${slotIdx+1} PATTERN録音完了: ${decoded.duration.toFixed(2)}s (${slotSteps}steps)${_srInfo}`, 'ok', 3500);
+      } catch(err) { showToast('PATTERN録音デコードエラー: ' + err.message, 'error'); }
+    };
+
+    // 録音開始
+    mr.start();
+    recPatBtn.style.cssText = 'border-color:#f55;color:#fcc;background:#3a1010;margin-left:6px;';
+    recPatBtn.textContent = '⏹ STOP';
+
+    // 再生していなければ開始
+    if (!isPlaying) startPlay();
+
+    // 1ループ分の時間を計算してタイマー停止
+    const stepDur = (60 / state.bpm) / 4;
+    const loopSteps = getStepLen();
+    const loopSec = stepDur * loopSteps;
+    // 現在ステップの残り時間 + ループ1周
+    const remainSteps = isPlaying ? (loopSteps - currentStep) : loopSteps;
+    const waitMs = remainSteps * stepDur * 1000 + 150; // +150ms tail余白
+
+    const recPatStart = Date.now();
+    _recPatState.timerInterval = setInterval(() => {
+      const elapsed = ((Date.now() - recPatStart) / 1000).toFixed(1);
+      recPatTimer.textContent = elapsed + 's/' + loopSec.toFixed(1) + 's';
+    }, 100);
+
+    setTimeout(() => {
+      if (_recPatState.mediaRecorder && _recPatState.mediaRecorder.state === 'recording') {
+        _recPatState.mediaRecorder.stop();
+      }
+    }, waitMs);
+
+    showToast(`PATTERN録音開始... (${loopSec.toFixed(1)}s)`, 'warn', 2000);
   };
 
   container.appendChild(hdr);
