@@ -5861,6 +5861,26 @@ function openWaveEditor(slotIdx) {
   let fadeInSec  = 0.0;
   let fadeOutSec = 0.0;
 
+  // ===== WAVE EDITOR 内 再生管理 =====
+  let weCurrentSrc = null; // 現在再生中の BufferSource
+  function weStop() {
+    if (weCurrentSrc) {
+      try { weCurrentSrc.stop(); } catch(e) {}
+      weCurrentSrc = null;
+    }
+  }
+  function wePlay(audioBuffer) {
+    weStop();
+    if (!audioCtx) initAudio();
+    const s = audioCtx.createBufferSource();
+    s.buffer = audioBuffer;
+    s.connect(audioCtx.destination);
+    s.onended = () => { if (weCurrentSrc === s) weCurrentSrc = null; };
+    s.start();
+    weCurrentSrc = s;
+    return s;
+  }
+
   // 反転フラグ (プレビュー用・適用前の状態)
   let isReversed  = false; // 時間軸反転
   let isPolarInv  = false; // 極性反転
@@ -6642,10 +6662,10 @@ function openWaveEditor(slotIdx) {
   gatePreviewBtn.className = 'btn primary';
   gatePreviewBtn.textContent = '▶ GATE試聴 (選択範囲)';
   gatePreviewBtn.onclick = () => {
-    if (!audioCtx) initAudio();
     const sampleStart = Math.floor(trimStart * totalSamples);
     const sampleLen   = Math.floor((trimEnd - trimStart) * totalSamples);
     if (sampleLen <= 0) return;
+    if (!audioCtx) initAudio();
     const tmpBuf = audioCtx.createBuffer(buf.numberOfChannels, sampleLen, sr);
     for (let c = 0; c < buf.numberOfChannels; c++) {
       const s = buf.getChannelData(c), d = tmpBuf.getChannelData(c);
@@ -6656,10 +6676,7 @@ function openWaveEditor(slotIdx) {
     if (isPolarInv) invertPolarityBuffer(tmpBuf);
     const useBpm = gateCustomBpm || state.bpm;
     applyGateToBuffer(tmpBuf, useBpm, gateSubdiv, gateDuty, gatePattern.slice(0, gateSubdiv), gateAtk, gateRel);
-    const src2 = audioCtx.createBufferSource();
-    src2.buffer = tmpBuf;
-    src2.connect(audioCtx.destination);
-    src2.start();
+    wePlay(tmpBuf);
   };
   gateRow4.appendChild(gatePreviewBtn);
 
@@ -6733,11 +6750,9 @@ function openWaveEditor(slotIdx) {
   playSelBtn.className = 'btn primary';
   playSelBtn.textContent = '▶ 選択範囲を試聴';
   playSelBtn.onclick = () => {
-    if (!audioCtx) initAudio();
     const sampleStart = Math.floor(trimStart * totalSamples);
     const sampleLen   = Math.floor((trimEnd - trimStart) * totalSamples);
     if (sampleLen <= 0) return;
-    // 試聴用バッファ作成 (フェード・反転適用)
     const tmpBuf = audioCtx.createBuffer(buf.numberOfChannels, sampleLen, sr);
     for (let c = 0; c < buf.numberOfChannels; c++) {
       const src = buf.getChannelData(c);
@@ -6747,10 +6762,7 @@ function openWaveEditor(slotIdx) {
     if (isReversed)  reverseBuffer(tmpBuf);
     if (isPolarInv)  invertPolarityBuffer(tmpBuf);
     applyFadeToBuffer(tmpBuf, fadeInSec, fadeOutSec);
-    const src2 = audioCtx.createBufferSource();
-    src2.buffer = tmpBuf;
-    src2.connect(audioCtx.destination);
-    src2.start();
+    wePlay(tmpBuf);
   };
   ctrlRow.appendChild(playSelBtn);
 
@@ -6758,14 +6770,16 @@ function openWaveEditor(slotIdx) {
   const playAllBtn = document.createElement('button');
   playAllBtn.className = 'btn';
   playAllBtn.textContent = '▶ 全体試聴';
-  playAllBtn.onclick = () => {
-    if (!audioCtx) initAudio();
-    const src2 = audioCtx.createBufferSource();
-    src2.buffer = buf;
-    src2.connect(audioCtx.destination);
-    src2.start();
-  };
+  playAllBtn.onclick = () => { wePlay(buf); };
   ctrlRow.appendChild(playAllBtn);
+
+  // ■ STOPボタン
+  const weStopBtn = document.createElement('button');
+  weStopBtn.className = 'btn warn';
+  weStopBtn.style.cssText = 'border-color:#d55;color:#fcc;font-size:11px;padding:3px 10px';
+  weStopBtn.textContent = '■ STOP';
+  weStopBtn.onclick = () => weStop();
+  ctrlRow.appendChild(weStopBtn);
 
   // 選択範囲を全体に
   const trimApplyBtn = document.createElement('button');
@@ -7380,10 +7394,7 @@ function openWaveEditor(slotIdx) {
     try {
       const outBuf = await doFxRender();
       if (!outBuf) return;
-      const prev = audioCtx.createBufferSource();
-      prev.buffer = outBuf;
-      prev.connect(audioCtx.destination);
-      prev.start();
+      wePlay(outBuf);
       showToast(`FX試聴: ${outBuf.duration.toFixed(2)}s`, 'ok', 1500);
     } catch (e) {
       showToast('FXレンダリングエラー: ' + e.message, 'error');
@@ -7486,6 +7497,8 @@ function openWaveEditor(slotIdx) {
     window.removeEventListener('touchmove',  onDragMove);
     window.removeEventListener('mouseup',   onDragEnd);
     window.removeEventListener('touchend',  onDragEnd);
+    // 再生中の音を停止
+    weStop();
     // FX RENDER が ON のまま閉じた場合、FX/MIXER の WET 値を元に戻す
     if (fxRenderEnabled) {
       fxWetTargets.forEach(t => {
