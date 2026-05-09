@@ -5640,6 +5640,7 @@ function renderPcmToneBank() {
 }
 
 const pcmCtxMenu = document.getElementById('pcmCtxMenu');
+let pcmClipboard = null; // { slot data copy }
 document.addEventListener('click', () => { pcmCtxMenu.style.display = 'none'; });
 
 function showPcmCtxMenu(e, slotIdx) {
@@ -5762,6 +5763,24 @@ function showPcmCtxMenu(e, slotIdx) {
       renderPcmToneBank();
       if (state.currentSeqTab === 'pcmseq') renderSeq();
     }});
+    items.push({ label: `📋 COPY (S${slotIdx+1})`, action: () => {
+      // rawBuffer のチャンネルデータを複製して独立したコピーを保持
+      const src = state.pcmToneBank[slotIdx];
+      const rb = src.rawBuffer;
+      const newRaw = audioCtx.createBuffer(rb.numberOfChannels, rb.length, rb.sampleRate);
+      for (let ch = 0; ch < rb.numberOfChannels; ch++) {
+        newRaw.copyToChannel(rb.getChannelData(ch).slice(), ch);
+      }
+      pcmClipboard = {
+        rawBuffer: newRaw,
+        bits: src.bits, sampleRate: src.sampleRate,
+        name: src.name, gain: src.gain ?? 100,
+        slotSteps: src.slotSteps, initialSlotSteps: src.initialSlotSteps,
+        groupId: src.groupId ?? null, rootNote: src.rootNote ?? 60,
+        loNote: src.loNote ?? 0, hiNote: src.hiNote ?? 127,
+      };
+      showToast(`S${slotIdx+1} [${src.name}] をコピーしました`, 'ok', 2000);
+    }});
     // ===== MULTI-SAMPLE 設定 =====
     const _grpSep = document.createElement('div');
     _grpSep.className = 'ctx-sep';
@@ -5793,6 +5812,36 @@ function showPcmCtxMenu(e, slotIdx) {
       slot.loNote = Math.max(0, Math.min(127, parseInt(lo)||0));
       slot.hiNote = Math.max(0, Math.min(127, parseInt(hi)||127));
       renderPcmToneBank();
+    }});
+  }
+
+  // PASTE (クリップボードにデータがある場合のみ表示)
+  if (pcmClipboard) {
+    const _pasteSep = document.createElement('div');
+    _pasteSep.className = 'ctx-sep';
+    pcmCtxMenu.appendChild(_pasteSep);
+    items.push({ label: `📌 PASTE [${pcmClipboard.name}] → S${slotIdx+1}`, action: () => {
+      if (!audioCtx) initAudio();
+      const cb = pcmClipboard;
+      const rb = cb.rawBuffer;
+      const newRaw = audioCtx.createBuffer(rb.numberOfChannels, rb.length, rb.sampleRate);
+      for (let ch = 0; ch < rb.numberOfChannels; ch++) {
+        newRaw.copyToChannel(rb.getChannelData(ch).slice(), ch);
+      }
+      if (state.pcmToneBank[slotIdx]) releasePcmSlot(slotIdx);
+      state.pcmToneBank[slotIdx] = {
+        rawBuffer: newRaw, buffer: null, stretchedBuffer: null,
+        bits: cb.bits, sampleRate: cb.sampleRate,
+        name: cb.name, gain: cb.gain,
+        slotSteps: cb.slotSteps, initialSlotSteps: cb.initialSlotSteps,
+        groupId: cb.groupId, rootNote: cb.rootNote,
+        loNote: cb.loNote, hiNote: cb.hiNote,
+      };
+      applyPcmSlotBits(slotIdx);
+      state.pcmActiveToneSlot = slotIdx;
+      renderPcmToneBank();
+      if (state.currentSeqTab === 'pcmseq') renderSeq();
+      showToast(`S${slotIdx+1} に [${cb.name}] をペーストしました`, 'ok', 2500);
     }});
   }
 
