@@ -7211,6 +7211,7 @@ function openWaveEditor(slotIdx) {
     sl.oninput = () => { fxSendVals[cfg.key] = parseInt(sl.value); valEl.textContent = sl.value + '%'; };
     col.appendChild(lbl); col.appendChild(sl); col.appendChild(valEl);
     sendRow.appendChild(col);
+    cfg._sl = sl; cfg._valEl = valEl;
   });
   fxRenderControls.appendChild(sendRow);
 
@@ -7433,6 +7434,12 @@ function openWaveEditor(slotIdx) {
     fxRenderControls.style.display = fxRenderEnabled ? 'flex' : 'none';
     fxRenderToggle.textContent = fxRenderEnabled ? 'ON' : 'OFF';
     fxRenderToggle.className = fxRenderEnabled ? 'btn active' : 'btn';
+    const targetVal = fxRenderEnabled ? 100 : 0;
+    fxSendConfigs.forEach(cfg => {
+      fxSendVals[cfg.key] = targetVal;
+      cfg._sl.value = targetVal;
+      cfg._valEl.textContent = targetVal + '%';
+    });
   };
 
   box.insertBefore(fxRenderSection, gateSection);
