@@ -1104,7 +1104,8 @@ const state = {
     seqData: createEmptySeqData(16),
   })),
   // SSAW params
-  subParams: { wave: 'sawtooth', length: 400, filterFreq: 6000, filterRes: 2, filterType: 'lowpass', envA: 5, envD: 150, envS: 60, envR: 300, voiceCount: 5, detune: 18, spread: 80, filtEnvOn: false, filtEnvAmt: 80, filtEnvA: 5, filtEnvD: 300, filtEnvR: 200 },
+  subParams: { wave: 'sawtooth', length: 400, filterFreq: 6000, filterRes: 2, filterType: 'lowpass', envA: 5, envD: 150, envS: 60, envR: 300, voiceCount: 5, detune: 18, spread: 80, filtEnvOn: false, filtEnvAmt: 80, filtEnvA: 5, filtEnvD: 300, filtEnvR: 200,
+    ssawRevOn: false, ssawRevDecay: 1.5, ssawRevWet: 40, ssawRevSend: 30, ssawRevPreDelay: 0 },
   subToneBank: Array(50).fill(null),   // null=未使用
   subActiveTone: -1,
   // FX
@@ -1191,6 +1192,9 @@ let delayNode = null, delayFb = null;
 let chorusDelay = null, chorusLfo = null, chorusDepthGain = null;
 // Reverb
 let reverbConv = null, reverbWetGain = null;
+// SSAW専用リバーブ
+let ssawRevConv = null, ssawRevSendGain = null, ssawRevWetGain = null, ssawRevPreDelayNode = null;
+let ssawDryGain = null;  // リバーブON時にドライ信号をWETに応じて減衰させるGain
 // Distortion
 let distShaper = null, distWetGain = null, distToneFilter = null;
 // Compressor
@@ -2202,6 +2206,32 @@ function initAudio() {
   compWetGain.connect(audioCtx.destination);
 
   chorusLfo.start();
+
+  // ===== SSAW 専用リバーブ =====
+  ssawRevPreDelayNode = audioCtx.createDelay(0.2);
+  ssawRevPreDelayNode.delayTime.value = (state.subParams.ssawRevPreDelay ?? 0) / 1000;
+  ssawRevConv = audioCtx.createConvolver();
+  ssawRevConv.buffer = buildReverbIR(state.subParams.ssawRevDecay ?? 1.5);
+  ssawRevSendGain = audioCtx.createGain();
+  ssawRevSendGain.gain.value = state.subParams.ssawRevOn ? (state.subParams.ssawRevSend ?? 30) / 100 : 0;
+  ssawRevWetGain = audioCtx.createGain();
+  ssawRevWetGain.gain.value = (state.subParams.ssawRevWet ?? 40) / 100;
+  // DRY gain: リバーブON時は WET量に応じてドライ信号を減衰 (WET=100% → dry=0)
+  ssawDryGain = audioCtx.createGain();
+  const _initDryGain = () => {
+    if (!state.subParams.ssawRevOn) return 1.0;
+    return 1.0 - (state.subParams.ssawRevWet ?? 40) / 100;
+  };
+  ssawDryGain.gain.value = _initDryGain();
+  // routing:
+  //   [playSubtractive mainPanner] → ssawDryGain → masterGainNode  (ドライ: WETで減衰)
+  //   [playSubtractive mainPanner] → ssawRevSendGain → ssawRevPreDelayNode → ssawRevConv → ssawRevWetGain → destination (ウェット)
+  ssawDryGain.connect(masterGainNode);
+  ssawRevSendGain.connect(ssawRevPreDelayNode);
+  ssawRevPreDelayNode.connect(ssawRevConv);
+  ssawRevConv.connect(ssawRevWetGain);
+  ssawRevWetGain.connect(audioCtx.destination);
+
   // VOCODER ノードを初期化
   initVocoderNodes();
 }
@@ -2462,7 +2492,7 @@ function playSubtractive(freq, vol, when, tie, dur, portaMs, noteName) {
   mixGn.connect(mainPanner);
 
   // VOCODER: ON時はSSAWをmasterGainNodeに直接つながず carInputGain のみに送る
-  // OFF時は従来通りmasterGainNodeに直結
+  // OFF時: ssawDryGain経由でmasterGainNodeへ (ssawDryGainはSSAW専用リバーブのWETで減衰)
   if (vcState.enabled && vcState.carInputGain) {
     // キャリアとしてvocoderへ
     mainPanner.connect(vcState.carInputGain);
@@ -2474,7 +2504,13 @@ function playSubtractive(freq, vol, when, tie, dur, portaMs, noteName) {
       bypassGain.connect(masterGainNode);
     }
   } else {
-    mainPanner.connect(masterGainNode);
+    // ssawDryGainが存在すればそれ経由（SSAW専用リバーブのWET分ドライをカット）
+    // ssawDryGain.connect(masterGainNode) は initAudio で接続済み
+    if (ssawDryGain) {
+      mainPanner.connect(ssawDryGain);
+    } else {
+      mainPanner.connect(masterGainNode);
+    }
   }
 
   // FX sends（vocoder ON/OFF 両方で有効）
@@ -2483,6 +2519,10 @@ function playSubtractive(freq, vol, when, tie, dur, portaMs, noteName) {
   if (fxBusComp) { const sg = audioCtx.createGain(); sg.gain.value = (state.mix.sendCompSub ?? 0) / 100; mainPanner.connect(sg); sg.connect(fxBusComp); }
   if (fxBusDly)  { const sg = audioCtx.createGain(); sg.gain.value = (state.mix.sendDlySub ?? 0) / 100;  mainPanner.connect(sg); sg.connect(fxBusDly); }
   if (fxBusChr)  { const sg = audioCtx.createGain(); sg.gain.value = (state.mix.sendChrSub ?? 0) / 100;  mainPanner.connect(sg); sg.connect(fxBusChr); }
+  // SSAW 専用リバーブ send
+  if (ssawRevSendGain && state.subParams.ssawRevOn) {
+    mainPanner.connect(ssawRevSendGain);
+  }
 
   // N voice オシレーター生成
   const oscs = [];
@@ -8055,6 +8095,81 @@ function buildSubPanel() {
   });
 
   container.appendChild(fenvBox);
+
+  // ===== SSAW 専用 REVERB セクション =====
+  const ssawRevBox = document.createElement('div');
+  ssawRevBox.className = 'sub-section';
+  ssawRevBox.style.minWidth = '160px';
+
+  const ssawRevHdr = document.createElement('div');
+  ssawRevHdr.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px';
+
+  const ssawRevTitle = document.createElement('div');
+  ssawRevTitle.className = 'small-title';
+  ssawRevTitle.style.cssText = 'margin:0;color:#a8d8a8';
+  ssawRevTitle.textContent = 'SSAW REVERB';
+  ssawRevHdr.appendChild(ssawRevTitle);
+
+  // ON/OFF ボタン
+  const ssawRevOnBtn = document.createElement('button');
+  const _srOn = () => !!state.subParams.ssawRevOn;
+  const _updateRevOnBtn = () => {
+    const on = _srOn();
+    ssawRevOnBtn.className = 'btn' + (on ? ' active' : '');
+    ssawRevOnBtn.style.cssText = `font-size:9px;padding:2px 10px;border-color:${on ? '#5a8' : '#444'};color:${on ? '#afe' : '#888'}`;
+    ssawRevOnBtn.textContent = on ? 'ON' : 'OFF';
+    ssawRevSliderArea.style.opacity = on ? '1' : '0.4';
+  };
+  ssawRevOnBtn.onclick = () => {
+    state.subParams.ssawRevOn = !state.subParams.ssawRevOn;
+    const on = state.subParams.ssawRevOn;
+    if (ssawRevSendGain) ssawRevSendGain.gain.value = on ? (state.subParams.ssawRevSend ?? 30) / 100 : 0;
+    // ON→ドライをWETで減衰、OFF→ドライをフル戻し
+    if (ssawDryGain) ssawDryGain.gain.value = on ? 1.0 - (state.subParams.ssawRevWet ?? 40) / 100 : 1.0;
+    _updateRevOnBtn();
+  };
+  ssawRevHdr.appendChild(ssawRevOnBtn);
+  ssawRevBox.appendChild(ssawRevHdr);
+
+  const ssawRevSliderArea = document.createElement('div');
+
+  // SEND スライダー
+  const _makeRevSlider = (label, key, min, max, step, unit, onInput) => {
+    const r = makeSubRow(label);
+    const inp = document.createElement('input');
+    inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step;
+    inp.value = state.subParams[key] ?? 0;
+    const v = document.createElement('span');
+    v.className = 'val';
+    v.textContent = (state.subParams[key] ?? 0) + (unit || '');
+    inp.oninput = (e) => {
+      const val = parseFloat(e.target.value);
+      state.subParams[key] = val;
+      v.textContent = val + (unit || '');
+      if (onInput) onInput(val);
+    };
+    r.appendChild(inp); r.appendChild(v);
+    ssawRevSliderArea.appendChild(r);
+  };
+
+  _makeRevSlider('SEND', 'ssawRevSend', 0, 100, 1, '%', val => {
+    if (ssawRevSendGain && state.subParams.ssawRevOn) ssawRevSendGain.gain.value = val / 100;
+  });
+  _makeRevSlider('WET', 'ssawRevWet', 0, 100, 1, '%', val => {
+    if (ssawRevWetGain) ssawRevWetGain.gain.value = val / 100;
+    // WET上昇に比例してドライ信号を減衰 (WET=100% → dry=0)
+    if (ssawDryGain && state.subParams.ssawRevOn) ssawDryGain.gain.value = 1.0 - val / 100;
+  });
+  _makeRevSlider('DECAY', 'ssawRevDecay', 0.1, 8.0, 0.1, 's', val => {
+    if (ssawRevConv && audioCtx) ssawRevConv.buffer = buildReverbIR(val);
+  });
+  _makeRevSlider('PRE-DLY', 'ssawRevPreDelay', 0, 150, 1, 'ms', val => {
+    if (ssawRevPreDelayNode) ssawRevPreDelayNode.delayTime.value = val / 1000;
+  });
+
+  ssawRevBox.appendChild(ssawRevSliderArea);
+  _updateRevOnBtn();
+  container.appendChild(ssawRevBox);
 }
 
 function makeSubRow(label) {
