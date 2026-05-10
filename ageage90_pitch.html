@@ -1175,8 +1175,8 @@ function createEmptySeqData(stepLen) {
         on: false, root: 'C', type: 'maj', octave: 4, inv: 0
       })),
       // 出力先パッド (0〜15のbitmask, 0xFFFF=全パッド)
-      targetPads: 0b0001,   // デフォルトはPAD1
-      targetSsaw: false,    // SSAWへ出力するか
+      targetPads: 0b0000,   // デフォルトはPAD全オフ
+      targetSsaw: true,     // SSAWへ出力するか
       // コードセットのベースオクターブ
     },
   };
@@ -2965,7 +2965,7 @@ function scheduleStep() {
       const cstep = seq.chordSeq.steps[step];
       if (cstep && cstep.on) {
         const chordNotes = buildChordNotes(cstep.root, cstep.type, cstep.octave, cstep.inv);
-        const mask = seq.chordSeq.targetPads ?? 0b0001;
+        const mask = seq.chordSeq.targetPads ?? 0b0000;
         for (let p = 0; p < 16; p++) {
           if (!(mask & (1 << p))) continue;
           if (!seq.samplerSeq) continue;
@@ -4470,8 +4470,8 @@ function ensureChordSeq(seq, len) {
   if (!seq.chordSeq) {
     seq.chordSeq = {
       steps: Array(len).fill(null).map(() => ({ on: false, root: 'C', type: 'maj', octave: 4, inv: 0 })),
-      targetPads: 0b0001,
-      targetSsaw: false,
+      targetPads: 0b0000,
+      targetSsaw: true,
     };
   }
   if (!seq.chordSeq.steps || seq.chordSeq.steps.length < len) {
@@ -4479,8 +4479,8 @@ function ensureChordSeq(seq, len) {
       seq.chordSeq.steps.push({ on: false, root: 'C', type: 'maj', octave: 4, inv: 0 });
     }
   }
-  if (seq.chordSeq.targetPads == null) seq.chordSeq.targetPads = 0b0001;
-  if (seq.chordSeq.targetSsaw == null) seq.chordSeq.targetSsaw = false;
+  if (seq.chordSeq.targetPads == null) seq.chordSeq.targetPads = 0b0000;
+  if (seq.chordSeq.targetSsaw == null) seq.chordSeq.targetSsaw = true;
 }
 
 // ===== CHORD PICKER (ポップアップ) =====
@@ -4615,7 +4615,7 @@ function openChordPicker(e, stepData, onApply) {
       if (audioCtx.state === 'suspended') audioCtx.resume();
       const seq = getSeqData();
       const notes = buildChordNotes(chordPickerState.root, chordPickerState.type, chordPickerState.octave, chordPickerState.inv);
-      const mask = seq.chordSeq?.targetPads ?? 0b0001;
+      const mask = seq.chordSeq?.targetPads ?? 0b0000;
       for (let p = 0; p < 16; p++) {
         if (!(mask & (1 << p))) continue;
         const pad = samplerPads[p];
@@ -4900,6 +4900,22 @@ function applyChordPreset(preset) {
   return true;
 }
 
+// PRESETを適用したバンク群をSONGステップに順番登録するヘルパー
+function registerPresetToSong(preset) {
+  const startBank = state.currentBank;
+  const count = preset.chords.length;
+  if (songState.steps.length + count > SONG_MAX_STEPS) {
+    showToast(`SOGNステップ上限(${SONG_MAX_STEPS})を超えるため登録できません`, 'warn', 3000);
+    return;
+  }
+  for (let ci = 0; ci < count; ci++) {
+    songState.steps.push({ bank: startBank + ci, repeat: 1 });
+  }
+  renderSongStepList();
+  updateSongStatusBar();
+  showToast(`SONG: Bank${startBank+1}〜${startBank+count} を末尾に追加 (計${songState.steps.length}steps)`, 'ok', 2500);
+}
+
 // プリセット選択ポップアップ
 let chordPresetPopupEl = null;
 
@@ -5018,12 +5034,31 @@ function renderChordSeq(content, seq, len, beatHeads) {
   const ctrlBar = document.createElement('div');
   ctrlBar.className = 'chord-ctrl-bar';
 
-  // 出力先PAD選択
+  // 出力先選択ラベル
   const padLbl = document.createElement('span');
   padLbl.style.cssText = 'font-size:9px;color:#aaa';
-  padLbl.textContent = 'OUTPUT PAD:';
+  padLbl.textContent = 'OUTPUT:';
   ctrlBar.appendChild(padLbl);
 
+  // SSAW出力ボタン（先頭）
+  const ssawBtn = document.createElement('button');
+  const ssawOn = !!cs.targetSsaw;
+  ssawBtn.className = 'btn' + (ssawOn ? ' active' : '');
+  ssawBtn.style.cssText = `font-size:9px;padding:2px 10px;border-color:${ssawOn ? '#5a8' : '#444'};color:${ssawOn ? '#afe' : '#666'}`;
+  ssawBtn.textContent = 'SSAW';
+  ssawBtn.title = 'コードノートをSSAWで発音 (ボコーダーON時はキャリアとして使用)';
+  ssawBtn.onclick = () => {
+    cs.targetSsaw = !cs.targetSsaw;
+    renderSeq();
+  };
+  ctrlBar.appendChild(ssawBtn);
+
+  // セパレータ
+  const sep = document.createElement('span');
+  sep.style.cssText = 'width:1px;background:#3a2000;margin:0 4px;align-self:stretch';
+  ctrlBar.appendChild(sep);
+
+  // PAD選択ボタン（SSAW の後）
   for (let p = 0; p < 16; p++) {
     const isOn = !!(cs.targetPads & (1 << p));
     const pad = samplerPads[p];
@@ -5039,24 +5074,6 @@ function renderChordSeq(content, seq, len, beatHeads) {
     };
     ctrlBar.appendChild(pb);
   }
-
-  // セパレータ
-  const sep = document.createElement('span');
-  sep.style.cssText = 'width:1px;background:#3a2000;margin:0 4px;align-self:stretch';
-  ctrlBar.appendChild(sep);
-
-  // SSAW出力ボタン
-  const ssawBtn = document.createElement('button');
-  const ssawOn = !!cs.targetSsaw;
-  ssawBtn.className = 'btn' + (ssawOn ? ' active' : '');
-  ssawBtn.style.cssText = `font-size:9px;padding:2px 10px;border-color:${ssawOn ? '#5a8' : '#444'};color:${ssawOn ? '#afe' : '#666'}`;
-  ssawBtn.textContent = 'SSAW';
-  ssawBtn.title = 'コードノートをSSAWで発音 (ボコーダーON時はキャリアとして使用)';
-  ssawBtn.onclick = () => {
-    cs.targetSsaw = !cs.targetSsaw;
-    renderSeq();
-  };
-  ctrlBar.appendChild(ssawBtn);
 
   // セパレータ2
   const sep2 = document.createElement('span');
@@ -5119,6 +5136,7 @@ function renderChordSeq(content, seq, len, beatHeads) {
       const end   = start + preset.chords.length - 1;
       const ok = applyChordPreset(preset);
       if (ok) {
+        registerPresetToSong(preset);
         buildBankBar();
         renderSeq();
         showToast(`PRESET: ${preset.name} → Bank${start}〜${end} (${preset.chords.length}パターン)`, 'ok', 2500);
@@ -5140,6 +5158,7 @@ function renderChordSeq(content, seq, len, beatHeads) {
       const end   = start + preset.chords.length - 1;
       const ok = applyChordPreset(preset);
       if (ok) {
+        registerPresetToSong(preset);
         buildBankBar();
         renderSeq();
         showToast(`PRESET: ${preset.name} → Bank${start}〜${end} (${preset.chords.length}パターン)`, 'ok', 2500);
