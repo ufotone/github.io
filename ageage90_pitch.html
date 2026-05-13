@@ -1104,8 +1104,8 @@ const state = {
     seqData: createEmptySeqData(16),
   })),
   // SSAW params
-  subParams: { wave: 'sawtooth', length: 400, filterFreq: 6000, filterRes: 2, filterType: 'lowpass', envA: 5, envD: 150, envS: 60, envR: 300, voiceCount: 5, detune: 18, spread: 80, filtEnvOn: false, filtEnvAmt: 80, filtEnvA: 5, filtEnvD: 300, filtEnvR: 200,
-    ssawRevOn: false, ssawRevDecay: 1.5, ssawRevWet: 40, ssawRevSend: 30, ssawRevPreDelay: 0 },
+  subParams: { wave: 'sawtooth', length: 2000, filterFreq: 800, filterRes: 8, filterType: 'lowpass', envA: 400, envD: 800, envS: 80, envR: 1500, voiceCount: 7, detune: 25, spread: 100, filtEnvOn: true, filtEnvAmt: 90, filtEnvA: 1500, filtEnvD: 2000, filtEnvR: 1500,
+    ssawRevOn: true, ssawRevDecay: 3.5, ssawRevWet: 70, ssawRevSend: 60, ssawRevPreDelay: 30 },
   subToneBank: Array(50).fill(null),   // null=未使用
   subActiveTone: -1,
   // FX
@@ -1845,10 +1845,12 @@ function playVocoderCarrier(freq, when, dur) {
   if (!audioCtx || !vcState.enabled || !vcState.carInputGain) return;
   const p = state.subParams;
   const A = p.envA / 1000, D = p.envD / 1000, S = p.envS / 100, R = p.envR / 1000;
-  const nVoices = Math.max(1, Math.min(5, p.voiceCount ?? 1));
+  const nVoices = Math.max(1, Math.min(8, p.voiceCount ?? 1));
   const detuneCents = p.detune ?? 0;
-  const noteLen = Math.max(dur - R, 0.01);
-  const volScale = nVoices > 1 ? (0.5 + 0.5 / Math.sqrt(nVoices)) : 1.0;
+  const noteLen = Math.max(dur - R, A + D, 0.01);
+  // 多声時のピーク補正: 1/√n (RMS合算) にレゾナンスQによる追加減衰を掛ける
+  const resAtten = 1 / Math.max(1, Math.sqrt((state.subParams.filterRes ?? 1) / 2));
+  const volScale = (nVoices > 1 ? (1 / Math.sqrt(nVoices)) : 1.0) * resAtten;
   const vPeak = 1.0 * volScale;
   const vSus  = S * volScale;
 
@@ -2388,10 +2390,14 @@ function _stopSubNode(node, fadeStart) {
   const FADE = 0.025; // 25ms — クリック防止に十分で知覚できない長さ
   try {
     const gn = node.gn;
-    // スケジュール済みの未来イベントをキャンセルし、
-    // 既知の sustainGain をアンカーにして滑らかにゼロへ
-    gn.gain.cancelScheduledValues(fadeStart);
-    gn.gain.setValueAtTime(node.sustainGain ?? 0, fadeStart);
+    // cancelAndHoldAtTime: その時刻の補間"現在値"を保持しつつ未来イベントをキャンセル。
+    // これで前ノートがアタック/ディケイ中でも段差なく fade out できる。
+    if (typeof gn.gain.cancelAndHoldAtTime === 'function') {
+      gn.gain.cancelAndHoldAtTime(fadeStart);
+    } else {
+      gn.gain.cancelScheduledValues(fadeStart);
+      gn.gain.setValueAtTime(gn.gain.value, fadeStart);
+    }
     gn.gain.linearRampToValueAtTime(0, fadeStart + FADE);
     // osc は gain が 0 になった後に止める（波形が残らないよう余裕を持たせる）
     node.oscs.forEach(o => { try { o.stop(fadeStart + FADE + 0.005); } catch(e){} });
@@ -2405,8 +2411,9 @@ function playSubtractive(freq, vol, when, tie, dur, portaMs, noteName) {
   const p = state.subParams;
   const A = p.envA / 1000, D = p.envD / 1000, S = p.envS / 100, R = p.envR / 1000;
   const v = (vol / 100) * (state.mix.sub / 100);
-  const noteLen = (dur != null) ? Math.max(dur - R, 0.01) : p.length / 1000;
-  const nVoices = Math.max(1, Math.min(5, p.voiceCount ?? 1));
+  // noteLenはアタック+ディケイを下回らないようにする(スローアタック時に段差が出るのを防止)
+  const noteLen = (dur != null) ? Math.max(dur - R, A + D, 0.01) : p.length / 1000;
+  const nVoices = Math.max(1, Math.min(8, p.voiceCount ?? 1));
   const detuneCents = p.detune ?? 0;
   const spreadAmt = (p.spread ?? 0) / 100;
   const basePan = (state.mix.panSub ?? 0) / 100;
@@ -2472,7 +2479,9 @@ function playSubtractive(freq, vol, when, tie, dur, portaMs, noteName) {
   }
 
   // ADSR ゲイン
-  const volScale = nVoices > 1 ? (0.5 + 0.5 / Math.sqrt(nVoices)) : 1.0;
+  // 多声時のピーク補正: 1/√n (RMS合算) にレゾナンスQによる追加減衰を掛ける
+  const resAtten = 1 / Math.max(1, Math.sqrt((state.subParams.filterRes ?? 1) / 2));
+  const volScale = (nVoices > 1 ? (1 / Math.sqrt(nVoices)) : 1.0) * resAtten;
   const vPeak = v * volScale;
   const vSus  = v * S * volScale;
   const gn = audioCtx.createGain();
@@ -2701,11 +2710,6 @@ function renderSongStepList() {
 
   updateSongStatusBar();
 
-  // 再生中の行を自動スクロール（逆順表示なので先頭方向へ）
-  if (songState.enabled && isPlaying) {
-    const curRow = list.querySelector('.song-cur');
-    if (curRow) curRow.scrollIntoView({ block: 'nearest' });
-  }
 }
 
 function updateSongStatusBar() {
@@ -7988,12 +7992,12 @@ function buildSubPanel() {
   waveRow.appendChild(waveSel);
   paramsBox.appendChild(waveRow);
 
-  // UNISON VOICES (1〜5)
+  // UNISON VOICES (1〜7)
   const voiceRow = makeSubRow('VOICES');
   const voiceSel = document.createElement('select');
-  [1,2,3,4,5].forEach(n => {
+  [1,2,3,4,5,6,7].forEach(n => {
     const opt = document.createElement('option'); opt.value = n;
-    opt.textContent = n === 1 ? '1 (mono)' : n + (n === 5 ? ' (supersaw)' : '');
+    opt.textContent = n === 1 ? '1 (mono)' : n + (n === 7 ? ' (JP-8000)' : (n === 5 ? ' (supersaw)' : ''));
     if ((state.subParams.voiceCount ?? 1) === n) opt.selected = true;
     voiceSel.appendChild(opt);
   });
@@ -9627,8 +9631,13 @@ function midiNoteOffTrigger(noteName) {
     const now = audioCtx ? audioCtx.currentTime : 0;
     const R = (state.subParams.envR ?? 200) / 1000;
     try {
-      node.gn.gain.cancelScheduledValues(now);
-      node.gn.gain.setValueAtTime(node.sustainGain ?? 0, now);
+      // cancelAndHoldAtTime: アタック中など vSus に未到達の状態でも段差なくリリースへ
+      if (typeof node.gn.gain.cancelAndHoldAtTime === 'function') {
+        node.gn.gain.cancelAndHoldAtTime(now);
+      } else {
+        node.gn.gain.cancelScheduledValues(now);
+        node.gn.gain.setValueAtTime(node.gn.gain.value, now);
+      }
       node.gn.gain.linearRampToValueAtTime(0, now + Math.max(R, 0.005));
       node.oscs.forEach(o => { try { o.stop(now + Math.max(R, 0.005) + 0.01); } catch(e){} });
     } catch(e) {}
