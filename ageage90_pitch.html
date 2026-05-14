@@ -620,7 +620,7 @@
     }
     .pk-white {
       position: absolute; bottom: 0;
-      width: calc(100% / 14 - 1px); height: 100%;
+      width: calc(100% / 28 - 1px); height: 100%;
       background: #ddd; border: 1px solid #888;
       border-radius: 0 0 3px 3px; cursor: pointer;
       box-sizing: border-box; touch-action: none;
@@ -634,6 +634,11 @@
       box-sizing: border-box; touch-action: none;
     }
     .pk-black:active, .pk-black.on { background: #c4803a; }
+    /* S1K キーマップ ハイライト */
+    .pk-white.km-mapped { background: #9ae89a; }
+    .pk-black.km-mapped { background: #2a6a2a; }
+    .pk-white.km-root   { background: #ffea7e; }
+    .pk-black.km-root   { background: #a87a00; }
     .pk-label {
       position: absolute; bottom: 2px; left: 0; right: 0;
       text-align: center; font-size: 6px; color: #666;
@@ -756,6 +761,278 @@
       from { background: #2a0808; box-shadow: 0 0 4px #f330 inset; }
       to   { background: #3e0e0e; box-shadow: 0 0 12px #f558 inset, 0 0 10px #f443; }
     }
+
+    /* ==================================================================== */
+    /* AKAI S1000 風 白基調テーマ (.s1k スコープ) + 丸ノブ + PolyStep ロール */
+    /* ==================================================================== */
+    .s1k {
+      --s1k-bg: #e8e2d2;
+      --s1k-bg2: #d6cfbb;
+      --s1k-fg: #1a1a1a;
+      --s1k-line: #8a8270;
+      --s1k-blue: #2a5fb8;
+      --s1k-blueLt: #4b80d8;
+      --s1k-red: #c33;
+      --s1k-lcd-bg: #0e2a18;
+      --s1k-lcd-fg: #9ae89a;
+      --s1k-acc: #c4803a;
+      background: var(--s1k-bg);
+      color: var(--s1k-fg);
+      border: 1px solid var(--s1k-line);
+      border-radius: 4px;
+      padding: 0;
+      box-shadow: 0 1px 0 #fff8 inset, 0 -1px 0 #0002 inset;
+    }
+    .s1k-titlebar {
+      display: flex; align-items: center; gap: 8px;
+      background: linear-gradient(#f0e9d6, #d6cfbb);
+      padding: 5px 8px; border-bottom: 1px solid var(--s1k-line);
+      border-radius: 3px 3px 0 0;
+    }
+    .s1k-brand {
+      font-family: monospace; font-weight: bold; font-size: 11px;
+      color: #fff; background: #c33;
+      padding: 1px 6px; border-radius: 2px;
+      letter-spacing: 2px;
+    }
+    .s1k-title { font-family: monospace; font-size: 11px; font-weight: bold; letter-spacing: 2px; color: #1a1a1a; }
+    .s1k-sub   { font-family: monospace; font-size: 8px; color: #555; letter-spacing: 1px; }
+    .s1k-lcd {
+      margin-left: auto;
+      background: var(--s1k-lcd-bg); color: var(--s1k-lcd-fg);
+      font-family: monospace; font-size: 9px; padding: 3px 8px;
+      border: 1px solid #000; border-radius: 2px;
+      box-shadow: 0 0 4px #5f5 inset, 0 1px 1px #0006;
+      letter-spacing: 1px; min-width: 90px; text-align: center;
+    }
+    .s1k-btn {
+      background: linear-gradient(#fafafa, #c8c8c8);
+      border: 1px solid #6a6a6a; color: #222;
+      font-family: monospace; font-size: 9px;
+      padding: 2px 7px; border-radius: 2px;
+      cursor: pointer;
+      box-shadow: 0 1px 0 #fff inset, 0 -1px 0 #0003 inset;
+    }
+    .s1k-btn:hover { background: linear-gradient(#fff, #dcdcdc); }
+    .s1k-btn:active, .s1k-btn.active {
+      background: linear-gradient(#9bbce8, #6a96d8);
+      color: #fff; border-color: #1a3a78;
+      box-shadow: 0 1px 2px #0006 inset;
+    }
+    .s1k-btn.red {
+      background: linear-gradient(#e88, #c44);
+      color: #fff; border-color: #722;
+    }
+    .s1k-body { padding: 6px; display: flex; flex-direction: column; gap: 6px; }
+
+    /* PAD STRIP */
+    .s1k-padstrip {
+      display: flex; gap: 3px; flex-wrap: wrap;
+      background: var(--s1k-bg2); border: 1px solid var(--s1k-line);
+      border-radius: 3px; padding: 4px;
+    }
+    .s1k-pad {
+      flex: 1 1 50px; min-width: 50px; max-width: 80px;
+      background: linear-gradient(#fafafa, #c8c8c8);
+      border: 1px solid #6a6a6a; border-radius: 2px;
+      padding: 3px 4px; cursor: pointer;
+      display: flex; flex-direction: column; gap: 1px;
+      box-shadow: 0 1px 0 #fff inset, 0 -1px 0 #0003 inset;
+      position: relative;
+    }
+    .s1k-pad:hover { background: linear-gradient(#fff, #dcdcdc); }
+    .s1k-pad.active {
+      background: linear-gradient(#9bbce8, #4b80d8);
+      color: #fff; border-color: #1a3a78;
+      box-shadow: 0 0 4px #2a5fb8 inset;
+    }
+    .s1k-pad.empty { opacity: 0.6; }
+    .s1k-pad.ssaw { background: linear-gradient(#fff0c0, #f0c060); border-color: #a07020; }
+    .s1k-pad.ssaw.active { background: linear-gradient(#ffd070, #d09020); color: #1a0a00; border-color: #5a2a00; box-shadow: 0 0 4px #c4803a inset; }
+    .s1k-pad-num { font-family: monospace; font-size: 7px; font-weight: bold; letter-spacing: 1px; opacity: 0.8; }
+    .s1k-pad-name { font-family: monospace; font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .s1k-pad-info { font-family: monospace; font-size: 7px; opacity: 0.7; }
+
+    /* KEY MAP */
+    .s1k-keymap {
+      background: var(--s1k-lcd-bg); border: 1px solid #000;
+      border-radius: 3px; padding: 6px;
+      display: flex; flex-direction: column; gap: 2px;
+      max-height: 240px; overflow-y: auto;
+      scrollbar-width: auto; scrollbar-color: #6aa86a #082014;
+    }
+    .s1k-keymap::-webkit-scrollbar, .pseq-roll::-webkit-scrollbar { width: 14px; height: 14px; }
+    .s1k-keymap::-webkit-scrollbar-track, .pseq-roll::-webkit-scrollbar-track { background: #082014; }
+    .s1k-keymap::-webkit-scrollbar-thumb, .pseq-roll::-webkit-scrollbar-thumb {
+      background: #6aa86a; border: 2px solid #082014; border-radius: 4px;
+    }
+    .s1k-keymap::-webkit-scrollbar-thumb:hover, .pseq-roll::-webkit-scrollbar-thumb:hover { background: #9ae89a; }
+    .pseq-roll { scrollbar-width: auto; scrollbar-color: #2a5fb8 #d6cfbb; }
+    .pseq-roll::-webkit-scrollbar-track { background: #d6cfbb; }
+    .pseq-roll::-webkit-scrollbar-thumb { background: #2a5fb8; }
+    .s1k-keymap-hdr {
+      display: flex; align-items: center; gap: 4px;
+      font-family: monospace; font-size: 8px; color: var(--s1k-lcd-fg);
+      letter-spacing: 1px; padding-bottom: 4px; border-bottom: 1px dashed #2a4a2a;
+    }
+    .s1k-keymap-hdr .lab-name { flex: 0 0 110px; }
+    .s1k-keymap-hdr .lab-range { flex: 1; }
+    .s1k-keymap-row {
+      display: flex; align-items: center; gap: 4px; height: 14px;
+    }
+    .s1k-keymap-row .km-name {
+      flex: 0 0 110px; font-family: monospace; font-size: 9px;
+      color: #cfeacf; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      cursor: pointer;
+    }
+    .s1k-keymap-row .km-name:hover { color: #fff; text-decoration: underline; }
+    .s1k-keymap-row.active .km-name { color: #ffea7e; font-weight: bold; }
+    .s1k-keymap-row .km-zone {
+      flex: 1; position: relative; height: 10px;
+      background: #051a0c; border: 1px solid #1a3a1a;
+      border-radius: 1px; cursor: pointer;
+    }
+    .s1k-keymap-row .km-bar {
+      position: absolute; top: 0; bottom: 0;
+      background: linear-gradient(#7fd87f, #3aa83a);
+      border: 1px solid #1a5a1a; border-radius: 1px;
+    }
+    .s1k-keymap-row.active .km-bar {
+      background: linear-gradient(#ffea7e, #f0a020);
+      border-color: #a05000;
+    }
+    .s1k-keymap-row.ssaw .km-bar { background: linear-gradient(#ffd070, #d09020); border-color: #5a2a00; }
+    .s1k-keymap-row .km-empty { font-family: monospace; font-size: 7px; color: #4a6a4a; padding-left: 4px; }
+
+    /* PARAM RACK (丸ノブ) — LCD風緑調 */
+    .s1k-rack, .s1k-fxrow {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      background: var(--s1k-lcd-bg); border: 1px solid #000;
+      border-radius: 3px; padding: 6px;
+    }
+    .s1k-section {
+      background: #082014; border: 1px solid #1a4a1a;
+      border-radius: 3px; padding: 4px 6px;
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .s1k-section-title {
+      font-family: monospace; font-size: 8px; font-weight: bold;
+      letter-spacing: 2px; color: var(--s1k-lcd-fg);
+      border-bottom: 1px dashed #2a4a2a; padding-bottom: 1px;
+    }
+    .s1k-rack .s1k-knob-lbl, .s1k-fxrow .s1k-knob-lbl { color: #6aa86a; }
+    .s1k-rack .s1k-knob-val, .s1k-fxrow .s1k-knob-val {
+      color: var(--s1k-lcd-fg);
+    }
+    .s1k-rack .s1k-knob::before, .s1k-fxrow .s1k-knob::before { background: #051a0c; }
+    .s1k-rack .s1k-knob::after, .s1k-fxrow .s1k-knob::after { background: var(--s1k-lcd-fg); box-shadow: 0 0 3px #5f5; }
+    .s1k-rack .s1k-knob, .s1k-fxrow .s1k-knob {
+      background:
+        conic-gradient(from 225deg,
+          var(--s1k-acc) 0deg,
+          var(--s1k-acc) var(--knob-deg, 0deg),
+          #1a3a1a var(--knob-deg, 0deg),
+          #1a3a1a 270deg,
+          transparent 270deg);
+    }
+    .s1k-knobs { display: flex; gap: 4px; flex-wrap: wrap; }
+    .s1k-knob-wrap {
+      display: flex; flex-direction: column; align-items: center;
+      width: 38px; gap: 1px;
+    }
+    .s1k-knob-lbl { font-family: monospace; font-size: 7px; color: #444; letter-spacing: 1px; }
+    .s1k-knob {
+      width: 28px; height: 28px; position: relative;
+      background:
+        conic-gradient(from 225deg,
+          var(--s1k-acc) 0deg,
+          var(--s1k-acc) var(--knob-deg, 0deg),
+          #b8b0a0 var(--knob-deg, 0deg),
+          #b8b0a0 270deg,
+          transparent 270deg);
+      border-radius: 50%;
+      cursor: ns-resize;
+      touch-action: none;
+    }
+    .s1k-knob::before {
+      /* 内側の白い円 (ゲージリングを残す) */
+      content: ''; position: absolute; inset: 4px;
+      background: #f4f0e2; border-radius: 50%;
+    }
+    .s1k-knob::after {
+      /* 中央のドット */
+      content: ''; position: absolute;
+      width: 4px; height: 4px;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      background: #1a1a1a; border-radius: 50%;
+    }
+    .s1k-knob-val { font-family: monospace; font-size: 7px; color: #1a1a1a; min-height: 8px; }
+
+    /* (旧 .s1k-fxrow ルールは .s1k-rack と統合済み) */
+
+    /* POLY SEQ (PolyStep 風ピアノロール) */
+    .pseq {
+      --pseq-bg: #e8e2d2;
+      --pseq-bg2: #f4f0e2;
+      --pseq-line: #8a8270;
+      --pseq-cell: #d6cfbb;
+      --pseq-cell-on: #2a5fb8;
+      --pseq-cell-cur: #c33;
+      --pseq-row: #c8c0a8;
+      background: var(--pseq-bg); color: #1a1a1a;
+      border: 1px solid var(--pseq-line); border-radius: 4px;
+      padding: 6px; display: flex; flex-direction: column; gap: 6px;
+    }
+    .pseq-toolbar {
+      display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+      background: linear-gradient(#f0e9d6, #d6cfbb);
+      border: 1px solid var(--pseq-line); border-radius: 3px;
+      padding: 4px 6px;
+    }
+    .pseq-padbtns { display: flex; gap: 2px; flex-wrap: wrap; }
+    .pseq-padbtn {
+      background: linear-gradient(#fafafa, #c8c8c8);
+      border: 1px solid #6a6a6a; color: #222;
+      font-family: monospace; font-size: 8px;
+      padding: 2px 5px; border-radius: 2px; cursor: pointer;
+      min-width: 26px;
+    }
+    .pseq-padbtn.active { background: linear-gradient(#9bbce8, #4b80d8); color: #fff; border-color: #1a3a78; }
+    .pseq-padbtn.ssaw.active { background: linear-gradient(#ffd070, #d09020); color: #1a0a00; border-color: #5a2a00; }
+    .pseq-padbtn.has-data { box-shadow: 0 0 0 1px #c4803a inset; }
+    .pseq-roll {
+      position: relative; background: var(--pseq-bg2);
+      border: 1px solid var(--pseq-line); border-radius: 3px;
+      overflow: auto; max-height: 360px;
+    }
+    .pseq-grid {
+      display: grid; gap: 1px; padding: 1px;
+      background: var(--pseq-line);
+    }
+    .pseq-cell {
+      background: var(--pseq-cell); min-height: 12px; cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .pseq-cell.beat-head { background: #b8a878; }
+    .pseq-cell.beat-strong { background: #a89868; }
+    .pseq-cell.on   { background: var(--pseq-cell-on); }
+    .pseq-cell.hold { background: #4b80d8; }   /* 持続: 少し淡い青 */
+    .pseq-cell.cur  { background: #f0e0a0; }
+    .pseq-cell.cur.on, .pseq-cell.cur.hold { background: #c33; }
+    .pseq-rowlbl {
+      background: var(--pseq-row); font-family: monospace;
+      font-size: 8px; color: #2a2a2a; padding: 0 4px;
+      display: flex; align-items: center; justify-content: flex-end;
+      min-height: 12px;
+    }
+    .pseq-rowlbl.blk { background: #8a7858; color: #f0f0f0; }
+    .pseq-corner {
+      background: linear-gradient(#f0e9d6, #d6cfbb);
+      font-family: monospace; font-size: 8px; color: #2a5fb8;
+      padding: 0 4px; display: flex; align-items: center; justify-content: center;
+      letter-spacing: 1px; font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -867,8 +1144,9 @@
   <!-- SEQUENCER TABS -->
   <div class="tab-bar" id="seqTabBar">
     <div class="tab active" data-stab="pcmseq">PCM SEQ</div>
-    <div class="tab" data-stab="sub">SSAW SEQ</div>
-    <div class="tab" data-stab="smplseq">SMPL SEQ</div>
+    <div class="tab" data-stab="polyseq">POLY SEQ</div>
+    <div class="tab" data-stab="sub" style="display:none">SSAW SEQ</div>
+    <div class="tab" data-stab="smplseq" style="display:none">SMPL SEQ</div>
     <div class="tab" data-stab="chordseq">CHORD SEQ</div>
   </div>
 
@@ -927,9 +1205,26 @@
   <!-- PIANO KEYBOARD -->
   <div class="panel">
     <!-- PCM SAMPLER -->
-    <div style="margin-bottom:6px">
-      <div class="small-title" style="margin-bottom:4px">PCM SAMPLER <span style="font-size:8px;color:#666;font-weight:normal">— パッド選択→鍵盤でピッチ演奏　右クリック/長押しでスロット割当</span></div>
-      <div id="samplerPanel"></div>
+    <div class="s1k" id="pcmSamplerV2Wrap" style="margin-bottom:6px">
+      <div class="s1k-titlebar">
+        <button class="s1k-btn" id="s1kCollapseBtn" title="折り畳み">▼</button>
+        <span class="s1k-brand">S1K</span>
+        <span class="s1k-title">PCM SAMPLER</span>
+        <span class="s1k-sub">16 PAD + SSAW</span>
+        <span class="s1k-lcd" id="s1kLcd">PAD —</span>
+      </div>
+      <div class="s1k-body" id="s1kBody">
+        <!-- PAD selector strip -->
+        <div class="s1k-padstrip" id="s1kPadStrip"></div>
+        <!-- KEY MAP editor -->
+        <div class="s1k-keymap" id="s1kKeyMap"></div>
+        <!-- PER-PAD PARAM RACK -->
+        <div class="s1k-rack" id="s1kRack"></div>
+        <!-- COMMON FX -->
+        <div class="s1k-fxrow" id="s1kFxRow"></div>
+      </div>
+      <!-- 旧パネル(互換用・hidden) -->
+      <div id="samplerPanel" style="display:none"></div>
     </div>
     <!-- KEYBOARD -->
     <div id="pianoWrap">
@@ -1137,7 +1432,10 @@ const state = {
 function createEmptySeqData(stepLen) {
   return {
     sub: {
-      notes: Array(stepLen).fill('A3'),
+      // 和音対応: 各ステップは ノート名の配列
+      notes: Array(stepLen).fill(null).map(() => []),
+      // POLY SEQ HOLD (前ステップからの持続): ノート名配列
+      holds: Array(stepLen).fill(null).map(() => []),
       vols:  Array(stepLen).fill(80),
       on:    Array(stepLen).fill(false),
       tie:   Array(stepLen).fill(false),
@@ -1165,7 +1463,8 @@ function createEmptySeqData(stepLen) {
     // SAMPLER PAD 16トラック (ノートシーケンサー・和音対応)
     samplerSeq: Array(16).fill(null).map(() => ({
       on:    Array(stepLen).fill(false),
-      notes: Array(stepLen).fill(null).map(() => ['C4']), // 和音: ノート名の配列
+      notes: Array(stepLen).fill(null).map(() => []), // 和音: ノート名の配列
+      holds: Array(stepLen).fill(null).map(() => []), // POLY SEQ HOLD
       vol:   Array(stepLen).fill(80),
       pan:   Array(stepLen).fill(0),
     })),
@@ -2970,19 +3269,36 @@ function scheduleStep() {
       if (subFs.comp.on[step] && subFs.comp.vals[step] != null) state.mix.sendCompSub = subFs.comp.vals[step];
     }
 
-    // ===== SSAW 演奏 =====
-    if (seq.sub.on[step]) {
-      playSubtractive(
-        noteToHz(seq.sub.notes[step]),
-        seq.sub.vols[step] ?? 80,
-        swungTime, false, stepDur
-      );
-    } else if (seq.sub.tie[step] && activeSubNode) {
-      playSubtractive(
-        noteToHz(seq.sub.notes[step]),
-        seq.sub.vols[step] ?? 80,
-        swungTime, true, stepDur
-      );
+    // ===== SSAW 演奏 (和音 + HOLD対応) =====
+    {
+      const nArr = seq.sub.notes[step] || [];
+      const hArr = seq.sub.holds ? (seq.sub.holds[step] || []) : [];
+      if (seq.sub.on[step]) {
+        nArr.forEach((nm, ni) => {
+          if (hArr.includes(nm)) return; // 持続: 頭ではないので再トリガ無し
+          // 後続HOLD連続数を数えて持続長を決定
+          let holdLen = 1;
+          for (let k = step + 1; k < stepLen; k++) {
+            const nk = seq.sub.notes[k] || [];
+            const hk = seq.sub.holds ? (seq.sub.holds[k] || []) : [];
+            if (seq.sub.on[k] && nk.includes(nm) && hk.includes(nm)) holdLen++;
+            else break;
+          }
+          playSubtractive(
+            noteToHz(nm),
+            seq.sub.vols[step] ?? 80,
+            swungTime, false, stepDur * holdLen,
+            undefined,
+            nArr.length > 1 ? `_subPoly_${ni}_${nm}` : undefined
+          );
+        });
+      } else if (seq.sub.tie[step] && activeSubNode && nArr[0]) {
+        playSubtractive(
+          noteToHz(nArr[0]),
+          seq.sub.vols[step] ?? 80,
+          swungTime, true, stepDur
+        );
+      }
     }
 
     // ===== PCM 16トラック演奏 (チャンネルFXセンドシーケンス込み) =====
@@ -3050,43 +3366,21 @@ function scheduleStep() {
         const noteArr = Array.isArray(str.notes?.[step]) ? str.notes[step]
                       : (str.note?.[step] ? [str.note[step]] : ['C4']);
 
+        // POLY SEQ HOLD: 持続音は再トリガしない / 頭ノートは後続HOLD連続数だけ持続
+        const holdArr = Array.isArray(str.holds?.[step]) ? str.holds[step] : [];
         noteArr.forEach(noteName => {
-          // グループモード or 直接スロット
-          let useSlotIdx = pad.slotIdx;
-          let useRootMidi = 60;
-          if (pad.groupId) {
-            const resolved = resolveSlotByGroup(pad.groupId, noteName);
-            if (resolved) { useSlotIdx = resolved.idx; useRootMidi = resolved.slot.rootNote ?? 60; }
-            else useSlotIdx = null;
+          if (holdArr.includes(noteName)) return;
+          let holdLen = 1;
+          for (let k = step + 1; k < stepLen; k++) {
+            const sk = seq.samplerSeq[p];
+            if (!sk || !sk.on[k]) break;
+            const nk = Array.isArray(sk.notes?.[k]) ? sk.notes[k] : [];
+            const hk = Array.isArray(sk.holds?.[k]) ? sk.holds[k] : [];
+            if (nk.includes(noteName) && hk.includes(noteName)) holdLen++;
+            else break;
           }
-          if (useSlotIdx == null) {
-            if (pad.useSsaw) {
-              const hz = noteToHz(noteName);
-              playSubtractive(hz, volPct / 100, swungTime, false, null, 0, `_smplssaw${p}_${noteName}`);
-            }
-            return;
-          }
-          const slot = state.pcmToneBank[useSlotIdx];
-          if (!slot) return;
-          const buf = slot.buffer ?? slot.rawBuffer;
-          if (!buf) return;
-
-          const playMidi = noteNameToMidi(noteName);
-          const rate = pad.groupId
-            ? semisToRate(useRootMidi, playMidi)
-            : noteToHz(noteName) / C4_HZ;
-
-          const src2    = audioCtx.createBufferSource();
-          const gn2     = audioCtx.createGain();
-          const panner2 = audioCtx.createStereoPanner();
-          src2.buffer = buf;
-          src2.playbackRate.value = rate;
-          gn2.gain.value = (volPct / 100) * ((slot.gain ?? 100) / 100) * 0.8;
-          panner2.pan.value = Math.max(-1, Math.min(1, panVal / 100));
-          src2.connect(gn2); gn2.connect(panner2); panner2.connect(masterGainNode);
-          src2.onended = () => activePcmSources.delete(src2);
-          activePcmSources.add(src2);
-          src2.start(swungTime);
+          const v127 = Math.max(1, Math.min(127, Math.round((volPct ?? 80) * 1.27)));
+          s1kPlayPadPcm(p, noteName, v127, swungTime, stepDur * holdLen);
         });
       }
     }
@@ -3181,6 +3475,11 @@ function updateStepIndicator(step) {
     document.querySelectorAll('.chord-step-cell').forEach((el, i) => {
       el.classList.toggle('chord-cur', i === step);
     });
+  }
+  // POLY SEQ インジケーター (列ハイライト)
+  if (state.currentSeqTab === 'polyseq') {
+    document.querySelectorAll('.pseq-cell.cur').forEach(el => el.classList.remove('cur'));
+    document.querySelectorAll(`.pseq-cell[data-pseq-step="${step}"]`).forEach(el => el.classList.add('cur'));
   }
 }
 
@@ -3895,10 +4194,10 @@ function renderSubSeq(content, seq, len, beatHeads) {
     applyStepBorder(sel, i, beatHeads);
     NOTES.forEach(n => {
       const opt = document.createElement('option'); opt.value = n; opt.textContent = n;
-      if (seq.sub.notes[i] === n) opt.selected = true;
+      if (Array.isArray(seq.sub.notes[i]) && seq.sub.notes[i][0] === n) opt.selected = true;
       sel.appendChild(opt);
     });
-    sel.onchange = (e) => { seq.sub.notes[i] = e.target.value; };
+    sel.onchange = (e) => { seq.sub.notes[i] = [e.target.value]; };
     noteRow.appendChild(sel);
   }
   content.appendChild(noteRow);
@@ -5852,30 +6151,48 @@ function showPcmCtxMenu(e, slotIdx) {
     _grpTitle.style.cssText = 'padding:3px 10px;font-size:8px;color:#888;letter-spacing:1px';
     _grpTitle.textContent = '── MULTI-SAMPLE ──';
     pcmCtxMenu.appendChild(_grpTitle);
-    const curGrp = slot.groupId || '';
     const curRoot = slot.rootNote != null ? slot.rootNote : 60;
-    const curLo = slot.loNote != null ? slot.loNote : 0;
-    const curHi = slot.hiNote != null ? slot.hiNote : 127;
     const midiToName = m => { const ns=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; return ns[m%12]+(Math.floor(m/12)-1); };
-    items.push({ label: `🎹 GROUP (現: ${curGrp || 'なし'})`, action: async () => {
-      const existingGroups = [...new Set(state.pcmToneBank.filter(s => s && s.groupId).map(s => s.groupId))];
-      const hint = existingGroups.length > 0 ? `\n既存グループ: ${existingGroups.join(', ')}` : '';
-      const nm = await mobilePrompt(`グループID (空欄で解除)${hint}:`, curGrp);
-      if (nm !== null) { slot.groupId = nm.trim() || null; renderPcmToneBank(); }
-    }});
     items.push({ label: `🎵 ROOT NOTE (現: ${midiToName(curRoot)} / MIDI ${curRoot})`, action: async () => {
       const nm = await mobilePrompt('ルートノート (0〜127, 例: 60=C4):', curRoot);
       if (nm !== null) { const v = Math.max(0, Math.min(127, parseInt(nm)||60)); slot.rootNote = v; renderPcmToneBank(); }
     }});
-    items.push({ label: `↕ KEY ZONE (現: ${midiToName(curLo)}〜${midiToName(curHi)})`, action: async () => {
-      const lo = await mobilePrompt(`ゾーン下限 MIDI (0〜127, 現:${curLo}):`, curLo);
-      if (lo === null) return;
-      const hi = await mobilePrompt(`ゾーン上限 MIDI (0〜127, 現:${curHi}):`, curHi);
-      if (hi === null) return;
-      slot.loNote = Math.max(0, Math.min(127, parseInt(lo)||0));
-      slot.hiNote = Math.max(0, Math.min(127, parseInt(hi)||127));
-      renderPcmToneBank();
-    }});
+    // S1K で使用 / 解除
+    const isReg = !!slot.s1kRegistered;
+    items.push({
+      label: isReg ? '✅ S1K から除外 (PAD割当も解除)' : '➡ S1K で使用 (PADに割り当て)',
+      action: async () => {
+        if (isReg){
+          // 全PADのslotIdsから当該スロットを除去
+          samplerPads.forEach(p => {
+            if (Array.isArray(p.slotIds)){
+              const i = p.slotIds.indexOf(slotIdx);
+              if (i >= 0) p.slotIds.splice(i, 1);
+              p.slotIdx = p.slotIds[0] ?? null;
+            } else if (p.slotIdx === slotIdx){
+              p.slotIdx = null;
+            }
+          });
+          slot.s1kRegistered = false;
+          showToast(`S${slotIdx+1} を S1K から除外しました`, 'ok', 1500);
+        } else {
+          // 登録 + アクティブPADに追加
+          slot.s1kRegistered = true;
+          if (samplerActivePad >= 0){
+            const ap = samplerPads[samplerActivePad];
+            if (!Array.isArray(ap.slotIds)) ap.slotIds = ap.slotIdx != null ? [ap.slotIdx] : [];
+            if (!ap.slotIds.includes(slotIdx)) ap.slotIds.push(slotIdx);
+            ap.slotIdx = ap.slotIds[0] ?? null;
+            ap.groupId = null;
+            showToast(`S${slotIdx+1} を PAD${samplerActivePad+1} に割り当てました`, 'ok', 1500);
+          } else {
+            showToast(`S${slotIdx+1} を S1K に登録しました (PAD未選択 — S1KでPADを選んで再操作)`, 'warn', 2500);
+          }
+        }
+        renderPcmToneBank();
+        if (typeof s1kRefresh === 'function') s1kRefresh();
+      }
+    });
   }
 
   // PASTE (クリップボードにデータがある場合のみ表示)
@@ -6161,6 +6478,10 @@ function applyGateToBuffer(audioBuf, bpm, subdivision, dutyCycle, pattern, gateA
 }
 
 function openWaveEditor(slotIdx) {
+  // WAVE EDITOR を開いている間はパターン再生を停止
+  if (typeof isPlaying !== 'undefined' && isPlaying && typeof stopPlay === 'function') {
+    stopPlay();
+  }
   const slot = state.pcmToneBank[slotIdx];
   if (!slot || !slot.rawBuffer) { showToast('WAVEデータがありません', 'warn'); return; }
 
@@ -8474,7 +8795,8 @@ function saveConfig() {
       loNote: s.loNote ?? null, hiNote: s.hiNote ?? null,
     } : null),
     pcmActiveToneSlot: state.pcmActiveToneSlot,
-    samplerPads: samplerPads.map(p => ({ slotIdx: p.slotIdx, groupId: p.groupId ?? null })),
+    samplerPads: samplerPads.map(p => ({ slotIdx: p.slotIdx, slotIds: Array.isArray(p.slotIds) ? [...p.slotIds] : null, groupId: p.groupId ?? null, fx: p.fx ? {...p.fx} : null })),
+    ssawPadFx: window.__ssawPadFx ? {...window.__ssawPadFx} : null,
     song: { steps: JSON.parse(JSON.stringify(songState.steps)), loop: songState.loop },
   };
   const json = JSON.stringify(cfg, null, 2);
@@ -8527,7 +8849,7 @@ function applyConfig(cfg) {
       const sd = b.seqData || {};
       // SSAW
       if (sd.sub) {
-        empty.sub.notes = _padArr(sd.sub.notes, sl, 'A3');
+        empty.sub.notes = _padArr(sd.sub.notes, sl, ['A3']).map(v => Array.isArray(v) ? v : [v ?? 'A3']);
         empty.sub.vols = _padArr(sd.sub.vols, sl, 80);
         empty.sub.on = _padArr(sd.sub.on, sl, false);
         empty.sub.tie = _padArr(sd.sub.tie, sl, false);
@@ -8575,8 +8897,14 @@ function applyConfig(cfg) {
           const srcNotes = src.notes ?? (src.note ? src.note.map(n=>[n]) : null);
           if (srcNotes) {
             const padded = srcNotes.slice(0, sl).map(n => Array.isArray(n) ? n : [n]);
-            while (padded.length < sl) padded.push(['C4']);
+            while (padded.length < sl) padded.push([]);
             empty.samplerSeq[t].notes = padded;
+          }
+          // holds (POLY SEQ HOLD) load
+          if (Array.isArray(src.holds)){
+            const hpadded = src.holds.slice(0, sl).map(h => Array.isArray(h) ? h : []);
+            while (hpadded.length < sl) hpadded.push([]);
+            empty.samplerSeq[t].holds = hpadded;
           }
           empty.samplerSeq[t].vol = _padArr(src.vol, sl, 80);
           empty.samplerSeq[t].pan = _padArr(src.pan, sl, 0);
@@ -8632,10 +8960,15 @@ function applyConfig(cfg) {
     for (let i = 0; i < 16 && i < cfg.samplerPads.length; i++) {
       if (cfg.samplerPads[i]) {
         samplerPads[i].slotIdx = cfg.samplerPads[i].slotIdx ?? null;
+        samplerPads[i].slotIds = Array.isArray(cfg.samplerPads[i].slotIds) ? [...cfg.samplerPads[i].slotIds] : (cfg.samplerPads[i].slotIdx != null ? [cfg.samplerPads[i].slotIdx] : []);
         samplerPads[i].groupId = cfg.samplerPads[i].groupId ?? null;
+        if (cfg.samplerPads[i].fx) samplerPads[i].fx = { ...samplerPads[i].fx, ...cfg.samplerPads[i].fx };
       }
     }
   }
+  if (cfg.ssawPadFx) window.__ssawPadFx = { ...(window.__ssawPadFx||{}), ...cfg.ssawPadFx };
+  if (typeof sanitizeAllSeqNotes === 'function') sanitizeAllSeqNotes();
+  if (typeof s1kRefresh === 'function') s1kRefresh();
   // SONG
   if (cfg.song) {
     if (Array.isArray(cfg.song.steps)) {
@@ -8988,7 +9321,7 @@ function resizeStepLen(bank, newLen) {
     return out;
   };
   // SSAW
-  sd.sub.notes = resize(sd.sub.notes, 'A3');
+  sd.sub.notes = resize(sd.sub.notes.map(v => Array.isArray(v) ? v : [v ?? 'A3']), ['A3']);
   sd.sub.vols  = resize(sd.sub.vols, 80);
   sd.sub.on    = resize(sd.sub.on, false);
   sd.sub.tie   = resize(sd.sub.tie, false);
@@ -9030,13 +9363,24 @@ function resizeStepLen(bank, newLen) {
       const oldNotes = sd.samplerSeq[t].notes ?? (sd.samplerSeq[t].note?.map(n=>[n]));
       if (oldNotes) {
         const n2 = oldNotes.slice(0, newLen);
-        while (n2.length < newLen) n2.push(['C4']);
+        while (n2.length < newLen) n2.push([]);
         sd.samplerSeq[t].notes = n2;
         delete sd.samplerSeq[t].note;
       }
+      // holds 配列の配列もリサイズ
+      const oldHolds = sd.samplerSeq[t].holds;
+      const h2 = (oldHolds || []).slice(0, newLen);
+      while (h2.length < newLen) h2.push([]);
+      sd.samplerSeq[t].holds = h2;
       sd.samplerSeq[t].vol   = resize(sd.samplerSeq[t].vol,   80);
       sd.samplerSeq[t].pan   = resize(sd.samplerSeq[t].pan,   0);
     }
+  }
+  // SSAW holds
+  if (sd.sub) {
+    const oh = (sd.sub.holds || []).slice(0, newLen);
+    while (oh.length < newLen) oh.push([]);
+    sd.sub.holds = oh;
   }
   // CHORD SEQ
   if (sd.chordSeq && sd.chordSeq.steps) {
@@ -9373,16 +9717,18 @@ function buildPianoKeys() {
   midiState.uiCache.pianoKeys.clear();
   
   const oct = pianoState.octave;
-  const ww = 100 / 14;
+  const OCT_COUNT = 4;
+  const WHITE_COUNT = OCT_COUNT * 7; // 28
+  const ww = 100 / WHITE_COUNT;
 
-  for (let octOff = 0; octOff < 2; octOff++) {
+  for (let octOff = 0; octOff < OCT_COUNT; octOff++) {
     const o = oct + octOff;
     PIANO_WHITE.forEach((name, i) => {
       const idx = octOff * 7 + i;
       const note = name + o;
       const el = document.createElement('div');
       el.className = 'pk-white';
-      el.style.left = `calc(${idx} * (100% / 14))`;
+      el.style.left = `calc(${idx} * (100% / ${WHITE_COUNT}))`;
       el.dataset.note = note;
       const lbl = document.createElement('div');
       lbl.className = 'pk-label';
@@ -9399,7 +9745,7 @@ function buildPianoKeys() {
       const whiteIdx = octOff * 7 + left + 1;
       const el = document.createElement('div');
       el.className = 'pk-black';
-      el.style.left = `calc(${whiteIdx * ww}% - ${bw / 2}%)`;
+      el.style.left = `calc(${whiteIdx} * (100% / ${WHITE_COUNT}) - ${bw / 2}%)`;
       el.style.width = `${bw}%`;
       el.dataset.note = note;
       el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); pianoTrigger(note, el); });
@@ -9409,7 +9755,8 @@ function buildPianoKeys() {
     });
   }
 
-  document.getElementById('pianoOctLabel').textContent = `C${oct}-C${oct+1}`;
+  document.getElementById('pianoOctLabel').textContent = `C${oct}-C${oct+4}`;
+  if (typeof updatePianoKeymapOverlay === 'function') updatePianoKeymapOverlay();
 }
 
 function pianoTrigger(note, el) {
@@ -9515,24 +9862,9 @@ function midiNoteOnTrigger(noteName, velocity, dest) {
 
     const hasPcm = useSlotIdx != null && state.pcmToneBank[useSlotIdx];
 
-    // PCM再生 (dest=pcm or dest=all)
+    // PCM再生 (dest=pcm or dest=all) — per-PAD FX チェーン経由 (keymap範囲外は無音)
     if ((midiDest === 'pcm' || midiDest === 'all') && hasPcm) {
-      const hz = noteToHz(noteName);
-      const playMidi = noteNameToMidi(noteName);
-      const rate = pad.groupId ? semisToRate(useRootMidi, playMidi) : hz / C4_HZ;
-      const slot = state.pcmToneBank[useSlotIdx];
-      const buf = slot.buffer ?? slot.rawBuffer;
-      if (buf) {
-        const src = audioCtx.createBufferSource();
-        const gn = audioCtx.createGain();
-        src.buffer = buf;
-        src.playbackRate.value = rate;
-        const vol = velocity > 0 ? midiVelToVol(velocity) : 80;
-        gn.gain.value = (slot.gain ?? 100) / 100 * (vol / 100) * 0.8;
-        src.connect(gn);
-        gn.connect(masterGainNode);
-        src.start(audioCtx.currentTime);
-      }
+      s1kPlayPadPcm(samplerActivePad, noteName, velocity, audioCtx.currentTime);
     }
 
     // スロット未割当のPADは無音（SSAW PAD 0のみSSAW発音）
@@ -9975,6 +10307,767 @@ function initPiano() {
     showToast('MIDIデバイス一覧を更新しました', 'ok', 1500);
   };
 }
+
+// ============================================================================
+// PCM SAMPLER + POLY SEQ (PolyStep style)
+// ============================================================================
+
+// 各PADにFXパラメータを初期化（追加分のみ・破壊しない）
+(function initPadFx(){
+  const defaults = () => ({
+    a: 5, d: 200, s: 80, r: 250,         // ADSR (ms / 0-100)
+    lpf: 100, res: 10,                   // 0-100
+    gain: 80, pitchC: 0, pitchF: 0,      // semis / cents
+    pan: 0,                              // -50..+50
+    lfoRate: 30, lfoDepth: 0, lfoTgt: 0, // 0=Off,1=Pitch,2=Filter,3=Amp
+    revSend: 0, dlySend: 0,              // 0-100
+    keyLo: 0, keyHi: 127                 // MIDIノート範囲 C-1..G9
+  });
+  samplerPads.forEach(p => { if (!p.fx) p.fx = defaults(); });
+  // SSAW PAD0 用
+  if (!window.__ssawPadFx) window.__ssawPadFx = defaults();
+})();
+
+// 共通リバーブ/ディレイ ノード（遅延初期化）
+const s1kFx = { rev: null, revWet: null, dly: null, dlyFb: null, dlyWet: null, ready:false };
+function s1kEnsureFx(){
+  if (s1kFx.ready || !audioCtx) return;
+  // Reverb (convolver, impulse生成)
+  s1kFx.rev = audioCtx.createConvolver();
+  const dur = 1.6, sr = audioCtx.sampleRate, len = sr*dur;
+  const imp = audioCtx.createBuffer(2, len, sr);
+  for (let ch=0; ch<2; ch++){
+    const d = imp.getChannelData(ch);
+    for (let i=0;i<len;i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 2.5);
+  }
+  s1kFx.rev.buffer = imp;
+  s1kFx.revWet = audioCtx.createGain(); s1kFx.revWet.gain.value = 0.6;
+  s1kFx.rev.connect(s1kFx.revWet); s1kFx.revWet.connect(masterGainNode);
+  // Delay
+  s1kFx.dly = audioCtx.createDelay(2.0); s1kFx.dly.delayTime.value = 0.32;
+  s1kFx.dlyFb = audioCtx.createGain(); s1kFx.dlyFb.gain.value = 0.35;
+  s1kFx.dlyWet = audioCtx.createGain(); s1kFx.dlyWet.gain.value = 0.5;
+  s1kFx.dly.connect(s1kFx.dlyFb); s1kFx.dlyFb.connect(s1kFx.dly);
+  s1kFx.dly.connect(s1kFx.dlyWet); s1kFx.dlyWet.connect(masterGainNode);
+  s1kFx.ready = true;
+}
+
+// 丸ノブ生成ヘルパ
+function s1kKnob(label, getVal, setVal, min, max, fmt){
+  const wrap = document.createElement('div'); wrap.className = 's1k-knob-wrap';
+  const lbl = document.createElement('div'); lbl.className = 's1k-knob-lbl'; lbl.textContent = label;
+  const knob = document.createElement('div'); knob.className = 's1k-knob';
+  const val = document.createElement('div'); val.className = 's1k-knob-val';
+  const render = () => {
+    const v = getVal();
+    const t = Math.max(0, Math.min(1, (v - min) / (max - min)));
+    knob.style.setProperty('--knob-deg', (t * 270) + 'deg');
+    knob.style.setProperty('--knob-rot', (-135 + t * 270) + 'deg');
+    val.textContent = fmt ? fmt(v) : (typeof v === 'number' ? (Math.abs(v)<10 ? v.toFixed(1) : Math.round(v)) : v);
+  };
+  render();
+  let dragging = false, startY = 0, startV = 0;
+  knob.addEventListener('pointerdown', e => {
+    dragging = true; startY = e.clientY; startV = getVal();
+    knob.setPointerCapture(e.pointerId);
+  });
+  knob.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dy = startY - e.clientY;
+    const range = max - min;
+    let nv = startV + dy * range / 120;
+    nv = Math.max(min, Math.min(max, nv));
+    setVal(nv); render();
+  });
+  knob.addEventListener('pointerup', () => dragging = false);
+  knob.addEventListener('dblclick', () => { setVal((min+max)/2); render(); });
+  wrap.appendChild(lbl); wrap.appendChild(knob); wrap.appendChild(val);
+  wrap._render = render;
+  return wrap;
+}
+
+// PAD STRIP 構築
+function s1kBuildPadStrip(){
+  const strip = document.getElementById('s1kPadStrip');
+  if (!strip) return;
+  strip.innerHTML = '';
+  // PAD 0 = SSAW
+  const ssaw = document.createElement('div');
+  ssaw.className = 's1k-pad ssaw' + (samplerActivePad === -1 ? ' active' : '');
+  ssaw.innerHTML = '<div class="s1k-pad-num">PAD 0</div><div class="s1k-pad-name">SSAW</div><div class="s1k-pad-info">SuperSaw</div>';
+  ssaw.onclick = () => { samplerActivePad = -1; s1kRefresh(); };
+  strip.appendChild(ssaw);
+  // PAD 1-16
+  samplerPads.forEach((p, i) => {
+    const ids = Array.isArray(p.slotIds) ? p.slotIds : (p.slotIdx != null ? [p.slotIdx] : []);
+    const slot = ids.length === 1 ? state.pcmToneBank[ids[0]] : null;
+    const hasAny = ids.length > 0 || p.groupId;
+    const div = document.createElement('div');
+    div.className = 's1k-pad' + (i === samplerActivePad ? ' active' : '') + (hasAny ? '' : ' empty');
+    let name = '─', info = 'empty';
+    if (p.groupId){ name = 'GRP:'+p.groupId; info = 'multi'; }
+    else if (ids.length > 1){
+      name = `MULTI×${ids.length}`;
+      info = ids.map(x=>'S'+(x+1)).slice(0,3).join(',') + (ids.length>3?'…':'');
+    } else if (slot){ name = slot.name; info = 'S'+(ids[0]+1); }
+    div.innerHTML = `<div class="s1k-pad-num">PAD ${i+1}</div><div class="s1k-pad-name">${name}</div><div class="s1k-pad-info">${info}</div>`;
+    div.onclick = () => { samplerActivePad = i; s1kRefresh(); };
+    div.oncontextmenu = e => { e.preventDefault(); showSamplerPadMenu(e, i); };
+    let pt = null;
+    div.addEventListener('touchstart', e => {
+      pt = setTimeout(() => { pt = null; showSamplerPadMenu(e.touches[0], i); }, 600);
+    }, { passive: true });
+    div.addEventListener('touchend', () => { if (pt){ clearTimeout(pt); pt = null; }});
+    strip.appendChild(div);
+  });
+  // LCD
+  const lcd = document.getElementById('s1kLcd');
+  if (lcd) lcd.textContent = samplerActivePad === -1 ? 'PAD 0 · SSAW' : `PAD ${samplerActivePad+1}`;
+}
+
+// KEY MAP 構築（NN-XT風）
+// スロットインデックスから決定的に色を生成 (HSL, 黄金角で均等分散)
+function slotColorHsl(slotIdx, lightness){
+  const hue = ((slotIdx * 137.508) % 360 + 360) % 360;
+  return `hsl(${hue.toFixed(1)},65%,${lightness ?? 55}%)`;
+}
+
+// KEY MAP (NN-XT風: PCM TONE BANK スロット毎の行 + 担当キー範囲)
+function s1kBuildKeyMap(){
+  const km = document.getElementById('s1kKeyMap');
+  if (!km) return;
+  km.innerHTML = '';
+  // ヘッダ
+  const hdr = document.createElement('div'); hdr.className = 's1k-keymap-hdr';
+  const hN = document.createElement('span'); hN.className='lab-name'; hN.textContent='PCM TONE BANK'; hdr.appendChild(hN);
+  const hR = document.createElement('span'); hR.className='lab-range';
+  hR.style.cssText='display:flex;justify-content:space-between;color:#6aa86a;position:relative';
+  ['C0','C1','C2','C3','C4','C5','C6','C7','C8'].forEach(n=>{ const s=document.createElement('span');s.textContent=n;hR.appendChild(s);});
+  hdr.appendChild(hR);
+  km.appendChild(hdr);
+
+  const activePad = samplerActivePad >= 0 ? samplerPads[samplerActivePad] : null;
+  const activeSlotIds = activePad ? (Array.isArray(activePad.slotIds) ? activePad.slotIds : (activePad.slotIdx != null ? [activePad.slotIdx] : [])) : [];
+
+  // PAD0 SSAW
+  km.appendChild(makeKmRow({
+    name: 'SSAW (PAD 0) — full range',
+    onClick: () => { samplerActivePad = -1; s1kRefresh(); },
+    isSsaw: true, active: samplerActivePad === -1,
+    lo: 0, hi: 127, root: null,
+  }));
+
+  // S1K に登録 (slot.s1kRegistered=true) されたスロットだけ列挙
+  let any = false;
+  for (let s = 0; s < state.pcmToneBank.length; s++){
+    const slot = state.pcmToneBank[s];
+    if (!slot) continue;
+    if (!slot.s1kRegistered) continue;
+    any = true;
+    const root = slot.rootNote ?? 60;
+    if (slot.kmLo == null) slot.kmLo = Math.max(0, root - 12);
+    if (slot.kmHi == null) slot.kmHi = Math.min(127, root + 12);
+    const usingPads = [];
+    samplerPads.forEach((p, i) => {
+      const ids = Array.isArray(p.slotIds) ? p.slotIds : (p.slotIdx != null ? [p.slotIdx] : []);
+      if (ids.includes(s)) usingPads.push(i+1);
+    });
+    const usedLabel = usingPads.length ? ` ← PAD${usingPads.join(',')}` : '';
+    const isInActive = activeSlotIds.includes(s);
+    km.appendChild(makeKmRow({
+      name: `${isInActive ? '✓ ' : ''}S${(s+1).toString().padStart(2,'0')}: ${slot.name}${usedLabel}`,
+      color: slotColorHsl(s, 50),
+      onClick: () => {
+        // アクティブPADに対し このスロットを追加/解除 (マルチサンプル)
+        if (samplerActivePad < 0) return;
+        const ap = samplerPads[samplerActivePad];
+        if (!Array.isArray(ap.slotIds)) {
+          ap.slotIds = ap.slotIdx != null ? [ap.slotIdx] : [];
+        }
+        const idx = ap.slotIds.indexOf(s);
+        if (idx >= 0) ap.slotIds.splice(idx, 1);
+        else ap.slotIds.push(s);
+        // slotIdx は最初の要素として同期 (互換)
+        ap.slotIdx = ap.slotIds[0] ?? null;
+        ap.groupId = null;
+        s1kRefresh();
+      },
+      active: isInActive,
+      lo: slot.kmLo, hi: slot.kmHi, root,
+      onZoneEdit: (lo, hi) => { slot.kmLo = lo; slot.kmHi = hi; },
+    }));
+  }
+  if (!any){
+    const empty = document.createElement('div');
+    empty.style.cssText = 'padding:10px;font-family:monospace;font-size:9px;color:#6aa86a;text-align:center';
+    empty.textContent = '— S1K に登録済みスロットなし — PCM SLOT を右クリック→「S1Kで使用」で登録';
+    km.appendChild(empty);
+  }
+
+  function makeKmRow(cfg){
+    const { name, lo, hi, root, active, isSsaw, onClick, onZoneEdit, color } = cfg;
+    const row = document.createElement('div');
+    row.className = 's1k-keymap-row' + (active?' active':'') + (isSsaw?' ssaw':'');
+    const nmEl = document.createElement('div'); nmEl.className='km-name'; nmEl.textContent=name;
+    nmEl.title = name;
+    if (onClick) nmEl.onclick = onClick;
+    row.appendChild(nmEl);
+    const zone = document.createElement('div'); zone.className='km-zone';
+    // C0(MIDI 12) を 0%、C8(MIDI 108) を 100% にマップ (ヘッダラベルと整合)
+    const KM_LO = 12, KM_HI = 108, KM_SPAN = KM_HI - KM_LO; // 96
+    const pct = (n) => Math.max(0, Math.min(100, ((n - KM_LO) / KM_SPAN) * 100));
+    const pxToMidi = (x) => Math.max(0, Math.min(127, Math.round(KM_LO + x * KM_SPAN)));
+    // オクターブ目盛り
+    for (let oct=0; oct<=8; oct++){
+      const m = 12 + oct*12;
+      const tick = document.createElement('div');
+      tick.style.cssText = `position:absolute;left:${pct(m)}%;top:0;bottom:0;width:1px;background:#1a3a1a;pointer-events:none`;
+      zone.appendChild(tick);
+    }
+    // ノート範囲帯
+    const bar = document.createElement('div'); bar.className='km-bar';
+    bar.style.left = pct(lo)+'%';
+    bar.style.width = Math.max(0.8, pct(hi)-pct(lo))+'%';
+    if (color){
+      bar.style.background = `linear-gradient(${color}, ${color})`;
+      bar.style.borderColor = color;
+      bar.style.opacity = active ? '1' : '0.7';
+    }
+    zone.appendChild(bar);
+    // 名前にも色マーカー
+    if (color){
+      const dot = document.createElement('span');
+      dot.style.cssText = `display:inline-block;width:6px;height:6px;background:${color};border-radius:50%;margin-right:4px;vertical-align:middle`;
+      nmEl.prepend(dot);
+    }
+    // ルートノート マーカー
+    if (root != null){
+      const rm = document.createElement('div');
+      rm.style.cssText = `position:absolute;left:${pct(root)}%;top:-1px;bottom:-1px;width:2px;background:#ffea7e;transform:translateX(-1px);pointer-events:none;z-index:2`;
+      rm.title = `ROOT: ${midiNoteToName(root)}`;
+      zone.appendChild(rm);
+      const rl = document.createElement('div');
+      rl.style.cssText = `position:absolute;left:${pct(root)}%;top:-10px;font-family:monospace;font-size:7px;color:#ffea7e;transform:translateX(-50%);pointer-events:none;white-space:nowrap;z-index:3`;
+      rl.textContent = midiNoteToName(root);
+      zone.appendChild(rl);
+    }
+    // ドラッグでlo/hi/移動 (C0..C8 マップに合わせて補正)
+    if (onZoneEdit){
+      let mode=null, curLo=lo, curHi=hi;
+      let downX=0, dragged=false;
+      zone.onpointerdown = e => {
+        e.stopPropagation();
+        const r = zone.getBoundingClientRect();
+        const x = (e.clientX - r.left)/r.width;
+        const n = pxToMidi(x);
+        const dLo = Math.abs(n-curLo), dHi = Math.abs(n-curHi);
+        if (n > curLo && n < curHi && Math.min(dLo, dHi) > 4) mode='move';
+        else if (dLo <= dHi) mode='lo';
+        else mode='hi';
+        downX = e.clientX; dragged = false;
+        zone.setPointerCapture(e.pointerId);
+      };
+      zone.onpointermove = e => {
+        if (!mode) return;
+        if (!dragged && Math.abs(e.clientX - downX) < 3) return; // クリックノイズ抑止
+        dragged = true;
+        const r = zone.getBoundingClientRect();
+        const x = (e.clientX - r.left)/r.width;
+        const n = pxToMidi(x);
+        if (mode==='lo') curLo = Math.min(n, curHi);
+        else if (mode==='hi') curHi = Math.max(n, curLo);
+        else if (mode==='move'){
+          const w = curHi - curLo;
+          curLo = Math.max(0, Math.min(127-w, n - Math.floor(w/2)));
+          curHi = curLo + w;
+        }
+        // ドラッグ中はDOM再構築せず、bar要素のみ更新
+        bar.style.left  = pct(curLo) + '%';
+        bar.style.width = Math.max(0.8, pct(curHi) - pct(curLo)) + '%';
+      };
+      zone.onpointerup = () => {
+        if (!mode) return;
+        const wasDragged = dragged;
+        mode = null;
+        if (wasDragged){
+          onZoneEdit(curLo, curHi);
+          s1kBuildKeyMap();
+          if (typeof updatePianoKeymapOverlay === 'function') updatePianoKeymapOverlay();
+        }
+      };
+      zone.onpointercancel = () => { mode = null; };
+    }
+    row.appendChild(zone);
+    return row;
+  }
+}
+
+// PARAM RACK 構築
+function s1kBuildRack(){
+  const rack = document.getElementById('s1kRack');
+  if (!rack) return;
+  rack.innerHTML = '';
+  const fx = samplerActivePad === -1 ? window.__ssawPadFx : samplerPads[samplerActivePad].fx;
+
+  function sect(title, knobs){
+    const s = document.createElement('div'); s.className='s1k-section';
+    const t = document.createElement('div'); t.className='s1k-section-title'; t.textContent=title; s.appendChild(t);
+    const ks = document.createElement('div'); ks.className='s1k-knobs';
+    knobs.forEach(k=>ks.appendChild(k)); s.appendChild(ks);
+    return s;
+  }
+
+  rack.appendChild(sect('AMP ENV', [
+    s1kKnob('A',  ()=>fx.a, v=>fx.a=v, 0, 2000, v=>Math.round(v)+'ms'),
+    s1kKnob('D',  ()=>fx.d, v=>fx.d=v, 0, 4000, v=>Math.round(v)+'ms'),
+    s1kKnob('S',  ()=>fx.s, v=>fx.s=v, 0, 100, v=>Math.round(v)),
+    s1kKnob('R',  ()=>fx.r, v=>fx.r=v, 0, 4000, v=>Math.round(v)+'ms'),
+  ]));
+  rack.appendChild(sect('FILTER (LPF)', [
+    s1kKnob('FREQ', ()=>fx.lpf, v=>fx.lpf=v, 0, 100, v=>Math.round(v)),
+    s1kKnob('RES',  ()=>fx.res, v=>fx.res=v, 0, 100, v=>Math.round(v)),
+  ]));
+  rack.appendChild(sect('PITCH', [
+    s1kKnob('COARSE', ()=>fx.pitchC, v=>fx.pitchC=v, -24, 24, v=>Math.round(v)+'st'),
+    s1kKnob('FINE',   ()=>fx.pitchF, v=>fx.pitchF=v, -100, 100, v=>Math.round(v)+'¢'),
+  ]));
+  rack.appendChild(sect('MIX', [
+    s1kKnob('GAIN', ()=>fx.gain, v=>fx.gain=v, 0, 100, v=>Math.round(v)),
+    s1kKnob('PAN',  ()=>fx.pan, v=>fx.pan=v, -50, 50, v=>Math.round(v)),
+  ]));
+  rack.appendChild(sect('LFO', [
+    s1kKnob('RATE',  ()=>fx.lfoRate, v=>fx.lfoRate=v, 0, 100, v=>Math.round(v)),
+    s1kKnob('DEPTH', ()=>fx.lfoDepth, v=>fx.lfoDepth=v, 0, 100, v=>Math.round(v)),
+    s1kKnob('TGT',   ()=>fx.lfoTgt, v=>fx.lfoTgt=Math.round(v), 0, 3, v=>['Off','Pit','Flt','Amp'][Math.round(v)]),
+  ]));
+  rack.appendChild(sect('SEND', [
+    s1kKnob('REV', ()=>fx.revSend, v=>fx.revSend=v, 0, 100, v=>Math.round(v)),
+    s1kKnob('DLY', ()=>fx.dlySend, v=>fx.dlySend=v, 0, 100, v=>Math.round(v)),
+  ]));
+
+  // COMMON FX (Reverb/Delay)
+  const fxRow = document.getElementById('s1kFxRow');
+  if (fxRow && !fxRow.dataset.built){
+    fxRow.dataset.built = '1';
+    fxRow.appendChild(sect('REVERB', [
+      s1kKnob('WET', ()=>s1kFx.revWet?Math.round(s1kFx.revWet.gain.value*100):60, v=>{ s1kEnsureFx(); if(s1kFx.revWet) s1kFx.revWet.gain.value = v/100; }, 0, 100, v=>Math.round(v)),
+    ]));
+    fxRow.appendChild(sect('DELAY', [
+      s1kKnob('TIME', ()=>s1kFx.dly?s1kFx.dly.delayTime.value*1000:320, v=>{ s1kEnsureFx(); if(s1kFx.dly) s1kFx.dly.delayTime.value = v/1000; }, 30, 1500, v=>Math.round(v)+'ms'),
+      s1kKnob('FB',   ()=>s1kFx.dlyFb?Math.round(s1kFx.dlyFb.gain.value*100):35, v=>{ s1kEnsureFx(); if(s1kFx.dlyFb) s1kFx.dlyFb.gain.value = v/100; }, 0, 95, v=>Math.round(v)),
+      s1kKnob('WET',  ()=>s1kFx.dlyWet?Math.round(s1kFx.dlyWet.gain.value*100):50, v=>{ s1kEnsureFx(); if(s1kFx.dlyWet) s1kFx.dlyWet.gain.value = v/100; }, 0, 100, v=>Math.round(v)),
+    ]));
+  }
+}
+
+// PAD毎FXチェーンでPCM発音する共通関数
+// src -> ampGain(ADSR) -> filter(LPF) -> panner -> dry(master) + revSend + dlySend
+function s1kPlayPadPcm(padIdx, noteName, velocity, when, sustainSec){
+  if (padIdx == null || padIdx < 0) return null;
+  const pad = samplerPads[padIdx];
+  if (!pad) return null;
+  const fx = pad.fx;
+  if (!fx) return null;
+
+  const midiNum = noteNameToMidi(noteName);
+
+  // スロット解決: マルチサンプル(slotIds) → group → 単一(slotIdx) の優先順
+  let useSlotIdx = null;
+  let useRootMidi = 60;
+  if (Array.isArray(pad.slotIds) && pad.slotIds.length > 0){
+    // キーレンジが現在ノートを含む最初のスロットを採用
+    for (const si of pad.slotIds){
+      const sl = state.pcmToneBank[si];
+      if (!sl) continue;
+      const lo = sl.kmLo ?? 0, hi = sl.kmHi ?? 127;
+      if (midiNum >= lo && midiNum <= hi){
+        useSlotIdx = si;
+        useRootMidi = sl.rootNote ?? 60;
+        break;
+      }
+    }
+    if (useSlotIdx == null) return null;
+  } else if (pad.groupId){
+    const r = resolveSlotByGroup(pad.groupId, noteName);
+    if (r){ useSlotIdx = r.idx; useRootMidi = r.slot.rootNote ?? 60; }
+    else return null;
+  } else {
+    useSlotIdx = pad.slotIdx;
+    if (useSlotIdx == null) return null;
+  }
+
+  const slot = state.pcmToneBank[useSlotIdx];
+  if (!slot) return null;
+  const buf = slot.buffer ?? slot.rawBuffer;
+  if (!buf) return null;
+
+  // PAD全体のキーレンジ判定 (fx.keyLo/Hi) — マルチサンプルでもPAD単位の制限は維持
+  if (midiNum < (fx.keyLo ?? 0) || midiNum > (fx.keyHi ?? 127)) return null;
+
+  if (!audioCtx) initAudio();
+  s1kEnsureFx();
+  const t0 = when ?? audioCtx.currentTime;
+
+  // playback rate (pitchC/pitchF 反映) — マルチサンプル/group時は slot.rootNote を基準にトランスポーズ
+  const multiMode = pad.groupId || (Array.isArray(pad.slotIds) && pad.slotIds.length > 0);
+  const baseRate = multiMode ? semisToRate(useRootMidi, midiNum) : (noteToHz(noteName) / C4_HZ);
+  const pitchMul = Math.pow(2, (fx.pitchC ?? 0)/12) * Math.pow(2, (fx.pitchF ?? 0)/1200);
+  const rate = baseRate * pitchMul;
+
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  src.playbackRate.value = rate;
+
+  // amp gain with ADSR
+  const ampGain = audioCtx.createGain();
+  const vol = velocity > 0 ? (velocity/127) : 0.8;
+  const peak = (fx.gain/100) * vol * ((slot.gain ?? 100)/100) * 0.9;
+  const sus = peak * ((fx.s ?? 80)/100);
+  const aMs = Math.max(1, fx.a ?? 5);
+  const dMs = Math.max(1, fx.d ?? 200);
+  ampGain.gain.setValueAtTime(0.0001, t0);
+  ampGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak), t0 + aMs/1000);
+  ampGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, sus),  t0 + aMs/1000 + dMs/1000);
+
+  // LPF
+  const lpf = audioCtx.createBiquadFilter();
+  lpf.type = 'lowpass';
+  const lpfPct = (fx.lpf ?? 100)/100;
+  lpf.frequency.value = 80 + lpfPct * (16000 - 80);
+  lpf.Q.value = (fx.res ?? 10)/100 * 18;
+
+  // PAN
+  const panner = audioCtx.createStereoPanner();
+  panner.pan.value = Math.max(-1, Math.min(1, (fx.pan ?? 0)/50));
+
+  // LFO
+  let lfo, lfoGain;
+  if ((fx.lfoDepth ?? 0) > 0 && (fx.lfoTgt ?? 0) > 0){
+    lfo = audioCtx.createOscillator();
+    lfo.frequency.value = 0.1 + (fx.lfoRate/100) * 20;
+    lfoGain = audioCtx.createGain();
+    const depth = fx.lfoDepth/100;
+    if (fx.lfoTgt === 1){      // Pitch (cents -> rate)
+      lfoGain.gain.value = rate * (Math.pow(2, depth*0.5/12) - 1);
+      lfo.connect(lfoGain); lfoGain.connect(src.playbackRate);
+    } else if (fx.lfoTgt === 2){ // Filter
+      lfoGain.gain.value = depth * 4000;
+      lfo.connect(lfoGain); lfoGain.connect(lpf.frequency);
+    } else if (fx.lfoTgt === 3){ // Amp
+      lfoGain.gain.value = peak * depth * 0.5;
+      lfo.connect(lfoGain); lfoGain.connect(ampGain.gain);
+    }
+    lfo.start(t0);
+  }
+
+  // wiring
+  src.connect(ampGain); ampGain.connect(lpf); lpf.connect(panner);
+  // DRY
+  panner.connect(masterGainNode);
+  // SEND: REVERB
+  if ((fx.revSend ?? 0) > 0 && s1kFx.rev){
+    const rs = audioCtx.createGain(); rs.gain.value = fx.revSend/100;
+    panner.connect(rs); rs.connect(s1kFx.rev);
+  }
+  // SEND: DELAY
+  if ((fx.dlySend ?? 0) > 0 && s1kFx.dly){
+    const ds = audioCtx.createGain(); ds.gain.value = fx.dlySend/100;
+    panner.connect(ds); ds.connect(s1kFx.dly);
+  }
+
+  src.start(t0);
+  // Release schedule (持続長 + R)
+  const rMs = Math.max(50, fx.r ?? 250);
+  const envDur = aMs/1000 + dMs/1000 + rMs/1000 + 0.05;
+  const totalDur = (sustainSec && sustainSec > 0) ? (sustainSec + rMs/1000) : envDur;
+  // sustainSec 指定時は手動でリリースランプを描いてからstop
+  if (sustainSec && sustainSec > 0){
+    const relStart = t0 + sustainSec;
+    ampGain.gain.setValueAtTime(Math.max(0.0001, sus), relStart);
+    ampGain.gain.exponentialRampToValueAtTime(0.0001, relStart + rMs/1000);
+  }
+  src.stop(t0 + Math.max(buf.duration / Math.abs(rate), totalDur));
+  src.onended = () => { try{ lfo && lfo.stop(); }catch(e){} activePcmSources.delete(src); };
+  activePcmSources.add(src);
+  return src;
+}
+
+// 鍵盤GUI上にアクティブPADのキーマップ範囲をハイライト (マルチサンプル対応 / スロット別カラー)
+function updatePianoKeymapOverlay(){
+  document.querySelectorAll('#pianoKeys [data-note]').forEach(el => {
+    el.classList.remove('km-mapped','km-root');
+    el.style.background = '';
+  });
+  if (samplerActivePad < 0) return;
+  const pad = samplerPads[samplerActivePad];
+  if (!pad) return;
+  const ids = Array.isArray(pad.slotIds) ? pad.slotIds : (pad.slotIdx != null ? [pad.slotIdx] : []);
+  if (ids.length === 0) return;
+  const rootColors = new Map(); // midi -> color
+  const ranges = [];
+  ids.forEach(si => {
+    const sl = state.pcmToneBank[si];
+    if (!sl) return;
+    const lo = sl.kmLo ?? 0, hi = sl.kmHi ?? 127, root = sl.rootNote ?? 60;
+    ranges.push({ lo, hi, color: slotColorHsl(si, 60), colorDark: slotColorHsl(si, 35) });
+    rootColors.set(root, slotColorHsl(si, 50));
+  });
+  document.querySelectorAll('#pianoKeys [data-note]').forEach(el => {
+    const m = noteNameToMidi(el.dataset.note);
+    const isBlk = el.classList.contains('pk-black');
+    // ルートノート最優先
+    if (rootColors.has(m)){
+      el.style.background = rootColors.get(m);
+      el.classList.add('km-root');
+      return;
+    }
+    // 範囲に含まれる最初のスロット色
+    const hit = ranges.find(r => m >= r.lo && m <= r.hi);
+    if (hit){
+      el.style.background = isBlk ? hit.colorDark : hit.color;
+      el.classList.add('km-mapped');
+    }
+  });
+}
+
+function s1kRefresh(){
+  s1kBuildPadStrip();
+  s1kBuildKeyMap();
+  s1kBuildRack();
+  updatePianoKeymapOverlay();
+  // 旧パネルとも同期（非表示だが状態維持）
+  try { buildSamplerPanel(); } catch(e){}
+  // POLY SEQ がアクティブなら再描画
+  if (state.currentSeqTab === 'polyseq') renderPolySeq();
+}
+
+// 既存の buildSamplerPanel 呼び出しは V2 のみへ短絡（旧 #samplerPanel 描画は廃止）
+buildSamplerPanel = function(){
+  if (document.getElementById('s1kPadStrip')){
+    s1kBuildPadStrip();
+    s1kBuildKeyMap();
+    s1kBuildRack();
+  }
+};
+
+// ============================================================================
+// POLY SEQ (PolyStep 風 統合シーケンサー)
+// ============================================================================
+let polySeqActivePad = -1; // -1 = SSAW (PAD0), 0..15 = PCM PAD
+
+const POLY_NOTE_NAMES_FULL = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+function polyMidiToName(m){ return POLY_NOTE_NAMES_FULL[m%12] + (Math.floor(m/12)-1); }
+
+function renderPolySeq(){
+  const content = document.getElementById('seqContent');
+  if (!content) return;
+  content.innerHTML = '';
+  const seq = getSeqData();
+  const len = getStepLen();
+  const beatHeads = getBeatHeadSets(len);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'pseq';
+
+  // toolbar
+  const tb = document.createElement('div'); tb.className = 'pseq-toolbar';
+  const lbl = document.createElement('span'); lbl.style.cssText='font-family:monospace;font-size:9px;letter-spacing:2px;color:#1a1a1a;font-weight:bold'; lbl.textContent='POLY SEQ';
+  tb.appendChild(lbl);
+  const padbtns = document.createElement('div'); padbtns.className='pseq-padbtns';
+  // PAD0 = SSAW
+  const b0 = document.createElement('button');
+  b0.className='pseq-padbtn ssaw'+(polySeqActivePad===-1?' active':'');
+  b0.textContent='PAD0';
+  b0.onclick = () => { polySeqActivePad = -1; renderPolySeq(); };
+  if (seq.sub && seq.sub.on && seq.sub.on.some(v=>v)) b0.classList.add('has-data');
+  padbtns.appendChild(b0);
+  for (let i=0;i<16;i++){
+    const b = document.createElement('button');
+    b.className='pseq-padbtn'+(polySeqActivePad===i?' active':'');
+    b.textContent='P'+(i+1);
+    if (seq.samplerSeq && seq.samplerSeq[i] && seq.samplerSeq[i].on && seq.samplerSeq[i].on.some(v=>v)) b.classList.add('has-data');
+    b.onclick = () => { polySeqActivePad = i; renderPolySeq(); };
+    padbtns.appendChild(b);
+  }
+  tb.appendChild(padbtns);
+
+  // clear button
+  const clr = document.createElement('button'); clr.className='s1k-btn red'; clr.textContent='CLR PAD';
+  clr.onclick = () => {
+    if (polySeqActivePad===-1){
+      if (seq.sub){ seq.sub.on.fill(false); }
+    } else if (seq.samplerSeq && seq.samplerSeq[polySeqActivePad]){
+      const s = seq.samplerSeq[polySeqActivePad];
+      s.on.fill(false);
+      for (let k=0;k<len;k++) s.notes[k]=['C4'];
+    }
+    renderPolySeq();
+  };
+  tb.appendChild(clr);
+  wrap.appendChild(tb);
+
+  // piano roll
+  const roll = document.createElement('div'); roll.className='pseq-roll';
+  const grid = document.createElement('div'); grid.className='pseq-grid';
+  // C2 .. C6 (5オクターブ × 12 = 60 行 + 1)
+  const loMidi = 36, hiMidi = 84; // C2..C6
+  const rows = hiMidi - loMidi + 1;
+  grid.style.gridTemplateColumns = `48px repeat(${len}, minmax(14px,1fr))`;
+  grid.style.gridTemplateRows = `16px repeat(${rows}, 13px)`;
+
+  // header: corner + step nums
+  const corner = document.createElement('div'); corner.className='pseq-corner';
+  corner.textContent = polySeqActivePad===-1?'SSAW':('PAD '+(polySeqActivePad+1));
+  grid.appendChild(corner);
+  for (let s=0;s<len;s++){
+    const h = document.createElement('div');
+    h.className='pseq-corner';
+    h.style.fontSize='7px';
+    h.textContent = (s+1);
+    if (beatHeads.strong.has(s)) h.style.background='#a89868';
+    else if (beatHeads.normal.has(s)) h.style.background='#b8a878';
+    grid.appendChild(h);
+  }
+
+  // rows: high pitch first
+  for (let m=hiMidi;m>=loMidi;m--){
+    const isBlk = [1,3,6,8,10].includes(m%12);
+    const rl = document.createElement('div');
+    rl.className = 'pseq-rowlbl'+(isBlk?' blk':'');
+    rl.textContent = polyMidiToName(m);
+    grid.appendChild(rl);
+    for (let s=0;s<len;s++){
+      const cell = document.createElement('div');
+      cell.className='pseq-cell';
+      cell.dataset.pseqStep = s;
+      if (beatHeads.strong.has(s)) cell.classList.add('beat-strong');
+      else if (beatHeads.normal.has(s)) cell.classList.add('beat-head');
+
+      // データ反映 (3-state: OFF / ON(頭) / HOLD(持続))
+      const noteName = polyMidiToName(m);
+      let state3 = 'off'; // 'off' | 'on' | 'hold'
+      const target = polySeqActivePad === -1 ? seq.sub : (seq.samplerSeq ? seq.samplerSeq[polySeqActivePad] : null);
+      if (target && target.on[s] && Array.isArray(target.notes[s]) && target.notes[s].includes(noteName)){
+        const heldArr = Array.isArray(target.holds?.[s]) ? target.holds[s] : [];
+        state3 = heldArr.includes(noteName) ? 'hold' : 'on';
+      }
+      if (state3 === 'on')   cell.classList.add('on');
+      if (state3 === 'hold') cell.classList.add('hold');
+
+      cell.onclick = () => {
+        if (!target) return;
+        if (!Array.isArray(target.notes[s])) target.notes[s] = [];
+        if (!Array.isArray(target.holds)) target.holds = Array(len).fill(null).map(()=>[]);
+        if (!Array.isArray(target.holds[s])) target.holds[s] = [];
+        // 3-state 循環: OFF -> ON -> HOLD -> OFF
+        if (state3 === 'off'){
+          target.notes[s].push(noteName);
+          target.on[s] = true;
+        } else if (state3 === 'on'){
+          target.holds[s].push(noteName); // ON のままHOLDに昇格
+        } else {
+          // HOLD -> OFF
+          const ni = target.notes[s].indexOf(noteName);
+          if (ni >= 0) target.notes[s].splice(ni,1);
+          const hi = target.holds[s].indexOf(noteName);
+          if (hi >= 0) target.holds[s].splice(hi,1);
+          if (target.notes[s].length === 0) target.on[s] = false;
+        }
+        renderPolySeq();
+      };
+      grid.appendChild(cell);
+    }
+  }
+  roll.appendChild(grid);
+  wrap.appendChild(roll);
+
+  content.appendChild(wrap);
+}
+
+// 既存 renderSeq を拡張: polyseq タブ対応
+const _origRenderSeq = renderSeq;
+renderSeq = function(){
+  if (state.currentSeqTab === 'polyseq'){
+    // STEP プリセット同期だけは原版に任せたいので最低限実行
+    const len = getStepLen();
+    const content = document.getElementById('seqContent');
+    if (content){
+      content.style.setProperty('--seq-steps', len);
+      content.classList.toggle('wide-seq', len > 24);
+    }
+    document.querySelectorAll('#stepLenPresets .btn').forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.dataset.slen) === len);
+    });
+    renderBeatGroupBar();
+    renderPolySeq();
+    return;
+  }
+  _origRenderSeq.apply(this, arguments);
+};
+
+// 折り畳みボタン
+(function(){
+  const btn = document.getElementById('s1kCollapseBtn');
+  const body = document.getElementById('s1kBody');
+  if (!btn || !body) return;
+  let open = true;
+  btn.title = '折り畳み / 展開';
+  btn.onclick = () => {
+    open = !open;
+    body.style.display = open ? '' : 'none';
+    btn.textContent = open ? '▼' : '▲';
+  };
+})();
+
+// 全バンクの notes/holds をサニタイズ: on=false のステップは notes/holds を空配列に強制
+function sanitizeAllSeqNotes(){
+  if (!state.banks) return;
+  state.banks.forEach(b => {
+    const sd = b && b.seqData;
+    if (!sd) return;
+    if (sd.sub){
+      const n = sd.sub.notes || [], h = sd.sub.holds || [];
+      for (let s = 0; s < n.length; s++){
+        if (!sd.sub.on[s]) { n[s] = []; if (h[s]) h[s] = []; }
+        else if (!Array.isArray(n[s])) n[s] = [];
+      }
+    }
+    if (Array.isArray(sd.samplerSeq)){
+      sd.samplerSeq.forEach(tr => {
+        if (!tr) return;
+        const n = tr.notes || [], h = tr.holds || [];
+        for (let s = 0; s < n.length; s++){
+          if (!tr.on[s]) { n[s] = []; if (h[s]) h[s] = []; }
+          else if (!Array.isArray(n[s])) n[s] = [];
+        }
+      });
+    }
+  });
+}
+sanitizeAllSeqNotes();
+
+// 既存データ互換: samplerPads から参照されているスロットを自動で S1K 登録扱いにする
+(function migrateS1kRegistered(){
+  const used = new Set();
+  samplerPads.forEach(p => {
+    const ids = Array.isArray(p.slotIds) ? p.slotIds : (p.slotIdx != null ? [p.slotIdx] : []);
+    ids.forEach(i => used.add(i));
+  });
+  used.forEach(i => { if (state.pcmToneBank[i]) state.pcmToneBank[i].s1kRegistered = true; });
+})();
+
+// PCM TONE BANK パネルを S1K の真上に移動
+(function relocateBank(){
+  const bank = document.getElementById('pcmBankPanelWrap');
+  const s1k  = document.getElementById('pcmSamplerV2Wrap');
+  if (!bank || !s1k || !s1k.parentNode) return;
+  s1k.parentNode.insertBefore(bank, s1k);
+})();
+
+// 初期描画
+setTimeout(() => {
+  if (typeof s1kRefresh === 'function') s1kRefresh();
+}, 0);
 
 // 起動
 init();
