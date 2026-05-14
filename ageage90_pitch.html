@@ -3334,6 +3334,7 @@ function scheduleStep() {
           // コードシーケンスが有効なステップにはコードノートを注入
           str.on[step] = true;
           str.notes[step] = chordNotes;
+          if (Array.isArray(str.holds)) str.holds[step] = []; // POLY SEQ HOLD と整合
         }
         // SSAW出力: targetSsaw=trueなら各コードノートをplaySubtractiveで発音
         // (ボコーダーON時はplaySubtractive内部でcarInputGainに自動接続される)
@@ -6154,8 +6155,31 @@ function showPcmCtxMenu(e, slotIdx) {
     const curRoot = slot.rootNote != null ? slot.rootNote : 60;
     const midiToName = m => { const ns=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; return ns[m%12]+(Math.floor(m/12)-1); };
     items.push({ label: `🎵 ROOT NOTE (現: ${midiToName(curRoot)} / MIDI ${curRoot})`, action: async () => {
-      const nm = await mobilePrompt('ルートノート (0〜127, 例: 60=C4):', curRoot);
-      if (nm !== null) { const v = Math.max(0, Math.min(127, parseInt(nm)||60)); slot.rootNote = v; renderPcmToneBank(); }
+      const nm = await mobilePrompt(`ルートノート (例: C4, F#3, Bb2, または MIDI番号 0〜127)\n現: ${midiToName(curRoot)}`, midiToName(curRoot));
+      if (nm === null) return;
+      const s = String(nm).trim();
+      let v = null;
+      // 数値か?
+      if (/^\d+$/.test(s)) v = parseInt(s);
+      else {
+        // ノート名パース (C, C#, Db, D, ..., B) + 任意のオクターブ(-1〜9)
+        const m = s.match(/^([A-Ga-g])([#bB♯♭]?)(-?\d+)$/);
+        if (m){
+          const base = {C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1].toUpperCase()];
+          let acc = 0;
+          if (m[2] === '#' || m[2] === '♯') acc = 1;
+          else if (m[2] === 'b' || m[2] === 'B' || m[2] === '♭') acc = -1;
+          const oct = parseInt(m[3]);
+          v = (oct + 1) * 12 + base + acc;
+        }
+      }
+      if (v == null || isNaN(v) || v < 0 || v > 127){
+        showToast('ノート名が解釈できません (例: C4, F#3, Bb2)', 'warn', 2500);
+        return;
+      }
+      slot.rootNote = v;
+      renderPcmToneBank();
+      if (typeof s1kRefresh === 'function') s1kRefresh();
     }});
     // S1K で使用 / 解除
     const isReg = !!slot.s1kRegistered;
@@ -9360,9 +9384,9 @@ function resizeStepLen(bank, newLen) {
       }
     });
   }
-  // SAMPLER 4トラック
+  // SAMPLER 16トラック
   if (sd.samplerSeq) {
-    for (let t = 0; t < 4; t++) {
+    for (let t = 0; t < sd.samplerSeq.length; t++) {
       if (!sd.samplerSeq[t]) continue;
       sd.samplerSeq[t].on    = resize(sd.samplerSeq[t].on,    false);
       // notes は配列の配列なので専用にリサイズ
@@ -9740,7 +9764,8 @@ function buildPianoKeys() {
       lbl.className = 'pk-label';
       lbl.textContent = (name === 'C') ? note : name;
       el.appendChild(lbl);
-      el.addEventListener('pointerdown', e => { e.preventDefault(); pianoTrigger(note, el); });
+      el.addEventListener('pointerdown', e => { if (e.button !== 0) return; e.preventDefault(); pianoTrigger(note, el); });
+      el.addEventListener('contextmenu', e => { e.preventDefault(); s1kHandlePianoRightClick(note, e); });
       wrap.appendChild(el);
       // キャッシュに登録
       midiState.uiCache.pianoKeys.set(note, el);
@@ -9754,7 +9779,8 @@ function buildPianoKeys() {
       el.style.left = `calc(${whiteIdx} * (100% / ${WHITE_COUNT}) - ${bw / 2}%)`;
       el.style.width = `${bw}%`;
       el.dataset.note = note;
-      el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); pianoTrigger(note, el); });
+      el.addEventListener('pointerdown', e => { if (e.button !== 0) return; e.preventDefault(); e.stopPropagation(); pianoTrigger(note, el); });
+      el.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); s1kHandlePianoRightClick(note, e); });
       wrap.appendChild(el);
       // キャッシュに登録
       midiState.uiCache.pianoKeys.set(note, el);
@@ -10485,6 +10511,34 @@ function s1kBuildKeyMap(){
     km.appendChild(makeKmRow({
       name: `${isInActive ? '✓ ' : ''}S${(s+1).toString().padStart(2,'0')}: ${slot.name}${usedLabel}`,
       color: slotColorHsl(s, 50),
+      onContext: async (ev) => {
+        ev.preventDefault();
+        const cur = slot.rootNote ?? 60;
+        const curName = midiNoteToName(cur);
+        const nm = await mobilePrompt(`S${s+1} の ROOT NOTE (例: C4, F#3, Bb2, または MIDI番号)\n現: ${curName}`, curName);
+        if (nm === null) return;
+        const ss = String(nm).trim();
+        let v = null;
+        if (/^\d+$/.test(ss)) v = parseInt(ss);
+        else {
+          const m = ss.match(/^([A-Ga-g])([#bB♯♭]?)(-?\d+)$/);
+          if (m){
+            const base = {C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1].toUpperCase()];
+            let acc = 0;
+            if (m[2] === '#' || m[2] === '♯') acc = 1;
+            else if (m[2] === 'b' || m[2] === 'B' || m[2] === '♭') acc = -1;
+            v = (parseInt(m[3]) + 1) * 12 + base + acc;
+          }
+        }
+        if (v == null || isNaN(v) || v < 0 || v > 127){
+          showToast('ノート名が解釈できません (例: C4, F#3, Bb2)', 'warn', 2500); return;
+        }
+        slot.rootNote = v;
+        // キーマップ範囲が初期値ぽいなら新ルート中心に再調整
+        if (slot.kmHi - slot.kmLo === 24){ slot.kmLo = Math.max(0, v-12); slot.kmHi = Math.min(127, v+12); }
+        renderPcmToneBank();
+        s1kRefresh();
+      },
       onClick: () => {
         // アクティブPADに対し このスロットを追加/解除 (マルチサンプル)
         if (samplerActivePad < 0) return;
@@ -10513,12 +10567,13 @@ function s1kBuildKeyMap(){
   }
 
   function makeKmRow(cfg){
-    const { name, lo, hi, root, active, isSsaw, onClick, onZoneEdit, color } = cfg;
+    const { name, lo, hi, root, active, isSsaw, onClick, onZoneEdit, color, onContext } = cfg;
     const row = document.createElement('div');
     row.className = 's1k-keymap-row' + (active?' active':'') + (isSsaw?' ssaw':'');
     const nmEl = document.createElement('div'); nmEl.className='km-name'; nmEl.textContent=name;
-    nmEl.title = name;
+    nmEl.title = (onContext ? '右クリックでROOTノート設定 — ' : '') + name;
     if (onClick) nmEl.onclick = onClick;
+    if (onContext) nmEl.oncontextmenu = onContext;
     row.appendChild(nmEl);
     const zone = document.createElement('div'); zone.className='km-zone';
     // C0(MIDI 12) を 0%、C8(MIDI 108) を 100% にマップ (ヘッダラベルと整合)
@@ -10798,6 +10853,61 @@ function s1kPlayPadPcm(padIdx, noteName, velocity, when, sustainSec){
   src.onended = () => { try{ lfo && lfo.stop(); }catch(e){} activePcmSources.delete(src); };
   activePcmSources.add(src);
   return src;
+}
+
+// 鍵盤GUI 右クリック: アクティブPADのスロットのルートノートを設定
+const s1kPianoRcMenu = document.createElement('div');
+s1kPianoRcMenu.className = 'ctx-menu';
+document.body.appendChild(s1kPianoRcMenu);
+document.addEventListener('click', () => { s1kPianoRcMenu.style.display = 'none'; });
+
+function s1kHandlePianoRightClick(noteName, e){
+  if (samplerActivePad < 0){
+    showToast('PCM PADを選んでから鍵盤を右クリックしてください', 'warn', 1800);
+    return;
+  }
+  const pad = samplerPads[samplerActivePad];
+  if (!pad) return;
+  const ids = Array.isArray(pad.slotIds) ? pad.slotIds : (pad.slotIdx != null ? [pad.slotIdx] : []);
+  if (ids.length === 0){
+    showToast(`PAD${samplerActivePad+1} にスロットがありません`, 'warn', 1800);
+    return;
+  }
+  const midi = noteNameToMidi(noteName);
+  const applyTo = (slotIdx) => {
+    const sl = state.pcmToneBank[slotIdx];
+    if (!sl) return;
+    sl.rootNote = midi;
+    // キーマップ範囲が未設定/初期値ぽいときは新ルート中心に追随
+    if (sl.kmLo == null || sl.kmHi == null){
+      sl.kmLo = Math.max(0, midi-12); sl.kmHi = Math.min(127, midi+12);
+    }
+    showToast(`S${slotIdx+1} ROOT → ${noteName}`, 'ok', 1500);
+    renderPcmToneBank();
+    if (typeof s1kRefresh === 'function') s1kRefresh();
+  };
+  if (ids.length === 1){
+    applyTo(ids[0]); return;
+  }
+  // 複数スロットの場合は小メニューで対象を選択
+  s1kPianoRcMenu.innerHTML = '';
+  const t = document.createElement('div');
+  t.style.cssText = 'padding:5px 10px;font-size:9px;color:#c4803a;border-bottom:1px solid #4a2a10;letter-spacing:1px';
+  t.textContent = `${noteName} を ROOT に設定するスロット:`;
+  s1kPianoRcMenu.appendChild(t);
+  ids.forEach(si => {
+    const sl = state.pcmToneBank[si];
+    if (!sl) return;
+    const it = document.createElement('div');
+    it.className = 'ctx-item';
+    it.textContent = `S${(si+1).toString().padStart(2,'0')}: ${sl.name}`;
+    it.onclick = ev => { ev.stopPropagation(); s1kPianoRcMenu.style.display='none'; applyTo(si); };
+    s1kPianoRcMenu.appendChild(it);
+  });
+  s1kPianoRcMenu.style.display = 'block';
+  const cx = e.clientX ?? 0, cy = e.clientY ?? 0;
+  s1kPianoRcMenu.style.left = Math.min(cx, window.innerWidth - 240) + 'px';
+  s1kPianoRcMenu.style.top  = Math.min(cy, window.innerHeight - 220) + 'px';
 }
 
 // 鍵盤GUI上にアクティブPADのキーマップ範囲をハイライト (マルチサンプル対応 / スロット別カラー)
