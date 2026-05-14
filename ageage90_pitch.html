@@ -6176,18 +6176,24 @@ function showPcmCtxMenu(e, slotIdx) {
           slot.s1kRegistered = false;
           showToast(`S${slotIdx+1} を S1K から除外しました`, 'ok', 1500);
         } else {
-          // 登録 + アクティブPADに追加
+          // 登録 + 対象PADに追加
           slot.s1kRegistered = true;
-          if (samplerActivePad >= 0){
-            const ap = samplerPads[samplerActivePad];
-            if (!Array.isArray(ap.slotIds)) ap.slotIds = ap.slotIdx != null ? [ap.slotIdx] : [];
-            if (!ap.slotIds.includes(slotIdx)) ap.slotIds.push(slotIdx);
-            ap.slotIdx = ap.slotIds[0] ?? null;
-            ap.groupId = null;
-            showToast(`S${slotIdx+1} を PAD${samplerActivePad+1} に割り当てました`, 'ok', 1500);
-          } else {
-            showToast(`S${slotIdx+1} を S1K に登録しました (PAD未選択 — S1KでPADを選んで再操作)`, 'warn', 2500);
+          // 配置先PADを決定: アクティブが PCM PAD ならそれ、SSAW(=PAD0) なら最初の空きPADへ
+          let targetPad = samplerActivePad;
+          if (targetPad < 0){
+            targetPad = samplerPads.findIndex(p => {
+              const ids = Array.isArray(p.slotIds) ? p.slotIds : (p.slotIdx != null ? [p.slotIdx] : []);
+              return ids.length === 0 && !p.groupId;
+            });
+            if (targetPad < 0) targetPad = 0; // 全埋まりの場合 PAD1 にフォールバック
+            samplerActivePad = targetPad;
           }
+          const ap = samplerPads[targetPad];
+          if (!Array.isArray(ap.slotIds)) ap.slotIds = ap.slotIdx != null ? [ap.slotIdx] : [];
+          if (!ap.slotIds.includes(slotIdx)) ap.slotIds.push(slotIdx);
+          ap.slotIdx = ap.slotIds[0] ?? null;
+          ap.groupId = null;
+          showToast(`S${slotIdx+1} を PAD${targetPad+1} に割り当てました`, 'ok', 1500);
         }
         renderPcmToneBank();
         if (typeof s1kRefresh === 'function') s1kRefresh();
@@ -9772,7 +9778,9 @@ function pianoTrigger(note, el) {
   el.addEventListener('pointerup',     offHandler);
   el.addEventListener('pointercancel', offHandler);
   el.addEventListener('pointerleave',  offHandler);
-  midiNoteOnTrigger(note, 100);
+  // アクティブPADに応じて出力先を決定 (PCM PAD ならPCM経路、SSAWならSSAW経路)
+  const dest = (samplerActivePad >= 0) ? 'pcm' : 'ssaw';
+  midiNoteOnTrigger(note, 100, dest);
 }
 
 // ============================================================================
