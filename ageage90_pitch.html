@@ -572,28 +572,7 @@
       font-size: 9px; color: #fc8; font-family: monospace; min-width: 80px;
     }
   
-    #samplerPanel {
-      display: flex; gap: 4px; align-items: stretch; flex-wrap: wrap;
-    }
-    .sampler-pad {
-      flex: 1; min-width: 52px;
-      background: #1a1006; border: 1px solid #3a2a10;
-      border-radius: 3px; padding: 4px 6px; cursor: pointer;
-      display: flex; flex-direction: column; gap: 2px;
-      position: relative;
-    }
-    .sampler-pad:hover { border-color: #8a5020; }
-    .sampler-pad.active-pad { border-color: #f0c080; background: #2a1a08; box-shadow: 0 0 5px #c4803a44 inset; }
-    .sampler-pad.has-slot { border-color: #c4803a; }
-    .sampler-pad-num { font-size: 8px; color: #c4803a; font-weight: bold; }
-    .sampler-pad-name { font-size: 9px; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .sampler-pad-info { font-size: 7px; color: #888; }
-    .sampler-pad-empty { font-size: 8px; color: #444; font-style: italic; }
-    .sampler-pad.ssaw-pad { border-color: #5a8; background: #0d1a10; }
-    .sampler-pad.ssaw-pad:hover { border-color: #afe; }
-    .sampler-pad.ssaw-pad.active-pad { border-color: #afe; background: #152a1a; box-shadow: 0 0 5px #5a844 inset; }
-    .sampler-pad-ssaw { font-size: 9px; color: #5a8; font-weight: bold; letter-spacing: 1px; }
-    .sampler-pad-ssaw-sub { font-size: 7px; color: #3a6; }
+    /* 旧 V1 #samplerPanel / .sampler-pad / .ssaw-pad のCSSは S1K V2 への置換に伴い削除 */
 
     /* ===== PIANO KEYBOARD ===== */
     #pianoWrap {
@@ -785,7 +764,7 @@
     }
     .s1k-titlebar {
       display: flex; align-items: center; gap: 8px;
-      background: linear-gradient(#f0e9d6, #d6cfbb);
+      background: var(--s1k-bg2);
       padding: 5px 8px; border-bottom: 1px solid var(--s1k-line);
       border-radius: 3px 3px 0 0;
     }
@@ -802,25 +781,25 @@
       background: var(--s1k-lcd-bg); color: var(--s1k-lcd-fg);
       font-family: monospace; font-size: 9px; padding: 3px 8px;
       border: 1px solid #000; border-radius: 2px;
-      box-shadow: 0 0 4px #5f5 inset, 0 1px 1px #0006;
+      box-shadow: none;
       letter-spacing: 1px; min-width: 90px; text-align: center;
     }
     .s1k-btn {
-      background: linear-gradient(#fafafa, #c8c8c8);
+      background: #e0e0e0;
       border: 1px solid #6a6a6a; color: #222;
       font-family: monospace; font-size: 9px;
       padding: 2px 7px; border-radius: 2px;
       cursor: pointer;
-      box-shadow: 0 1px 0 #fff inset, 0 -1px 0 #0003 inset;
+      box-shadow: none;
     }
-    .s1k-btn:hover { background: linear-gradient(#fff, #dcdcdc); }
+    .s1k-btn:hover { background: #f0f0f0; }
     .s1k-btn:active, .s1k-btn.active {
-      background: linear-gradient(#9bbce8, #6a96d8);
+      background: var(--s1k-blue);
       color: #fff; border-color: #1a3a78;
-      box-shadow: 0 1px 2px #0006 inset;
+      box-shadow: none;
     }
     .s1k-btn.red {
-      background: linear-gradient(#e88, #c44);
+      background: var(--s1k-red);
       color: #fff; border-color: #722;
     }
     .s1k-body { padding: 6px; display: flex; flex-direction: column; gap: 6px; }
@@ -833,22 +812,22 @@
     }
     .s1k-pad {
       flex: 1 1 50px; min-width: 50px; max-width: 80px;
-      background: linear-gradient(#fafafa, #c8c8c8);
+      background: #e0e0e0;
       border: 1px solid #6a6a6a; border-radius: 2px;
       padding: 3px 4px; cursor: pointer;
       display: flex; flex-direction: column; gap: 1px;
-      box-shadow: 0 1px 0 #fff inset, 0 -1px 0 #0003 inset;
+      box-shadow: none;
       position: relative;
     }
-    .s1k-pad:hover { background: linear-gradient(#fff, #dcdcdc); }
+    .s1k-pad:hover { background: #f0f0f0; }
     .s1k-pad.active {
-      background: linear-gradient(#9bbce8, #4b80d8);
+      background: var(--s1k-blue);
       color: #fff; border-color: #1a3a78;
-      box-shadow: 0 0 4px #2a5fb8 inset;
+      box-shadow: none;
     }
     .s1k-pad.empty { opacity: 0.6; }
-    .s1k-pad.ssaw { background: linear-gradient(#fff0c0, #f0c060); border-color: #a07020; }
-    .s1k-pad.ssaw.active { background: linear-gradient(#ffd070, #d09020); color: #1a0a00; border-color: #5a2a00; box-shadow: 0 0 4px #c4803a inset; }
+    .s1k-pad.ssaw { background: #f0c060; border-color: #a07020; }
+    .s1k-pad.ssaw.active { background: #d09020; color: #1a0a00; border-color: #5a2a00; box-shadow: none; }
     .s1k-pad-num { font-family: monospace; font-size: 7px; font-weight: bold; letter-spacing: 1px; opacity: 0.8; }
     .s1k-pad-name { font-family: monospace; font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .s1k-pad-info { font-family: monospace; font-size: 7px; opacity: 0.7; }
@@ -867,9 +846,9 @@
       background: #6aa86a; border: 2px solid #082014; border-radius: 4px;
     }
     .s1k-keymap::-webkit-scrollbar-thumb:hover, .pseq-roll::-webkit-scrollbar-thumb:hover { background: #9ae89a; }
-    .pseq-roll { scrollbar-width: auto; scrollbar-color: #2a5fb8 #d6cfbb; }
-    .pseq-roll::-webkit-scrollbar-track { background: #d6cfbb; }
-    .pseq-roll::-webkit-scrollbar-thumb { background: #2a5fb8; }
+    .pseq-roll { scrollbar-width: auto; scrollbar-color: #c4803a #1a1006; }
+    .pseq-roll::-webkit-scrollbar-track { background: #1a1006; }
+    .pseq-roll::-webkit-scrollbar-thumb { background: #c4803a; border: 2px solid #1a1006; border-radius: 4px; }
     .s1k-keymap-hdr {
       display: flex; align-items: center; gap: 4px;
       font-family: monospace; font-size: 8px; color: var(--s1k-lcd-fg);
@@ -894,14 +873,14 @@
     }
     .s1k-keymap-row .km-bar {
       position: absolute; top: 0; bottom: 0;
-      background: linear-gradient(#7fd87f, #3aa83a);
+      background: #3aa83a;
       border: 1px solid #1a5a1a; border-radius: 1px;
     }
     .s1k-keymap-row.active .km-bar {
-      background: linear-gradient(#ffea7e, #f0a020);
+      background: #f0a020;
       border-color: #a05000;
     }
-    .s1k-keymap-row.ssaw .km-bar { background: linear-gradient(#ffd070, #d09020); border-color: #5a2a00; }
+    .s1k-keymap-row.ssaw .km-bar { background: #d09020; border-color: #5a2a00; }
     .s1k-keymap-row .km-empty { font-family: monospace; font-size: 7px; color: #4a6a4a; padding-left: 4px; }
 
     /* PARAM RACK (丸ノブ) — LCD風緑調 */
@@ -925,7 +904,7 @@
       color: var(--s1k-lcd-fg);
     }
     .s1k-rack .s1k-knob::before, .s1k-fxrow .s1k-knob::before { background: #051a0c; }
-    .s1k-rack .s1k-knob::after, .s1k-fxrow .s1k-knob::after { background: var(--s1k-lcd-fg); box-shadow: 0 0 3px #5f5; }
+    .s1k-rack .s1k-knob::after, .s1k-fxrow .s1k-knob::after { background: var(--s1k-lcd-fg); box-shadow: none; }
     .s1k-rack .s1k-knob, .s1k-fxrow .s1k-knob {
       background:
         conic-gradient(from 225deg,
@@ -971,35 +950,152 @@
 
     /* (旧 .s1k-fxrow ルールは .s1k-rack と統合済み) */
 
+    /* ============ TX (TRANCE SYNTH) - Roland JP-8000 風テーマ ============ */
+    .tx-jp8k {
+      --jp-navy:   #0a1838;
+      --jp-navy2:  #122448;
+      --jp-navy3:  #1a3060;
+      --jp-blue:   #1a4eb8;
+      --jp-blueLt: #4078e0;
+      --jp-cyan:   #6ad8ff;
+      --jp-red:    #ff5050;
+      --jp-orange: #ff8a20;
+      --jp-text:   #cce4ff;
+      --jp-lcd-bg: #06122a;
+      --jp-lcd-fg: #6ad8ff;
+      background: var(--jp-navy);
+      color: var(--jp-text);
+      border: 1px solid #08204a;
+      box-shadow: none;
+    }
+    .tx-jp8k .s1k-titlebar {
+      background: var(--jp-blue);
+      border-bottom: 1px solid #08204a;
+      color: #fff;
+      padding: 5px 8px;
+      box-shadow: none;
+    }
+    .tx-jp8k .s1k-title { color: #fff; text-shadow: none; }
+    .tx-jp8k .s1k-sub   { color: #cce4ff; }
+    .tx-jp8k .s1k-brand {
+      background: var(--jp-orange) !important;
+      color: #1a0a00 !important; border-color: #802000 !important;
+      box-shadow: none;
+    }
+    .tx-jp8k .s1k-btn {
+      background: var(--jp-navy3);
+      border: 1px solid #2a4878; color: var(--jp-text);
+      box-shadow: none;
+    }
+    .tx-jp8k .s1k-btn:hover { background: #2a4878; }
+    .tx-jp8k .s1k-lcd {
+      background: var(--jp-lcd-bg);
+      color: var(--jp-lcd-fg);
+      border: 1px solid #000;
+      text-shadow: none;
+      box-shadow: none;
+    }
+    .tx-jp8k .s1k-body { background: var(--jp-navy); }
+    .tx-jp8k .s1k-padstrip {
+      background: #050e22;
+      border: 1px solid #000;
+      box-shadow: none;
+    }
+    .tx-jp8k .s1k-pad {
+      background: var(--jp-navy2);
+      border: 1px solid #08204a;
+      color: var(--jp-text);
+      box-shadow: none;
+    }
+    .tx-jp8k .s1k-pad:hover {
+      background: var(--jp-navy3);
+      border-color: var(--jp-blueLt);
+    }
+    .tx-jp8k .s1k-pad.active {
+      background: var(--jp-blue);
+      color: #fff;
+      border-color: var(--jp-cyan);
+      box-shadow: none;
+    }
+    .tx-jp8k .s1k-pad-num { color: var(--jp-orange); }
+    .tx-jp8k .s1k-pad.active .s1k-pad-num { color: #ffea7e; }
+    .tx-jp8k .s1k-rack {
+      background: var(--jp-navy);
+      border: 1px solid #08204a;
+      box-shadow: none;
+    }
+    .tx-jp8k .s1k-section {
+      background: var(--jp-navy2);
+      border: 1px solid #2a4878;
+      border-radius: 3px;
+      box-shadow: none;
+    }
+    .tx-jp8k .s1k-section-title {
+      color: var(--jp-cyan);
+      letter-spacing: 2px;
+      text-shadow: none;
+    }
+    .tx-jp8k .s1k-knob-lbl { color: var(--jp-cyan); }
+    .tx-jp8k .s1k-knob-val { color: #fff; }
+    .tx-jp8k .s1k-knob {
+      background:
+        conic-gradient(from -135deg,
+          var(--jp-red) 0deg,
+          var(--jp-red) var(--knob-deg, 0deg),
+          #1a3060 var(--knob-deg, 0deg),
+          #1a3060 270deg,
+          transparent 270deg,
+          transparent 360deg);
+      box-shadow: none;
+    }
+    .tx-jp8k .s1k-knob::before {
+      background: #050e22;
+      box-shadow: none;
+    }
+    .tx-jp8k .s1k-knob::after {
+      background: var(--jp-red);
+      box-shadow: none;
+    }
+    /* ============ /TX (JP-8000) ============ */
+
     /* POLY SEQ (PolyStep 風ピアノロール) */
     .pseq {
-      --pseq-bg: #e8e2d2;
-      --pseq-bg2: #f4f0e2;
-      --pseq-line: #8a8270;
-      --pseq-cell: #d6cfbb;
-      --pseq-cell-on: #2a5fb8;
-      --pseq-cell-cur: #c33;
-      --pseq-row: #c8c0a8;
-      background: var(--pseq-bg); color: #1a1a1a;
+      --pseq-bg:      #1a1006;
+      --pseq-bg2:     #251608;
+      --pseq-line:    #3a2a10;
+      --pseq-cell:    #251608;
+      --pseq-cell-on: #c4803a;
+      --pseq-cell-cur:#fc8;
+      --pseq-row:     #1a1006;
+      --pseq-fg:      #fc8;
+      background: var(--pseq-bg); color: var(--pseq-fg);
       border: 1px solid var(--pseq-line); border-radius: 4px;
       padding: 6px; display: flex; flex-direction: column; gap: 6px;
     }
     .pseq-toolbar {
       display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
-      background: linear-gradient(#f0e9d6, #d6cfbb);
+      background: #251608;
       border: 1px solid var(--pseq-line); border-radius: 3px;
       padding: 4px 6px;
     }
     .pseq-padbtns { display: flex; gap: 2px; flex-wrap: wrap; }
     .pseq-padbtn {
-      background: linear-gradient(#fafafa, #c8c8c8);
-      border: 1px solid #6a6a6a; color: #222;
+      background: #1a1006;
+      border: 1px solid #553a1a; color: #c4803a;
       font-family: monospace; font-size: 8px;
       padding: 2px 5px; border-radius: 2px; cursor: pointer;
       min-width: 26px;
     }
-    .pseq-padbtn.active { background: linear-gradient(#9bbce8, #4b80d8); color: #fff; border-color: #1a3a78; }
-    .pseq-padbtn.ssaw.active { background: linear-gradient(#ffd070, #d09020); color: #1a0a00; border-color: #5a2a00; }
+    .pseq-padbtn:hover { background: #2a1a08; border-color: #c4803a; }
+    .pseq-padbtn.active { background: #c4803a; color: #1a1006; border-color: #fc8; }
+    .pseq-padbtn.ssaw         { border-color: #5a8; color: #5a8; }
+    .pseq-padbtn.ssaw.active  { background: #5a8; color: #0a1a10; border-color: #afe; }
+    .pseq-padbtn.tx-sub        { border-color: #5af; color: #5af; }
+    .pseq-padbtn.tx-sub.active { background: #5af; color: #04122a; border-color: #afe; }
+    .pseq-padbtn.tx-roll        { border-color: #fa5; color: #fa5; }
+    .pseq-padbtn.tx-roll.active { background: #fa5; color: #2a1a04; border-color: #fea; }
+    .pseq-padbtn.tx-pluck        { border-color: #c8f; color: #c8f; }
+    .pseq-padbtn.tx-pluck.active { background: #c8f; color: #20102a; border-color: #ecf; }
     .pseq-padbtn.has-data { box-shadow: 0 0 0 1px #c4803a inset; }
     .pseq-roll {
       position: relative; background: var(--pseq-bg2);
@@ -1014,22 +1110,22 @@
       background: var(--pseq-cell); min-height: 12px; cursor: pointer;
       border: 1px solid transparent;
     }
-    .pseq-cell.beat-head { background: #b8a878; }
-    .pseq-cell.beat-strong { background: #a89868; }
+    .pseq-cell.beat-head   { background: #3a2a10; }
+    .pseq-cell.beat-strong { background: #4a3a20; }
     .pseq-cell.on   { background: var(--pseq-cell-on); }
-    .pseq-cell.hold { background: #4b80d8; }   /* 持続: 少し淡い青 */
-    .pseq-cell.cur  { background: #f0e0a0; }
-    .pseq-cell.cur.on, .pseq-cell.cur.hold { background: #c33; }
+    .pseq-cell.hold { background: #8a5020; }   /* 持続: 少し暗いオレンジ */
+    .pseq-cell.cur  { background: #553a1a; }
+    .pseq-cell.cur.on, .pseq-cell.cur.hold { background: #fc8; }
     .pseq-rowlbl {
       background: var(--pseq-row); font-family: monospace;
-      font-size: 8px; color: #2a2a2a; padding: 0 4px;
+      font-size: 8px; color: #fc8; padding: 0 4px;
       display: flex; align-items: center; justify-content: flex-end;
       min-height: 12px;
     }
-    .pseq-rowlbl.blk { background: #8a7858; color: #f0f0f0; }
+    .pseq-rowlbl.blk { background: #0e0803; color: #c4803a; }
     .pseq-corner {
-      background: linear-gradient(#f0e9d6, #d6cfbb);
-      font-family: monospace; font-size: 8px; color: #2a5fb8;
+      background: #251608;
+      font-family: monospace; font-size: 8px; color: #c4803a;
       padding: 0 4px; display: flex; align-items: center; justify-content: center;
       letter-spacing: 1px; font-weight: bold;
     }
@@ -1179,7 +1275,8 @@
   </div>
 
   <!-- SUPERSAW SYNTH (collapsible) -->
-  <div class="panel" id="subPanelWrap">
+  <!-- SUPERSAW SYNTH パネルは TX(TRANCE SYNTH) 内に移動。互換のためDOMのみ残置(非表示) -->
+  <div class="panel" id="subPanelWrap" style="display:none">
     <div class="collapsible-header" id="subPanelToggle">
       <span class="small-title collapsible-title" style="margin:0">SUPERSAW SYNTH</span>
       <span class="collapsible-arrow collapsed" id="subPanelArrow">&#9660;</span>
@@ -1210,7 +1307,7 @@
         <button class="s1k-btn" id="s1kCollapseBtn" title="折り畳み">▼</button>
         <span class="s1k-brand">S1K</span>
         <span class="s1k-title">PCM SAMPLER</span>
-        <span class="s1k-sub">16 PAD + SSAW</span>
+        <span class="s1k-sub">16 PAD</span>
         <span class="s1k-lcd" id="s1kLcd">PAD —</span>
       </div>
       <div class="s1k-body" id="s1kBody">
@@ -1223,8 +1320,20 @@
         <!-- COMMON FX -->
         <div class="s1k-fxrow" id="s1kFxRow"></div>
       </div>
-      <!-- 旧パネル(互換用・hidden) -->
-      <div id="samplerPanel" style="display:none"></div>
+    </div>
+    <!-- TRANCE SYNTH PANEL (Sub Bass / Rolling Bass / Pluck) -->
+    <div class="s1k tx-jp8k" id="tranceSynthWrap" style="margin-bottom:6px">
+      <div class="s1k-titlebar">
+        <button class="s1k-btn" id="tranceCollapseBtn" title="折り畳み">▼</button>
+        <span class="s1k-brand" style="background:linear-gradient(#c060ff,#7030c0);color:#fff;border-color:#5020a0">TX</span>
+        <span class="s1k-title">TRANCE SYNTH</span>
+        <span class="s1k-sub">SUB / ROLL / PLK</span>
+        <span class="s1k-lcd" id="tranceLcd">VOICE —</span>
+      </div>
+      <div class="s1k-body" id="tranceBody">
+        <div class="s1k-padstrip" id="tranceVoiceStrip"></div>
+        <div class="s1k-rack" id="tranceRack"></div>
+      </div>
     </div>
     <!-- KEYBOARD -->
     <div id="pianoWrap">
@@ -1403,6 +1512,9 @@ const state = {
     ssawRevOn: true, ssawRevDecay: 3.5, ssawRevWet: 70, ssawRevSend: 60, ssawRevPreDelay: 30 },
   subToneBank: Array(50).fill(null),   // null=未使用
   subActiveTone: -1,
+  // TX SYNTH 各ボイスのトーンバンク (16スロット/ボイス)
+  txToneBanks: { sub: Array(16).fill(null), roll: Array(16).fill(null), pluck: Array(16).fill(null) },
+  txActiveTones: { sub: -1, roll: -1, pluck: -1 },
   // FX
   fx: {
     delayFb: 30,
@@ -1468,6 +1580,12 @@ function createEmptySeqData(stepLen) {
       vol:   Array(stepLen).fill(80),
       pan:   Array(stepLen).fill(0),
     })),
+    // TRANCE SYNTH (TX) シーケンス: SUB / ROLL / PLUCK (sub と同形式)
+    txSeq: {
+      sub:   { on: Array(stepLen).fill(false), notes: Array(stepLen).fill(null).map(()=>[]), holds: Array(stepLen).fill(null).map(()=>[]), vols: Array(stepLen).fill(80) },
+      roll:  { on: Array(stepLen).fill(false), notes: Array(stepLen).fill(null).map(()=>[]), holds: Array(stepLen).fill(null).map(()=>[]), vols: Array(stepLen).fill(80) },
+      pluck: { on: Array(stepLen).fill(false), notes: Array(stepLen).fill(null).map(()=>[]), holds: Array(stepLen).fill(null).map(()=>[]), vols: Array(stepLen).fill(80) },
+    },
     // CHORD シーケンス (4パッド共通 or パッドごと選択)
     chordSeq: {
       // 各ステップ: { on, root, type, octave, inv }
@@ -3299,6 +3417,35 @@ function scheduleStep() {
           swungTime, true, stepDur
         );
       }
+    }
+
+    // ===== TX SYNTH (SUB/ROLL/PLUCK) 演奏 =====
+    if (seq.txSeq){
+      const txMap = [
+        { key: 'sub',   voice: 'sub'   },
+        { key: 'roll',  voice: 'roll'  },
+        { key: 'pluck', voice: 'pluck' },
+      ];
+      txMap.forEach(tm => {
+        const tx = seq.txSeq[tm.key];
+        if (!tx || !tx.on[step]) return;
+        const nArr = tx.notes[step] || [];
+        const hArr = Array.isArray(tx.holds) ? (tx.holds[step] || []) : [];
+        nArr.forEach(nm => {
+          if (hArr.includes(nm)) return; // 持続: 頭ではない
+          // 後続HOLD連続数で持続長計算
+          let holdLen = 1;
+          for (let k=step+1; k<stepLen; k++){
+            const nk = tx.notes[k] || [];
+            const hk = Array.isArray(tx.holds) ? (tx.holds[k] || []) : [];
+            if (tx.on[k] && nk.includes(nm) && hk.includes(nm)) holdLen++; else break;
+          }
+          const vol = (tx.vols && tx.vols[step] != null) ? tx.vols[step] : 80;
+          if (typeof playTranceVoice === 'function'){
+            playTranceVoice(nm, Math.round(vol*1.27), swungTime, stepDur*holdLen, tm.voice);
+          }
+        });
+      });
     }
 
     // ===== PCM 16トラック演奏 (チャンネルFXセンドシーケンス込み) =====
@@ -8551,7 +8698,13 @@ function makeSubSlider(label, key, min, max, step, unit) {
   return r;
 }
 
-function applySubParamsToUI() { buildSubPanel(); }
+function applySubParamsToUI() {
+  buildSubPanel();
+  // TX側がSSAW表示中なら同期再描画
+  if (typeof buildTrancePanel === 'function' && typeof tranceState !== 'undefined' && tranceState.activeVoice === 'ssaw'){
+    try{ buildTrancePanel(); }catch(e){}
+  }
+}
 
 // SSAW SLOT context menu
 const subSlotCtxMenu = document.getElementById('subSlotCtxMenu');
@@ -9427,111 +9580,15 @@ function resizeStepLen(bank, newLen) {
 // ============================================================================
 // 4パッド: { slotIdx: null=未割当, name }
 const samplerPads = Array.from({ length: 16 }, () => ({ slotIdx: null, groupId: null, useSsaw: false }));
-let samplerActivePad = -1; // -1 = SSAW PAD、0〜15 = PCM PAD 1〜16
+let samplerActivePad = -1; // -1 = PCM PAD未選択 (鍵盤入力はTXパネル側 SSAW/SUB/ROLL/PLUCK へ)、0〜15 = PCM PAD 1〜16
 let samplerSeqRecMode = false;      // 録音モード ON/OFF
 let samplerSeqRecType = 'realtime'; // 'realtime' | 'step'
 let stepRecCursor = 0;              // ステップレコーディング カーソル位置
 let stepRecLastVol = 80;            // 最後に使ったベロシティ（ステップREC用）
 
-function buildSamplerPanel() {
-  const panel = document.getElementById('samplerPanel');
-  if (!panel) return;
-  panel.innerHTML = '';
-
-  // ===== SSAW PAD 0 (専用・常時SSAW) =====
-  const ssawPadDiv = document.createElement('div');
-  ssawPadDiv.className = 'sampler-pad ssaw-pad' + (samplerActivePad === -1 ? ' active-pad' : '');
-  ssawPadDiv.style.minWidth = '60px';
-  const ssawNumEl = document.createElement('div');
-  ssawNumEl.className = 'sampler-pad-num';
-  ssawNumEl.style.color = '#5a8';
-  ssawNumEl.textContent = 'SSAW';
-  ssawPadDiv.appendChild(ssawNumEl);
-  const ssawLblEl = document.createElement('div');
-  ssawLblEl.className = 'sampler-pad-ssaw';
-  ssawLblEl.textContent = '◈ PAD 0';
-  ssawPadDiv.appendChild(ssawLblEl);
-  const ssawSubEl = document.createElement('div');
-  ssawSubEl.className = 'sampler-pad-ssaw-sub';
-  ssawSubEl.textContent = 'SuperSAW Synth';
-  ssawPadDiv.appendChild(ssawSubEl);
-  ssawPadDiv.onclick = () => { samplerActivePad = -1; buildSamplerPanel(); };
-  panel.appendChild(ssawPadDiv);
-
-  // 区切り
-  const sepDiv = document.createElement('div');
-  sepDiv.style.cssText = 'width:1px;background:#333;align-self:stretch;margin:0 2px;flex-shrink:0';
-  panel.appendChild(sepDiv);
-
-  samplerPads.forEach((pad, i) => {
-    const slot = pad.slotIdx != null ? state.pcmToneBank[pad.slotIdx] : null;
-    const div = document.createElement('div');
-    div.className = 'sampler-pad'
-      + (i === samplerActivePad ? ' active-pad' : '')
-      + (slot ? ' has-slot' : '');
-
-    const numEl = document.createElement('div');
-    numEl.className = 'sampler-pad-num';
-    numEl.textContent = `PAD ${i + 1}`;
-    div.appendChild(numEl);
-
-    if (pad.groupId) {
-      const grpEl = document.createElement('div');
-      grpEl.className = 'sampler-pad-info';
-      grpEl.style.color = '#f0c080';
-      grpEl.textContent = `GRP: ${pad.groupId}`;
-      div.appendChild(grpEl);
-      if (slot) {
-        const nameEl = document.createElement('div');
-        nameEl.className = 'sampler-pad-name';
-        nameEl.textContent = slot.name;
-        div.appendChild(nameEl);
-        const infoEl = document.createElement('div');
-        infoEl.className = 'sampler-pad-info';
-        infoEl.textContent = `S${pad.slotIdx + 1} · ${slot.bits}b/${(slot.sampleRate/1000).toFixed(0)}k`;
-        div.appendChild(infoEl);
-      } else {
-        const emEl = document.createElement('div');
-        emEl.className = 'sampler-pad-empty';
-        emEl.style.fontStyle = 'normal';
-        emEl.style.color = '#aaa';
-        emEl.textContent = 'multi-sample mode';
-        div.appendChild(emEl);
-      }
-    } else if (slot) {
-      const nameEl = document.createElement('div');
-      nameEl.className = 'sampler-pad-name';
-      nameEl.textContent = slot.name;
-      div.appendChild(nameEl);
-      const infoEl = document.createElement('div');
-      infoEl.className = 'sampler-pad-info';
-      infoEl.textContent = `S${pad.slotIdx + 1} · ${slot.bits}b/${(slot.sampleRate/1000).toFixed(0)}k`;
-      div.appendChild(infoEl);
-    } else {
-      const emEl = document.createElement('div');
-      emEl.className = 'sampler-pad-empty';
-      emEl.textContent = '─ empty ─';
-      div.appendChild(emEl);
-    }
-
-    // クリック: アクティブパッド切替
-    div.onclick = () => {
-      samplerActivePad = i;
-      buildSamplerPanel();
-    };
-
-    // 右クリック / 長押し: スロット割当メニュー
-    div.addEventListener('contextmenu', e => { e.preventDefault(); showSamplerPadMenu(e, i); });
-    let pt = null;
-    div.addEventListener('touchstart', e => {
-      pt = setTimeout(() => { pt = null; showSamplerPadMenu(e.touches[0], i); }, 600);
-    }, { passive: true });
-    div.addEventListener('touchend', () => { if (pt) { clearTimeout(pt); pt = null; } });
-    div.addEventListener('touchmove', () => { if (pt) { clearTimeout(pt); pt = null; } });
-
-    panel.appendChild(div);
-  });
-}
+// 旧V1 buildSamplerPanel は廃止 (line ~11044 で S1K V2 ビルダーへ短絡)
+// 互換のため空関数だけ宣言しておく — 後段で実体を上書きする
+function buildSamplerPanel(){}
 
 // ============================================================================
 // SMPL SEQ: ステップ右クリックコンテキストメニュー
@@ -9865,7 +9922,7 @@ function scheduleUIUpdate(updateFn) {
 
 // MIDIノートオン受信 → pianoTriggerと同等処理（GUIハイライト + 音声 + REC）
 // ===== 低レイテンシー版: オーディオ処理を最優先、UI更新は非同期化 =====
-function midiNoteOnTrigger(noteName, velocity, dest) {
+function midiNoteOnTrigger(noteName, velocity, dest, fromMidi) {
   // dest: 'ssaw' | 'pcm' | 'all'  省略時は 'ssaw'
   const midiDest = dest ?? 'ssaw';
 
@@ -9914,27 +9971,27 @@ function midiNoteOnTrigger(noteName, velocity, dest) {
     }
     if (el) el.classList.add('on');
 
-    // MIDI INジケーター（キャッシュ利用）
-    if (!midiState.uiCache.indicator) {
-      midiState.uiCache.indicator = document.getElementById('midiNoteIndicator');
-    }
-    if (midiState.uiCache.indicator) {
-      midiState.uiCache.indicator.textContent = noteName;
-      clearTimeout(midiState.noteIndicatorTimer);
-      midiState.noteIndicatorTimer = setTimeout(() => {
-        if (midiState.uiCache.indicator) midiState.uiCache.indicator.textContent = '';
-      }, 600);
-    }
-
-    // グローバルドット点滅（キャッシュ利用）
-    if (!midiState.uiCache.globalDot) {
-      midiState.uiCache.globalDot = document.getElementById('midiGlobalDot');
-    }
-    if (midiState.uiCache.globalDot) {
-      midiState.uiCache.globalDot.classList.add('active');
-      setTimeout(() => {
-        if (midiState.uiCache.globalDot) midiState.uiCache.globalDot.classList.remove('active');
-      }, 80);
+    // MIDI INジケーター/LED は実MIDI入力時のみ点灯
+    if (fromMidi) {
+      if (!midiState.uiCache.indicator) {
+        midiState.uiCache.indicator = document.getElementById('midiNoteIndicator');
+      }
+      if (midiState.uiCache.indicator) {
+        midiState.uiCache.indicator.textContent = noteName;
+        clearTimeout(midiState.noteIndicatorTimer);
+        midiState.noteIndicatorTimer = setTimeout(() => {
+          if (midiState.uiCache.indicator) midiState.uiCache.indicator.textContent = '';
+        }, 600);
+      }
+      if (!midiState.uiCache.globalDot) {
+        midiState.uiCache.globalDot = document.getElementById('midiGlobalDot');
+      }
+      if (midiState.uiCache.globalDot) {
+        midiState.uiCache.globalDot.classList.add('active');
+        setTimeout(() => {
+          if (midiState.uiCache.globalDot) midiState.uiCache.globalDot.classList.remove('active');
+        }, 80);
+      }
     }
   });
 
@@ -10059,7 +10116,7 @@ function onMidiMessage(deviceId, e) {
   // 分岐を最小化
   if (type === 0x90) {
     if (velocity > 0) {
-      midiNoteOnTrigger(noteName, velocity, dest);
+      midiNoteOnTrigger(noteName, velocity, dest, true);
     } else {
       midiNoteOffTrigger(noteName);
     }
@@ -10441,12 +10498,7 @@ function s1kBuildPadStrip(){
   const strip = document.getElementById('s1kPadStrip');
   if (!strip) return;
   strip.innerHTML = '';
-  // PAD 0 = SSAW
-  const ssaw = document.createElement('div');
-  ssaw.className = 's1k-pad ssaw' + (samplerActivePad === -1 ? ' active' : '');
-  ssaw.innerHTML = '<div class="s1k-pad-num">PAD 0</div><div class="s1k-pad-name">SSAW</div><div class="s1k-pad-info">SuperSaw</div>';
-  ssaw.onclick = () => { samplerActivePad = -1; s1kRefresh(); };
-  strip.appendChild(ssaw);
+  // (PAD 0 SSAW は TRANCE SYNTH パネルに移動済み)
   // PAD 1-16
   samplerPads.forEach((p, i) => {
     const ids = Array.isArray(p.slotIds) ? p.slotIds : (p.slotIdx != null ? [p.slotIdx] : []);
@@ -10472,7 +10524,7 @@ function s1kBuildPadStrip(){
   });
   // LCD
   const lcd = document.getElementById('s1kLcd');
-  if (lcd) lcd.textContent = samplerActivePad === -1 ? 'PAD 0 · SSAW' : `PAD ${samplerActivePad+1}`;
+  if (lcd) lcd.textContent = samplerActivePad === -1 ? 'PAD —' : `PAD ${samplerActivePad+1}`;
 }
 
 // KEY MAP 構築（NN-XT風）
@@ -10499,14 +10551,7 @@ function s1kBuildKeyMap(){
   const activePad = samplerActivePad >= 0 ? samplerPads[samplerActivePad] : null;
   const activeSlotIds = activePad ? (Array.isArray(activePad.slotIds) ? activePad.slotIds : (activePad.slotIdx != null ? [activePad.slotIdx] : [])) : [];
 
-  // PAD0 SSAW
-  km.appendChild(makeKmRow({
-    name: 'SSAW (PAD 0) — full range',
-    onClick: () => { samplerActivePad = -1; s1kRefresh(); },
-    isSsaw: true, active: samplerActivePad === -1,
-    lo: 0, hi: 127, root: null,
-  }));
-
+  // (SSAW行は TRANCE SYNTH パネルに移動)
   // S1K に登録 (slot.s1kRegistered=true) されたスロットだけ列挙
   let any = false;
   for (let s = 0; s < state.pcmToneBank.length; s++){
@@ -11032,6 +11077,8 @@ function s1kRefresh(){
   s1kBuildKeyMap();
   s1kBuildRack();
   updatePianoKeymapOverlay();
+  // TXパネルもハイライト同期（S1K PADと排他表示）
+  if (typeof buildTrancePanel === 'function') { try{ buildTrancePanel(); }catch(e){} }
   // 旧パネルとも同期（非表示だが状態維持）
   try { buildSamplerPanel(); } catch(e){}
   // POLY SEQ がアクティブなら再描画
@@ -11050,7 +11097,24 @@ buildSamplerPanel = function(){
 // ============================================================================
 // POLY SEQ (PolyStep 風 統合シーケンサー)
 // ============================================================================
-let polySeqActivePad = -1; // -1 = SSAW (PAD0), 0..15 = PCM PAD
+let polySeqActivePad = -1; // -1=SSAW, -2=TX SUB, -3=TX ROLL, -4=TX PLUCK, 0..15=PCM PAD
+
+// POLY SEQ ターゲット解決 (ON/notes/holds/vols 形式の互換オブジェクトを返す)
+function polySeqResolveTarget(padIdx){
+  const seq = getSeqData();
+  if (padIdx === -1) return seq.sub;
+  if (padIdx === -2) return seq.txSeq?.sub  || null;
+  if (padIdx === -3) return seq.txSeq?.roll || null;
+  if (padIdx === -4) return seq.txSeq?.pluck|| null;
+  return seq.samplerSeq ? seq.samplerSeq[padIdx] : null;
+}
+function polySeqPadLabel(padIdx){
+  if (padIdx === -1) return 'SSAW';
+  if (padIdx === -2) return 'SUB';
+  if (padIdx === -3) return 'ROLL';
+  if (padIdx === -4) return 'PLK';
+  return 'PAD '+(padIdx+1);
+}
 
 const POLY_NOTE_NAMES_FULL = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 function polyMidiToName(m){ return POLY_NOTE_NAMES_FULL[m%12] + (Math.floor(m/12)-1); }
@@ -11071,13 +11135,25 @@ function renderPolySeq(){
   const lbl = document.createElement('span'); lbl.style.cssText='font-family:monospace;font-size:9px;letter-spacing:2px;color:#1a1a1a;font-weight:bold'; lbl.textContent='POLY SEQ';
   tb.appendChild(lbl);
   const padbtns = document.createElement('div'); padbtns.className='pseq-padbtns';
-  // PAD0 = SSAW
-  const b0 = document.createElement('button');
-  b0.className='pseq-padbtn ssaw'+(polySeqActivePad===-1?' active':'');
-  b0.textContent='PAD0';
-  b0.onclick = () => { polySeqActivePad = -1; renderPolySeq(); };
-  if (seq.sub && seq.sub.on && seq.sub.on.some(v=>v)) b0.classList.add('has-data');
-  padbtns.appendChild(b0);
+  // TX/SSAW セクション
+  const txButtons = [
+    { idx: -1, label: 'SSAW', cls: 'ssaw',     data: seq.sub },
+    { idx: -2, label: 'SUB',  cls: 'tx-sub',   data: seq.txSeq?.sub },
+    { idx: -3, label: 'ROLL', cls: 'tx-roll',  data: seq.txSeq?.roll },
+    { idx: -4, label: 'PLK',  cls: 'tx-pluck', data: seq.txSeq?.pluck },
+  ];
+  txButtons.forEach(tb2 => {
+    const b = document.createElement('button');
+    b.className = 'pseq-padbtn ' + tb2.cls + (polySeqActivePad===tb2.idx?' active':'');
+    b.textContent = tb2.label;
+    if (tb2.data && tb2.data.on && tb2.data.on.some(v=>v)) b.classList.add('has-data');
+    b.onclick = () => { polySeqActivePad = tb2.idx; renderPolySeq(); };
+    padbtns.appendChild(b);
+  });
+  // セパレータ
+  const sep = document.createElement('span');
+  sep.style.cssText = 'width:1px;align-self:stretch;background:#553a1a;margin:0 3px';
+  padbtns.appendChild(sep);
   for (let i=0;i<16;i++){
     const b = document.createElement('button');
     b.className='pseq-padbtn'+(polySeqActivePad===i?' active':'');
@@ -11091,12 +11167,13 @@ function renderPolySeq(){
   // clear button
   const clr = document.createElement('button'); clr.className='s1k-btn red'; clr.textContent='CLR PAD';
   clr.onclick = () => {
-    if (polySeqActivePad===-1){
-      if (seq.sub){ seq.sub.on.fill(false); }
-    } else if (seq.samplerSeq && seq.samplerSeq[polySeqActivePad]){
-      const s = seq.samplerSeq[polySeqActivePad];
-      s.on.fill(false);
-      for (let k=0;k<len;k++) s.notes[k]=['C4'];
+    const tgt = polySeqResolveTarget(polySeqActivePad);
+    if (tgt){
+      tgt.on.fill(false);
+      for (let k=0;k<len;k++){
+        if (Array.isArray(tgt.notes)) tgt.notes[k] = [];
+        if (Array.isArray(tgt.holds)) tgt.holds[k] = [];
+      }
     }
     renderPolySeq();
   };
@@ -11114,15 +11191,15 @@ function renderPolySeq(){
 
   // header: corner + step nums
   const corner = document.createElement('div'); corner.className='pseq-corner';
-  corner.textContent = polySeqActivePad===-1?'SSAW':('PAD '+(polySeqActivePad+1));
+  corner.textContent = polySeqPadLabel(polySeqActivePad);
   grid.appendChild(corner);
   for (let s=0;s<len;s++){
     const h = document.createElement('div');
     h.className='pseq-corner';
     h.style.fontSize='7px';
     h.textContent = (s+1);
-    if (beatHeads.strong.has(s)) h.style.background='#a89868';
-    else if (beatHeads.normal.has(s)) h.style.background='#b8a878';
+    if (beatHeads.strong.has(s)) h.style.background='#4a3a20';
+    else if (beatHeads.normal.has(s)) h.style.background='#3a2a10';
     grid.appendChild(h);
   }
 
@@ -11143,7 +11220,7 @@ function renderPolySeq(){
       // データ反映 (3-state: OFF / ON(頭) / HOLD(持続))
       const noteName = polyMidiToName(m);
       let state3 = 'off'; // 'off' | 'on' | 'hold'
-      const target = polySeqActivePad === -1 ? seq.sub : (seq.samplerSeq ? seq.samplerSeq[polySeqActivePad] : null);
+      const target = polySeqResolveTarget(polySeqActivePad);
       if (target && target.on[s] && Array.isArray(target.notes[s]) && target.notes[s].includes(noteName)){
         const heldArr = Array.isArray(target.holds?.[s]) ? target.holds[s] : [];
         state3 = heldArr.includes(noteName) ? 'hold' : 'on';
@@ -11265,6 +11342,509 @@ sanitizeAllSeqNotes();
 setTimeout(() => {
   if (typeof s1kRefresh === 'function') s1kRefresh();
 }, 0);
+
+// ============================================================================
+// TRANCE SYNTH ENGINE (Sub Bass / Rolling Bass / Pluck)
+// ============================================================================
+const tranceState = {
+  activeVoice: 'ssaw',
+  armPiano: true,
+  sub:  { cut: 35, res: 5,  a: 5,   d: 200, s: 90, r: 200, gain: 80, subMix: 60, drive: 10, glide: 8, sendRev: 10, sendDly: 0,  sendDist: 0 },
+  roll: { cut: 55, res: 30, a: 2,   d: 120, s: 0,  r: 80,  gain: 75, fenv: 70, detune: 8, glide: 4, sendRev: 5,  sendDly: 15, sendDist: 0 },
+  pluck:{ mode:'uplift', cut: 65, res: 35, a: 1, d: 150, s: 0, r: 250, gain: 90, fenv: 80, fm: 30, sendRev: 25, sendDly: 50, sendDist: 0 },
+};
+const activeTranceNodes = new Map(); // noteName -> { release(t), stopAt }
+let _tranceLastFreq = { sub: null, roll: null, pluck: null };
+
+function _tranceSend(panner, fx){
+  // 共通: s1k FX バスへの SEND
+  if (!s1kFx.ready) return;
+  if ((fx.sendRev ?? 0) > 0 && s1kFx.rev){
+    const g = audioCtx.createGain(); g.gain.value = fx.sendRev/100;
+    panner.connect(g); g.connect(s1kFx.rev);
+  }
+  if ((fx.sendDly ?? 0) > 0 && s1kFx.dly){
+    const g = audioCtx.createGain(); g.gain.value = fx.sendDly/100;
+    panner.connect(g); g.connect(s1kFx.dly);
+  }
+  if ((fx.sendDist ?? 0) > 0 && s1kFx.distPre){
+    const g = audioCtx.createGain(); g.gain.value = fx.sendDist/100;
+    panner.connect(g); g.connect(s1kFx.distPre);
+  }
+}
+
+function playTranceSub(noteName, velocity, when, sustainSec){
+  if (!audioCtx) initAudio();
+  s1kEnsureFx();
+  const fx = tranceState.sub;
+  if ((fx.gain ?? 0) <= 0) return; // GAIN 0 は完全無音
+  const t0 = when ?? audioCtx.currentTime;
+  const hz = noteToHz(noteName);
+  const vol = (velocity ?? 100)/127;
+
+  // OSC: sine main + sine sub (-1oct) + tri overtone
+  const o1 = audioCtx.createOscillator(); o1.type='sine'; o1.frequency.value = hz;
+  const o2 = audioCtx.createOscillator(); o2.type='sine'; o2.frequency.value = hz/2;
+  const o3 = audioCtx.createOscillator(); o3.type='triangle'; o3.frequency.value = hz;
+  // Glide
+  if (_tranceLastFreq.sub && fx.glide > 0){
+    o1.frequency.setValueAtTime(_tranceLastFreq.sub, t0);
+    o2.frequency.setValueAtTime(_tranceLastFreq.sub/2, t0);
+    o3.frequency.setValueAtTime(_tranceLastFreq.sub, t0);
+    const gT = fx.glide/100 * 0.3;
+    o1.frequency.exponentialRampToValueAtTime(hz, t0+gT);
+    o2.frequency.exponentialRampToValueAtTime(hz/2, t0+gT);
+    o3.frequency.exponentialRampToValueAtTime(hz, t0+gT);
+  }
+  _tranceLastFreq.sub = hz;
+  const subG = audioCtx.createGain(); subG.gain.value = fx.subMix/100;
+  const triG = audioCtx.createGain(); triG.gain.value = 0.15;
+  // Drive (waveshaper for warmth)
+  const shaper = audioCtx.createWaveShaper();
+  shaper.curve = s1kMakeDistCurve(fx.drive);
+  shaper.oversample = '2x';
+  // LPF
+  const lpf = audioCtx.createBiquadFilter(); lpf.type='lowpass';
+  lpf.frequency.value = 60 + (fx.cut/100) * 2000; // sub範囲
+  lpf.Q.value = fx.res/100 * 6;
+  // AMP
+  const amp = audioCtx.createGain();
+  const peak = (fx.gain/100) * vol * 0.9;
+  const sus = peak * (fx.s/100);
+  amp.gain.setValueAtTime(0.0001, t0);
+  amp.gain.exponentialRampToValueAtTime(Math.max(0.0001,peak), t0 + fx.a/1000);
+  amp.gain.exponentialRampToValueAtTime(Math.max(0.0001,sus),  t0 + fx.a/1000 + fx.d/1000);
+  const pan = audioCtx.createStereoPanner(); pan.pan.value = 0;
+  // wiring
+  o1.connect(amp); o2.connect(subG); subG.connect(amp); o3.connect(triG); triG.connect(amp);
+  amp.connect(shaper); shaper.connect(lpf); lpf.connect(pan);
+  pan.connect(masterGainNode);
+  _tranceSend(pan, fx);
+  o1.start(t0); o2.start(t0); o3.start(t0);
+  const releaseFn = (relT) => {
+    const tr = relT ?? audioCtx.currentTime;
+    amp.gain.cancelScheduledValues(tr);
+    amp.gain.setValueAtTime(amp.gain.value, tr);
+    amp.gain.exponentialRampToValueAtTime(0.0001, tr + fx.r/1000);
+    const stopT = tr + fx.r/1000 + 0.05;
+    try{ o1.stop(stopT); o2.stop(stopT); o3.stop(stopT); }catch(e){}
+  };
+  if (sustainSec && sustainSec > 0){
+    releaseFn(t0 + sustainSec);
+  } else {
+    activeTranceNodes.set(noteName, { release: releaseFn });
+  }
+}
+
+function playTranceRoll(noteName, velocity, when, sustainSec){
+  if (!audioCtx) initAudio();
+  s1kEnsureFx();
+  const fx = tranceState.roll;
+  if ((fx.gain ?? 0) <= 0) return;
+  const t0 = when ?? audioCtx.currentTime;
+  const hz = noteToHz(noteName);
+  const vol = (velocity ?? 100)/127;
+  // 2x Saw detuned
+  const o1 = audioCtx.createOscillator(); o1.type='sawtooth'; o1.frequency.value = hz;
+  const o2 = audioCtx.createOscillator(); o2.type='sawtooth'; o2.frequency.value = hz;
+  o2.detune.value = fx.detune;
+  if (_tranceLastFreq.roll && fx.glide > 0){
+    o1.frequency.setValueAtTime(_tranceLastFreq.roll, t0);
+    o2.frequency.setValueAtTime(_tranceLastFreq.roll, t0);
+    const gT = fx.glide/100 * 0.15;
+    o1.frequency.exponentialRampToValueAtTime(hz, t0+gT);
+    o2.frequency.exponentialRampToValueAtTime(hz, t0+gT);
+  }
+  _tranceLastFreq.roll = hz;
+  // LPF with strong env
+  const lpf = audioCtx.createBiquadFilter(); lpf.type='lowpass';
+  const baseF = 80 + (fx.cut/100) * 1500;
+  const envAmt = fx.fenv/100 * 4000;
+  lpf.frequency.setValueAtTime(baseF + envAmt, t0);
+  lpf.frequency.exponentialRampToValueAtTime(Math.max(80, baseF), t0 + Math.max(0.02, fx.d/1000));
+  lpf.Q.value = fx.res/100 * 12;
+  // AMP
+  const amp = audioCtx.createGain();
+  const peak = (fx.gain/100) * vol * 0.55;
+  const sus = peak * (fx.s/100);
+  amp.gain.setValueAtTime(0.0001, t0);
+  amp.gain.exponentialRampToValueAtTime(Math.max(0.0001,peak), t0 + fx.a/1000);
+  amp.gain.exponentialRampToValueAtTime(Math.max(0.0001,sus),  t0 + fx.a/1000 + fx.d/1000);
+  const pan = audioCtx.createStereoPanner(); pan.pan.value = 0;
+  o1.connect(amp); o2.connect(amp);
+  amp.connect(lpf); lpf.connect(pan);
+  pan.connect(masterGainNode);
+  _tranceSend(pan, fx);
+  o1.start(t0); o2.start(t0);
+  const releaseFn = (relT) => {
+    const tr = relT ?? audioCtx.currentTime;
+    amp.gain.cancelScheduledValues(tr);
+    amp.gain.setValueAtTime(amp.gain.value, tr);
+    amp.gain.exponentialRampToValueAtTime(0.0001, tr + fx.r/1000);
+    const stopT = tr + fx.r/1000 + 0.05;
+    try{ o1.stop(stopT); o2.stop(stopT); }catch(e){}
+  };
+  if (sustainSec && sustainSec > 0){
+    releaseFn(t0 + sustainSec);
+  } else {
+    activeTranceNodes.set(noteName, { release: releaseFn });
+  }
+}
+
+function playTrancePluck(noteName, velocity, when, sustainSec){
+  if (!audioCtx) initAudio();
+  s1kEnsureFx();
+  const fx = tranceState.pluck;
+  if ((fx.gain ?? 0) <= 0) return;
+  const t0 = when ?? audioCtx.currentTime;
+  const hz = noteToHz(noteName);
+  const vol = (velocity ?? 100)/127;
+
+  let car, mod, modGain;
+  if (fx.mode === 'fm'){
+    // FM: carrier sine + modulator sine at ratio 2
+    car = audioCtx.createOscillator(); car.type='sine'; car.frequency.value = hz;
+    mod = audioCtx.createOscillator(); mod.type='sine'; mod.frequency.value = hz*2;
+    modGain = audioCtx.createGain();
+    const modDepth = fx.fm/100 * hz * 4;
+    modGain.gain.setValueAtTime(modDepth, t0);
+    modGain.gain.exponentialRampToValueAtTime(Math.max(0.001, modDepth*0.05), t0 + fx.d/1000);
+    mod.connect(modGain); modGain.connect(car.frequency);
+    mod.start(t0);
+  } else {
+    // Uplift: saw -> BPF
+    car = audioCtx.createOscillator(); car.type='sawtooth'; car.frequency.value = hz;
+  }
+
+  // Filter (uplift=BPF, fm=LPF)
+  const filt = audioCtx.createBiquadFilter();
+  if (fx.mode === 'fm'){
+    filt.type = 'lowpass';
+    const baseF = 200 + (fx.cut/100) * 6000;
+    filt.frequency.setValueAtTime(baseF + fx.fenv/100*4000, t0);
+    filt.frequency.exponentialRampToValueAtTime(Math.max(200, baseF), t0 + fx.d/1000);
+    filt.Q.value = fx.res/100 * 10;
+  } else {
+    filt.type = 'bandpass';
+    const baseF = 400 + (fx.cut/100) * 4000;
+    filt.frequency.setValueAtTime(baseF + fx.fenv/100*3000, t0);
+    filt.frequency.exponentialRampToValueAtTime(Math.max(200, baseF), t0 + fx.d/1000);
+    filt.Q.value = 2 + fx.res/100 * 14;
+  }
+  const amp = audioCtx.createGain();
+  const peak = (fx.gain/100) * vol * 1.8;
+  amp.gain.setValueAtTime(0.0001, t0);
+  amp.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak), t0 + Math.max(0.001, fx.a/1000));
+  amp.gain.exponentialRampToValueAtTime(0.0001, t0 + fx.a/1000 + fx.d/1000 + fx.r/1000);
+  const pan = audioCtx.createStereoPanner(); pan.pan.value = 0;
+  car.connect(amp); amp.connect(filt); filt.connect(pan);
+  pan.connect(masterGainNode);
+  _tranceSend(pan, fx);
+  car.start(t0);
+  const stopT = t0 + fx.a/1000 + fx.d/1000 + fx.r/1000 + 0.1;
+  try{ car.stop(stopT); if (mod) mod.stop(stopT); }catch(e){}
+  // Pluckはshort one-shot — release不要だがmap登録だけ(早期offにも対応)
+  activeTranceNodes.set(noteName, { release: () => {
+    const tr = audioCtx.currentTime;
+    amp.gain.cancelScheduledValues(tr);
+    amp.gain.setValueAtTime(amp.gain.value, tr);
+    amp.gain.exponentialRampToValueAtTime(0.0001, tr + 0.08);
+    try{ car.stop(tr+0.1); if (mod) mod.stop(tr+0.1); }catch(e){}
+  }});
+}
+
+function playTranceVoice(noteName, velocity, when, sustainSec, voice){
+  const v = voice ?? tranceState.activeVoice;
+  if (v === 'ssaw'){
+    if (!audioCtx) initAudio();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const hz = noteToHz(noteName);
+    playSubtractive(hz, midiVelToVol(velocity ?? 100), when ?? audioCtx.currentTime, false,
+      (sustainSec != null ? sustainSec*1000 : state.subParams.length), undefined, noteName);
+    return;
+  }
+  if (v === 'sub')   return playTranceSub(noteName, velocity, when, sustainSec);
+  if (v === 'roll')  return playTranceRoll(noteName, velocity, when, sustainSec);
+  if (v === 'pluck') return playTrancePluck(noteName, velocity, when, sustainSec);
+}
+function tranceReleaseNote(noteName){
+  const n = activeTranceNodes.get(noteName);
+  if (n){ try{ n.release(); }catch(e){} activeTranceNodes.delete(noteName); }
+}
+
+// ----- TRANCE SYNTH UI -----
+function buildTrancePanel(){
+  const voices = [
+    { id:'ssaw',  name:'SSAW (PAD/LEAD)', color:'#afe' },
+    { id:'sub',   name:'SUB BASS',         color:'#5af' },
+    { id:'roll',  name:'ROLLING BASS',     color:'#fa5' },
+    { id:'pluck', name:'PLUCK',            color:'#c8f' },
+  ];
+  // Voice strip
+  const strip = document.getElementById('tranceVoiceStrip');
+  if (!strip) return;
+  strip.innerHTML = '';
+  voices.forEach(v => {
+    const b = document.createElement('div');
+    b.className = 's1k-pad' + ((samplerActivePad === -1 && tranceState.activeVoice===v.id)?' active':'');
+    b.style.cssText = `min-width:90px;border-color:${v.color}`;
+    b.innerHTML = `<div class="s1k-pad-num" style="color:${v.color}">${v.id.toUpperCase()}</div><div class="s1k-pad-name" style="color:${v.color}">${v.name}</div>`;
+    b.onclick = () => {
+      tranceState.activeVoice = v.id;
+      // TXパネル側のボイス選択は常にS1K PADを解除する (鍵盤入力をTX/SSAWへ向ける)
+      samplerActivePad = -1;
+      if (typeof s1kRefresh==='function') s1kRefresh();
+      buildTrancePanel(); updateTranceLcd();
+    };
+    strip.appendChild(b);
+  });
+  // Rack
+  const rack = document.getElementById('tranceRack');
+  rack.innerHTML = '';
+  const sect = (title, knobs) => {
+    const s = document.createElement('div'); s.className='s1k-section';
+    const t = document.createElement('div'); t.className='s1k-section-title'; t.textContent=title; s.appendChild(t);
+    const kb = document.createElement('div'); kb.className='s1k-knobs';
+    knobs.forEach(k => kb.appendChild(k)); s.appendChild(kb); return s;
+  };
+  const K = (lbl, get, set, lo, hi, fmt) => s1kKnob(lbl, get, set, lo, hi, fmt);
+
+  // ===== SSAW: subParams を直接編集 (旧SUPERSAW SYNTHパネルの内容を吸収) =====
+  if (tranceState.activeVoice === 'ssaw'){
+    const sp = state.subParams;
+    // ドロップダウン/トグル類 (ノブ化が不適切なもの) は小さなセクションにまとめる
+    const optSec = document.createElement('div');
+    optSec.className = 's1k-section';
+    const optT = document.createElement('div'); optT.className='s1k-section-title'; optT.textContent = 'OSC';
+    optSec.appendChild(optT);
+    const optRow = document.createElement('div');
+    optRow.style.cssText = 'display:flex;flex-direction:column;gap:3px;font-family:monospace;font-size:8px';
+    const mkSel = (label, vals, getCur, onCh) => {
+      const r = document.createElement('div'); r.style.cssText = 'display:flex;align-items:center;gap:4px';
+      const l = document.createElement('span'); l.style.cssText='color:#9ae89a;min-width:42px'; l.textContent=label;
+      const sel = document.createElement('select'); sel.style.cssText='font-family:monospace;font-size:8px;background:#0e1c3a;color:#cce4ff;border:1px solid #2a4878;padding:1px 2px';
+      vals.forEach(v => { const o = document.createElement('option'); o.value = v[0] ?? v; o.textContent = v[1] ?? v; if ((v[0] ?? v) == getCur()) o.selected = true; sel.appendChild(o); });
+      sel.onchange = e => onCh(e.target.value);
+      r.appendChild(l); r.appendChild(sel); return r;
+    };
+    optRow.appendChild(mkSel('WAVE', ['sine','sawtooth','square','triangle'], ()=>sp.wave, v=>{sp.wave=v;}));
+    optRow.appendChild(mkSel('VOICES', [[1,'1'],[2,'2'],[3,'3'],[4,'4'],[5,'5'],[6,'6'],[7,'7']], ()=>sp.voiceCount, v=>{sp.voiceCount=parseInt(v);}));
+    optRow.appendChild(mkSel('FLT TYPE', ['lowpass','highpass','bandpass','notch'], ()=>sp.filterType, v=>{sp.filterType=v;}));
+    optSec.appendChild(optRow);
+    rack.appendChild(optSec);
+
+    rack.appendChild(sect('UNISON', [
+      K('DETUNE', ()=>sp.detune, v=>sp.detune=v, 0, 100, v=>Math.round(v)+'¢'),
+      K('SPREAD', ()=>sp.spread, v=>sp.spread=v, 0, 100, v=>Math.round(v)),
+    ]));
+    rack.appendChild(sect('FILTER', [
+      K('FRQ', ()=>sp.filterFreq, v=>sp.filterFreq=v, 50, 20000, v=>Math.round(v)+'Hz'),
+      K('RES', ()=>sp.filterRes,  v=>sp.filterRes=v, 0.1, 30, v=>v.toFixed(1)),
+    ]));
+    rack.appendChild(sect('AMP ENV', [
+      K('A', ()=>sp.envA, v=>sp.envA=v, 0, 2000, v=>Math.round(v)+'ms'),
+      K('D', ()=>sp.envD, v=>sp.envD=v, 0, 2000, v=>Math.round(v)+'ms'),
+      K('S', ()=>sp.envS, v=>sp.envS=v, 0, 100, v=>Math.round(v)),
+      K('R', ()=>sp.envR, v=>sp.envR=v, 0, 3000, v=>Math.round(v)+'ms'),
+    ]));
+    rack.appendChild(sect('FLT ENV', [
+      K('AMT', ()=>sp.filtEnvAmt, v=>sp.filtEnvAmt=v, 0, 100, v=>Math.round(v)),
+      K('A',   ()=>sp.filtEnvA,   v=>sp.filtEnvA=v,   0, 2000, v=>Math.round(v)+'ms'),
+      K('D',   ()=>sp.filtEnvD,   v=>sp.filtEnvD=v,  10, 3000, v=>Math.round(v)+'ms'),
+      K('R',   ()=>sp.filtEnvR,   v=>sp.filtEnvR=v,   0, 3000, v=>Math.round(v)+'ms'),
+      K('ON',  ()=>sp.filtEnvOn?1:0, v=>{ sp.filtEnvOn = Math.round(v)===1; }, 0, 1, v=>Math.round(v)===1?'ON':'OFF'),
+    ]));
+    rack.appendChild(sect('SSAW REV', [
+      K('ON',  ()=>sp.ssawRevOn?1:0, v=>{
+        sp.ssawRevOn = Math.round(v)===1;
+        if (ssawRevSendGain) ssawRevSendGain.gain.value = sp.ssawRevOn ? (sp.ssawRevSend ?? 30)/100 : 0;
+        if (ssawDryGain) ssawDryGain.gain.value = sp.ssawRevOn ? 1.0 - (sp.ssawRevWet ?? 40)/100 : 1.0;
+      }, 0, 1, v=>Math.round(v)===1?'ON':'OFF'),
+      K('SEND',  ()=>sp.ssawRevSend, v=>{ sp.ssawRevSend=v; if(ssawRevSendGain && sp.ssawRevOn) ssawRevSendGain.gain.value=v/100; }, 0, 100, v=>Math.round(v)),
+      K('WET',   ()=>sp.ssawRevWet,  v=>{ sp.ssawRevWet=v; if(ssawRevWetGain) ssawRevWetGain.gain.value=v/100; if(ssawDryGain && sp.ssawRevOn) ssawDryGain.gain.value = 1.0 - v/100; }, 0, 100, v=>Math.round(v)),
+      K('DECAY', ()=>sp.ssawRevDecay,v=>{ sp.ssawRevDecay=v; if(ssawRevConv && audioCtx) ssawRevConv.buffer = buildReverbIR(v); }, 0.1, 8, v=>v.toFixed(1)+'s'),
+      K('PRE',   ()=>sp.ssawRevPreDelay, v=>{ sp.ssawRevPreDelay=v; if(ssawRevPreDelayNode) ssawRevPreDelayNode.delayTime.value=v/1000; }, 0, 150, v=>Math.round(v)+'ms'),
+    ]));
+    rack.appendChild(sect('MISC', [
+      K('LEN', ()=>sp.length, v=>sp.length=v, 50, 2000, v=>Math.round(v)+'ms'),
+    ]));
+    rack.appendChild(buildTxToneBankUI('ssaw'));
+    updateTranceLcd();
+    return;
+  }
+
+  const fx = tranceState[tranceState.activeVoice];
+  // Common AMP
+  rack.appendChild(sect('AMP ENV', [
+    K('A', ()=>fx.a, v=>fx.a=v, 0, 2000, v=>Math.round(v)+'ms'),
+    K('D', ()=>fx.d, v=>fx.d=v, 0, 2000, v=>Math.round(v)+'ms'),
+    K('S', ()=>fx.s, v=>fx.s=v, 0, 100, v=>Math.round(v)),
+    K('R', ()=>fx.r, v=>fx.r=v, 0, 2000, v=>Math.round(v)+'ms'),
+  ]));
+  rack.appendChild(sect('FILTER', [
+    K('CUT', ()=>fx.cut, v=>fx.cut=v, 0, 100, v=>Math.round(v)),
+    K('RES', ()=>fx.res, v=>fx.res=v, 0, 100, v=>Math.round(v)),
+  ]));
+  if (tranceState.activeVoice === 'sub'){
+    rack.appendChild(sect('SUB', [
+      K('SUB', ()=>fx.subMix, v=>fx.subMix=v, 0, 100, v=>Math.round(v)),
+      K('DRV', ()=>fx.drive, v=>fx.drive=v, 0, 100, v=>Math.round(v)),
+      K('GLIDE', ()=>fx.glide, v=>fx.glide=v, 0, 100, v=>Math.round(v)),
+    ]));
+  } else if (tranceState.activeVoice === 'roll'){
+    rack.appendChild(sect('VOICE', [
+      K('FENV', ()=>fx.fenv, v=>fx.fenv=v, 0, 100, v=>Math.round(v)),
+      K('DET', ()=>fx.detune, v=>fx.detune=v, 0, 50, v=>Math.round(v)+'¢'),
+      K('GLIDE', ()=>fx.glide, v=>fx.glide=v, 0, 100, v=>Math.round(v)),
+    ]));
+  } else {
+    rack.appendChild(sect('PLUCK', [
+      K('FENV', ()=>fx.fenv, v=>fx.fenv=v, 0, 100, v=>Math.round(v)),
+      K('FM',   ()=>fx.fm,   v=>fx.fm=v,   0, 100, v=>Math.round(v)),
+      K('MODE', ()=>fx.mode==='fm'?1:0, v=>{ fx.mode = (Math.round(v)===1?'fm':'uplift'); buildTrancePanel(); }, 0, 1, v=>Math.round(v)===1?'FM':'UPLIFT'),
+    ]));
+  }
+  rack.appendChild(sect('MIX', [
+    K('GAIN', ()=>fx.gain, v=>fx.gain=v, 0, 100, v=>Math.round(v)),
+  ]));
+  rack.appendChild(sect('SEND', [
+    K('REV',  ()=>fx.sendRev,  v=>fx.sendRev=v,  0, 100, v=>Math.round(v)),
+    K('DLY',  ()=>fx.sendDly,  v=>fx.sendDly=v,  0, 100, v=>Math.round(v)),
+    K('DST',  ()=>fx.sendDist, v=>fx.sendDist=v, 0, 100, v=>Math.round(v)),
+  ]));
+  rack.appendChild(buildTxToneBankUI(tranceState.activeVoice));
+  updateTranceLcd();
+}
+
+// TX/SSAW トーンバンク UI (voice='ssaw'|'sub'|'roll'|'pluck')
+function buildTxToneBankUI(voice){
+  const box = document.createElement('div');
+  box.className = 's1k-section';
+  box.style.minWidth = '100%';
+  const t = document.createElement('div'); t.className='s1k-section-title';
+  let bank, active, label, slotCount, getParams, applyParams;
+  if (voice === 'ssaw'){
+    bank = state.subToneBank; active = state.subActiveTone; slotCount = bank.length;
+    label = `SSAW TONE BANK (${slotCount})`;
+    getParams = () => JSON.parse(JSON.stringify(state.subParams));
+    applyParams = (p) => { Object.assign(state.subParams, JSON.parse(JSON.stringify(p))); };
+  } else {
+    bank = state.txToneBanks[voice]; active = state.txActiveTones[voice]; slotCount = bank.length;
+    label = `${voice.toUpperCase()} TONE BANK (${slotCount})`;
+    getParams = () => JSON.parse(JSON.stringify(tranceState[voice]));
+    applyParams = (p) => { Object.assign(tranceState[voice], JSON.parse(JSON.stringify(p))); };
+  }
+  t.textContent = label;
+  box.appendChild(t);
+  const ctrl = document.createElement('div');
+  ctrl.style.cssText = 'display:flex;gap:4px;margin:3px 0;flex-wrap:wrap;align-items:center;font-family:monospace;font-size:8px';
+  // STORE
+  const storeBtn = document.createElement('button');
+  storeBtn.className = 's1k-btn';
+  storeBtn.textContent = active >= 0 ? `STORE→${active}` : 'STORE';
+  storeBtn.onclick = async () => {
+    if (active < 0){ showToast('保存先スロットをクリックしてください', 'warn'); return; }
+    const cur = bank[active];
+    const nm = await mobilePrompt('音色名:', cur?._name || `${voice}${active}`);
+    if (nm === null) return;
+    bank[active] = { ...getParams(), _name: String(nm).slice(0,8) };
+    buildTrancePanel();
+    showToast(`${voice.toUpperCase()} SLOT ${active} 保存`, 'ok');
+  };
+  ctrl.appendChild(storeBtn);
+  // CLR BANK
+  const clrBtn = document.createElement('button');
+  clrBtn.className = 's1k-btn red';
+  clrBtn.textContent = 'CLR';
+  clrBtn.onclick = async () => {
+    if (!await mobileConfirm(`${voice.toUpperCase()} TONE BANK 全消去しますか?`)) return;
+    bank.fill(null);
+    if (voice === 'ssaw') state.subActiveTone = -1;
+    else state.txActiveTones[voice] = -1;
+    buildTrancePanel();
+  };
+  ctrl.appendChild(clrBtn);
+  // Active info
+  const info = document.createElement('span');
+  info.style.cssText = 'color:#9ae89a;font-size:8px;margin-left:auto';
+  if (active >= 0){
+    const sl = bank[active];
+    info.textContent = sl ? `ACT: ${active} (${sl._name || ''})` : `ACT: ${active} (空き)`;
+  } else {
+    info.textContent = 'スロットをクリックで選択';
+  }
+  ctrl.appendChild(info);
+  box.appendChild(ctrl);
+  // Slot grid
+  const grid = document.createElement('div');
+  grid.style.cssText = `display:grid;grid-template-columns:repeat(${voice==='ssaw'?10:8},1fr);gap:2px`;
+  for (let s=0; s<slotCount; s++){
+    const slot = bank[s];
+    const cell = document.createElement('div');
+    const isAct = active === s;
+    cell.style.cssText = `font-family:monospace;font-size:8px;padding:3px 2px;border:1px solid ${slot?'#5a8':'#2a4878'};background:${isAct?(slot?'#5a8':'#2a4878'):'#0e1c3a'};color:${isAct?'#0a1a10':(slot?'#9ae89a':'#557788')};border-radius:2px;cursor:pointer;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis`;
+    cell.textContent = slot ? `${s}:${(slot._name||'').slice(0,5)}` : `${s}`;
+    cell.title = slot ? `SLOT ${s}: ${slot._name||''}` : `SLOT ${s}: 空き`;
+    cell.onclick = () => {
+      if (slot){
+        const { _name, ...params } = slot;
+        applyParams(params);
+      }
+      if (voice === 'ssaw') state.subActiveTone = s;
+      else state.txActiveTones[voice] = s;
+      buildTrancePanel();
+    };
+    grid.appendChild(cell);
+  }
+  box.appendChild(grid);
+  return box;
+}
+function updateTranceLcd(){
+  const lcd = document.getElementById('tranceLcd');
+  if (lcd) lcd.textContent = 'VOICE ' + tranceState.activeVoice.toUpperCase();
+}
+
+// Collapse + ARM
+document.addEventListener('DOMContentLoaded', () => {
+  const cb = document.getElementById('tranceCollapseBtn');
+  const body = document.getElementById('tranceBody');
+  if (cb && body){
+    cb.onclick = () => {
+      const hidden = body.style.display === 'none';
+      body.style.display = hidden ? '' : 'none';
+      cb.textContent = hidden ? '▼' : '▶';
+    };
+  }
+  buildTrancePanel();
+});
+
+// PIANO HOOK: midiNoteOnTrigger/midiNoteOffTrigger に ARM PIANO 横取りを差し込む
+(function hookPianoForTrance(){
+  const origOn  = window.midiNoteOnTrigger;
+  const origOff = window.midiNoteOffTrigger;
+  window.midiNoteOnTrigger = function(noteName, velocity, dest){
+    // S1K PADが選ばれている時はPCM優先
+    if (samplerActivePad >= 0) return origOn.apply(this, arguments);
+    // TXボイス選択時 (sub/roll/pluck) → TX発音
+    if (tranceState.activeVoice === 'sub' || tranceState.activeVoice === 'roll' || tranceState.activeVoice === 'pluck'){
+      playTranceVoice(noteName, velocity ?? 100);
+      const el = document.querySelector(`#pianoKeys [data-note="${noteName}"]`);
+      if (el) el.classList.add('on');
+      return;
+    }
+    // 既定: SSAW
+    return origOn.apply(this, arguments);
+  };
+  window.midiNoteOffTrigger = function(noteName){
+    if (activeTranceNodes.has(noteName)){
+      tranceReleaseNote(noteName);
+      const el = document.querySelector(`#pianoKeys [data-note="${noteName}"]`);
+      if (el) el.classList.remove('on');
+      return;
+    }
+    return origOff.apply(this, arguments);
+  };
+})();
 
 // 起動
 init();
