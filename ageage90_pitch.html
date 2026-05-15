@@ -1143,7 +1143,7 @@
 
   <!-- SEQUENCER TABS -->
   <div class="tab-bar" id="seqTabBar">
-    <div class="tab active" data-stab="pcmseq">PCM SEQ</div>
+    <div class="tab active" data-stab="pcmseq">LOOP SEQ</div>
     <div class="tab" data-stab="polyseq">POLY SEQ</div>
     <div class="tab" data-stab="sub" style="display:none">SSAW SEQ</div>
     <div class="tab" data-stab="smplseq" style="display:none">SMPL SEQ</div>
@@ -3714,11 +3714,11 @@ function renderSeq() {
   }
 }
 
-// ===== PCM SEQ: 16トラック =====
+// ===== LOOP SEQ: 16トラック =====
 function renderPcmSeq(content, seq, len, beatHeads) {
   const desc = document.createElement('div');
   desc.style.cssText = 'font-size:9px;color:#c4803a;margin-bottom:6px;padding:3px 6px;border-left:2px solid #c4803a;background:#1a1006';
-  desc.innerHTML = '<b>PCM 16-Track Sequencer</b> &nbsp;|&nbsp; ' +
+  desc.innerHTML = '<b>PCMLOOP 16-Track Sequencer</b> &nbsp;|&nbsp; ' +
     '行: <span style="color:#5a8">ON</span> / ' +
     '<span style="color:#fc8">SLOT</span> / ' +
     '<span style="color:#fc8">FREQ(Hz)</span> / ' +
@@ -10354,7 +10354,7 @@ function initPiano() {
     gain: 80, pitchC: 0, pitchF: 0,      // semis / cents
     pan: 0,                              // -50..+50
     lfoRate: 30, lfoDepth: 0, lfoTgt: 0, // 0=Off,1=Pitch,2=Filter,3=Amp
-    revSend: 0, dlySend: 0,              // 0-100
+    revSend: 0, dlySend: 0, distSend: 0, // 0-100
     keyLo: 0, keyHi: 127                 // MIDIノート範囲 C-1..G9
   });
   samplerPads.forEach(p => { if (!p.fx) p.fx = defaults(); });
@@ -10363,7 +10363,16 @@ function initPiano() {
 })();
 
 // 共通リバーブ/ディレイ ノード（遅延初期化）
-const s1kFx = { rev: null, revWet: null, dly: null, dlyFb: null, dlyWet: null, ready:false };
+const s1kFx = { rev: null, revWet: null, dly: null, dlyFb: null, dlyWet: null, dist: null, distPre: null, distWet: null, distDrive: 40, ready:false };
+function s1kMakeDistCurve(amount){
+  const k = Math.max(0, Math.min(100, amount)) * 4;
+  const n = 1024, curve = new Float32Array(n), deg = Math.PI/180;
+  for (let i=0;i<n;i++){
+    const x = i*2/n - 1;
+    curve[i] = (3+k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
+  }
+  return curve;
+}
 function s1kEnsureFx(){
   if (s1kFx.ready || !audioCtx) return;
   // Reverb (convolver, impulse生成)
@@ -10383,6 +10392,13 @@ function s1kEnsureFx(){
   s1kFx.dlyWet = audioCtx.createGain(); s1kFx.dlyWet.gain.value = 0.5;
   s1kFx.dly.connect(s1kFx.dlyFb); s1kFx.dlyFb.connect(s1kFx.dly);
   s1kFx.dly.connect(s1kFx.dlyWet); s1kFx.dlyWet.connect(masterGainNode);
+  // Distortion (WaveShaper)
+  s1kFx.distPre = audioCtx.createGain(); s1kFx.distPre.gain.value = 1.0;
+  s1kFx.dist = audioCtx.createWaveShaper();
+  s1kFx.dist.curve = s1kMakeDistCurve(s1kFx.distDrive);
+  s1kFx.dist.oversample = '4x';
+  s1kFx.distWet = audioCtx.createGain(); s1kFx.distWet.gain.value = 0.7;
+  s1kFx.distPre.connect(s1kFx.dist); s1kFx.dist.connect(s1kFx.distWet); s1kFx.distWet.connect(masterGainNode);
   s1kFx.ready = true;
 }
 
@@ -10511,33 +10527,9 @@ function s1kBuildKeyMap(){
     km.appendChild(makeKmRow({
       name: `${isInActive ? '✓ ' : ''}S${(s+1).toString().padStart(2,'0')}: ${slot.name}${usedLabel}`,
       color: slotColorHsl(s, 50),
-      onContext: async (ev) => {
+      onContext: (ev) => {
         ev.preventDefault();
-        const cur = slot.rootNote ?? 60;
-        const curName = midiNoteToName(cur);
-        const nm = await mobilePrompt(`S${s+1} の ROOT NOTE (例: C4, F#3, Bb2, または MIDI番号)\n現: ${curName}`, curName);
-        if (nm === null) return;
-        const ss = String(nm).trim();
-        let v = null;
-        if (/^\d+$/.test(ss)) v = parseInt(ss);
-        else {
-          const m = ss.match(/^([A-Ga-g])([#bB♯♭]?)(-?\d+)$/);
-          if (m){
-            const base = {C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1].toUpperCase()];
-            let acc = 0;
-            if (m[2] === '#' || m[2] === '♯') acc = 1;
-            else if (m[2] === 'b' || m[2] === 'B' || m[2] === '♭') acc = -1;
-            v = (parseInt(m[3]) + 1) * 12 + base + acc;
-          }
-        }
-        if (v == null || isNaN(v) || v < 0 || v > 127){
-          showToast('ノート名が解釈できません (例: C4, F#3, Bb2)', 'warn', 2500); return;
-        }
-        slot.rootNote = v;
-        // キーマップ範囲が初期値ぽいなら新ルート中心に再調整
-        if (slot.kmHi - slot.kmLo === 24){ slot.kmLo = Math.max(0, v-12); slot.kmHi = Math.min(127, v+12); }
-        renderPcmToneBank();
-        s1kRefresh();
+        s1kShowKeymapMenu(ev, s);
       },
       onClick: () => {
         // アクティブPADに対し このスロットを追加/解除 (マルチサンプル)
@@ -10706,6 +10698,7 @@ function s1kBuildRack(){
   rack.appendChild(sect('SEND', [
     s1kKnob('REV', ()=>fx.revSend, v=>fx.revSend=v, 0, 100, v=>Math.round(v)),
     s1kKnob('DLY', ()=>fx.dlySend, v=>fx.dlySend=v, 0, 100, v=>Math.round(v)),
+    s1kKnob('DST', ()=>fx.distSend ?? 0, v=>fx.distSend=v, 0, 100, v=>Math.round(v)),
   ]));
 
   // COMMON FX (Reverb/Delay)
@@ -10719,6 +10712,11 @@ function s1kBuildRack(){
       s1kKnob('TIME', ()=>s1kFx.dly?s1kFx.dly.delayTime.value*1000:320, v=>{ s1kEnsureFx(); if(s1kFx.dly) s1kFx.dly.delayTime.value = v/1000; }, 30, 1500, v=>Math.round(v)+'ms'),
       s1kKnob('FB',   ()=>s1kFx.dlyFb?Math.round(s1kFx.dlyFb.gain.value*100):35, v=>{ s1kEnsureFx(); if(s1kFx.dlyFb) s1kFx.dlyFb.gain.value = v/100; }, 0, 95, v=>Math.round(v)),
       s1kKnob('WET',  ()=>s1kFx.dlyWet?Math.round(s1kFx.dlyWet.gain.value*100):50, v=>{ s1kEnsureFx(); if(s1kFx.dlyWet) s1kFx.dlyWet.gain.value = v/100; }, 0, 100, v=>Math.round(v)),
+    ]));
+    fxRow.appendChild(sect('DIST', [
+      s1kKnob('DRIVE', ()=>s1kFx.distDrive, v=>{ s1kEnsureFx(); s1kFx.distDrive = v; if(s1kFx.dist) s1kFx.dist.curve = s1kMakeDistCurve(v); }, 0, 100, v=>Math.round(v)),
+      s1kKnob('TONE',  ()=>s1kFx.distPre?Math.round(s1kFx.distPre.gain.value*50):50, v=>{ s1kEnsureFx(); if(s1kFx.distPre) s1kFx.distPre.gain.value = v/50; }, 0, 100, v=>Math.round(v)),
+      s1kKnob('WET',   ()=>s1kFx.distWet?Math.round(s1kFx.distWet.gain.value*100):70, v=>{ s1kEnsureFx(); if(s1kFx.distWet) s1kFx.distWet.gain.value = v/100; }, 0, 100, v=>Math.round(v)),
     ]));
   }
 }
@@ -10837,6 +10835,11 @@ function s1kPlayPadPcm(padIdx, noteName, velocity, when, sustainSec){
     const ds = audioCtx.createGain(); ds.gain.value = fx.dlySend/100;
     panner.connect(ds); ds.connect(s1kFx.dly);
   }
+  // SEND: DIST
+  if ((fx.distSend ?? 0) > 0 && s1kFx.distPre){
+    const xs = audioCtx.createGain(); xs.gain.value = fx.distSend/100;
+    panner.connect(xs); xs.connect(s1kFx.distPre);
+  }
 
   src.start(t0);
   // Release schedule (持続長 + R)
@@ -10853,6 +10856,82 @@ function s1kPlayPadPcm(padIdx, noteName, velocity, when, sustainSec){
   src.onended = () => { try{ lfo && lfo.stop(); }catch(e){} activePcmSources.delete(src); };
   activePcmSources.add(src);
   return src;
+}
+
+// S1K キーマップ行 右クリックメニュー
+const s1kKmMenu = document.createElement('div');
+s1kKmMenu.className = 'ctx-menu';
+document.body.appendChild(s1kKmMenu);
+document.addEventListener('click', () => { s1kKmMenu.style.display = 'none'; });
+function s1kShowKeymapMenu(ev, slotIdx){
+  const slot = state.pcmToneBank[slotIdx];
+  if (!slot) return;
+  s1kKmMenu.innerHTML = '';
+  const t = document.createElement('div');
+  t.style.cssText = 'padding:5px 10px;font-size:9px;color:#c4803a;border-bottom:1px solid #4a2a10;letter-spacing:1px';
+  t.textContent = `S${(slotIdx+1).toString().padStart(2,'0')}: ${slot.name}`;
+  s1kKmMenu.appendChild(t);
+  const addItem = (label, fn) => {
+    const it = document.createElement('div');
+    it.className = 'ctx-item';
+    it.textContent = label;
+    it.onclick = e => { e.stopPropagation(); s1kKmMenu.style.display='none'; fn(); };
+    s1kKmMenu.appendChild(it);
+  };
+  addItem('🎯 ROOT NOTE 設定…', async () => {
+    const cur = slot.rootNote ?? 60;
+    const curName = midiNoteToName(cur);
+    const nm = await mobilePrompt(`S${slotIdx+1} の ROOT NOTE (例: C4, F#3, Bb2, または MIDI番号)\n現: ${curName}`, curName);
+    if (nm === null) return;
+    const ss = String(nm).trim();
+    let v = null;
+    if (/^\d+$/.test(ss)) v = parseInt(ss);
+    else {
+      const m = ss.match(/^([A-Ga-g])([#bB♯♭]?)(-?\d+)$/);
+      if (m){
+        const base = {C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1].toUpperCase()];
+        let acc = 0;
+        if (m[2] === '#' || m[2] === '♯') acc = 1;
+        else if (m[2] === 'b' || m[2] === 'B' || m[2] === '♭') acc = -1;
+        v = (parseInt(m[3]) + 1) * 12 + base + acc;
+      }
+    }
+    if (v == null || isNaN(v) || v < 0 || v > 127){
+      showToast('ノート名が解釈できません (例: C4, F#3, Bb2)', 'warn', 2500); return;
+    }
+    slot.rootNote = v;
+    if (slot.kmHi - slot.kmLo === 24){ slot.kmLo = Math.max(0, v-12); slot.kmHi = Math.min(127, v+12); }
+    renderPcmToneBank();
+    s1kRefresh();
+  });
+  addItem('↺ キーマップを初期化 (ROOT±12)', () => {
+    const root = slot.rootNote ?? 60;
+    slot.kmLo = Math.max(0, root - 12);
+    slot.kmHi = Math.min(127, root + 12);
+    showToast(`S${slotIdx+1} キーマップを初期化`, 'ok', 1500);
+    s1kRefresh();
+    if (typeof updatePianoKeymapOverlay === 'function') updatePianoKeymapOverlay();
+  });
+  addItem('🗑 PCM割り当てを解除 (全PADから外す)', () => {
+    let removed = 0;
+    samplerPads.forEach((p) => {
+      if (Array.isArray(p.slotIds)){
+        const i = p.slotIds.indexOf(slotIdx);
+        if (i >= 0){ p.slotIds.splice(i, 1); removed++; }
+        p.slotIdx = p.slotIds[0] ?? null;
+      }
+      if (p.slotIdx === slotIdx){ p.slotIdx = null; removed++; }
+    });
+    slot.s1kRegistered = false;
+    showToast(`S${slotIdx+1} を ${removed} PAD から解除 / S1K登録解除`, 'ok', 2000);
+    renderPcmToneBank();
+    s1kRefresh();
+    if (typeof updatePianoKeymapOverlay === 'function') updatePianoKeymapOverlay();
+  });
+  s1kKmMenu.style.display = 'block';
+  const cx = ev.clientX ?? 0, cy = ev.clientY ?? 0;
+  s1kKmMenu.style.left = Math.min(cx, window.innerWidth - 260) + 'px';
+  s1kKmMenu.style.top  = Math.min(cy, window.innerHeight - 200) + 'px';
 }
 
 // 鍵盤GUI 右クリック: アクティブPADのスロットのルートノートを設定
