@@ -404,7 +404,7 @@ code { color: var(--green2); font-family: monospace; }
 
 <!-- ===== サイドナビ ===== -->
 <nav id="sidenav">
-  <div class="logo">honodori<span>FM+PSG SYNTH v4.2</span></div>
+  <div class="logo">honodori<span>FM+PSG SYNTH v4.3 (YM2608 hommage)</span></div>
   <div class="nav-sec">はじめに</div>
   <a href="#overview">概要</a>
   <a href="#touch">スマートフォン操作</a>
@@ -421,7 +421,8 @@ code { color: var(--green2); font-family: monospace; }
   <a href="#sub">SUB（サブトラクティブ）</a>
   <a href="#fm">FM 合成</a>
   <a href="#psg">PSG / SSG</a>
-  <a href="#drums">ドラム</a>
+  <a href="#drums">ドラム（HONODORI DRUMS）</a>
+  <a href="#rhythm26">26RY（YM2608内蔵リズム）</a>
   <a href="#pcm">PCM</a>
   <a href="#fx">FX エフェクト</a>
   <div class="nav-sec">上級機能</div>
@@ -571,7 +572,7 @@ code { color: var(--green2); font-family: monospace; }
     <tr><td><code>▶ PLAY</code></td><td>再生開始。再生中は緑でハイライト。再度タップで停止も可。</td></tr>
     <tr><td><code>■ STOP</code></td><td>停止＆先頭に戻る（step 0へリセット）</td></tr>
     <tr><td>BPM 入力欄</td><td>40〜300 BPM。入力してEnterまたはフォーカスを外すと即反映。再生中でも変更可。</td></tr>
-    <tr><td>GAIN スライダー</td><td>マスターボリューム（0〜100%）。デフォルト30%。</td></tr>
+    <tr><td>GAIN スライダー</td><td>マスターボリューム（0〜100%）。デフォルト80%。</td></tr>
     <tr><td><code>💾 SAVE</code></td><td>全設定をJSONファイルとしてダウンロード保存</td></tr>
     <tr><td><code>📂 LOAD</code></td><td>保存したJSONファイルを読み込んで設定を復元</td></tr>
   </table>
@@ -1106,9 +1107,35 @@ code { color: var(--green2); font-family: monospace; }
     <div><h1>PCM サンプラー</h1></div>
   </div>
 
-  <p>WAVファイルを読み込んでシーケンサーで再生するサンプラーです。最大32スロットのトーンバンクを持ちます。</p>
+  <p>WAVファイルを読み込んでシーケンサーで再生するサンプラーです。最大40スロットのトーンバンクを持ち、マイク録音とWAVE編集機能も内蔵します。</p>
 
   <h2>PCMトーンバンク（音色エディタ PCM タブ）</h2>
+  <p>40スロット × 10列×4行のコンパクト表示。各スロットは独立したサンプル・ビット深度・サンプルレート・ゲインを持ちます。</p>
+  <h3>ヘッダボタン</h3>
+  <table>
+    <tr><th>ボタン</th><th>動作</th></tr>
+    <tr><td><code>SAVE</code></td><td>PCM TONEBANKを .hpcmb に保存</td></tr>
+    <tr><td><code>LOAD</code></td><td>.hpcmb を読み込み</td></tr>
+    <tr><td><code>MUCOM BIN</code></td><td>MUCOM88 PCMバイナリ (.bin) を読み込み</td></tr>
+    <tr><td><code>⏺ REC</code></td><td>マイク録音を開始（アクティブSLOTまたは空きSLOT）。再クリックで <code>■ STOP</code></td></tr>
+    <tr><td><code>CLRA</code></td><td>全スロット消去</td></tr>
+  </table>
+
+  <h3>SLOT REC（マイク録音）</h3>
+  <ul>
+    <li>録音停止後、デコード→<b>無音部の自動クロップ</b>（前後の無音を±20msパディングで除去）</li>
+    <li>名前入力ダイアログが開く（デフォルト <code>RECnn</code>、最大12文字）</li>
+    <li>続けて WAVE EDIT 画面が自動で開く</li>
+  </ul>
+
+  <h3>WAVE EDIT（スロット右クリックメニュー → ✂ EDIT WAVE）</h3>
+  <p>波形ビュー上で範囲ドラッグして、TRIM/FADE IN/FADE OUT/REVERSE/GAIN を編集して APPLY で上書き。</p>
+  <ul>
+    <li><b>波形表示</b>: 現在のGAIN・FADE・REVERSE状態を即時反映、クリップ警告の点線も表示</li>
+    <li><b>GAIN</b>: スライダ -10dB〜+10dB（ダブルクリックで0dBリセット）。WAVE EDITのGAIN値は <code>slot.gain</code> と整合化されており、メニューのGAIN設定と一致</li>
+    <li><b>PREVIEW</b>: 編集結果を再生中もスライダ操作で即時反映</li>
+    <li><b>明示クローズ</b>: 外側クリック閉じは無効化、APPLY/CANCELボタンで明示的に終了</li>
+  </ul>
   <div class="ui-mock">
     <span class="ui-mock-label">PCM BANK PANEL</span>
     <div class="mock-panel" style="background:#120d06;border-color:#5a3a10">
@@ -1129,7 +1156,44 @@ code { color: var(--green2); font-family: monospace; }
   </table>
 
   <h2>PCMシーケンサー（シーケンサー PCM タブ）</h2>
-  <p>各ステップでPCMスロット・再生周波数・音量を個別設定できます。周波数はHzで入力（null=デフォルト6kHz相当）。</p>
+  <p>各ステップで <b>SLOT / FREQ / VOL / PAN / ON</b> を個別設定できます。周波数はHzで入力（null=元WAVと同ピッチ）。</p>
+  <ul>
+    <li><b>SLOT</b>: ACT（アクティブスロット）か S1〜S40 を選択</li>
+    <li><b>FREQ</b>: ステップ毎の再生周波数 (2000〜55500Hz)。<code>FILL FREQ</code>/<code>RAMP FREQ</code>/<code>NOTE→FREQ</code> プリセットあり</li>
+    <li><b>VOL</b>: 0〜100%（DEF=100）</li>
+    <li><b>PAN</b>: L100〜C〜R100（YM2608 ADPCMのステレオ制御をオマージュ）</li>
+    <li><b>ON</b>: 連続ONは同一SLOTのグループとして1イベント発音</li>
+  </ul>
+</section>
+
+<!-- ===== 26RY (YM2608 RHYTHM) ===== -->
+<section id="rhythm26">
+  <div class="sec-header">
+    <div class="sec-num">15</div>
+    <div><h1>26RY</h1></div>
+  </div>
+
+  <p>26RYはYM2608リズム音源風のセクションです。</p>
+
+  <h2>6チャンネル構成</h2>
+  <table>
+    <tr><th>CH</th><th>名称</th><th>説明</th></tr>
+    <tr><td>0</td><td>BD</td><td>Bass Drum</td></tr>
+    <tr><td>1</td><td>SD</td><td>Snare Drum</td></tr>
+    <tr><td>2</td><td>TOP</td><td>Top Cymbal</td></tr>
+    <tr><td>3</td><td>HH</td><td>Hi-Hat</td></tr>
+    <tr><td>4</td><td>TOM</td><td>Tom Tom</td></tr>
+    <tr><td>5</td><td>RIM</td><td>Rim Shot</td></tr>
+  </table>
+
+  <h2>シーケンサ（シーケンサーの 26RY タブ）</h2>
+  <p>各チャンネルにステップON行と、CH名・<code>▶</code>試聴・<code>IL</code>(0-31)・<code>PAN</code>(L100/L50/C/R50/R100)・<code>CLR</code> のコントロール行があります。さらにヘッダに全体 <code>MASTER IL</code>(0-63) があります。</p>
+
+  <h2>IL（Instrument Level）について</h2>
+  <p><b>0=最大音量・31=最小</b>、0.75dB/step。MASTER IL は全chに加算されます（こちらは0-63）。</p>
+
+  <h2>HONODORI DRUMS との関係</h2>
+  <p>26RY はYM2608風音色です。</p>
 </section>
 
 <!-- ===== FX ===== -->
@@ -1212,7 +1276,7 @@ code { color: var(--green2); font-family: monospace; }
     <tr><td>FM トーンバンク</td><td>最大400スロット</td><td>FM1〜6のいずれかにアサイン可能。シーケンサーのfmTone行でステップ自動切替。</td></tr>
     <tr><td>PSG（SSG）トーンバンク</td><td>50スロット</td><td>PSG1〜3のいずれかにアサイン可能。</td></tr>
     <tr><td>SUB トーンバンク</td><td>50スロット</td><td>SUBチャンネルの音色をスロットに保存。</td></tr>
-    <tr><td>PCM トーンバンク</td><td>32スロット</td><td>WAVファイルを格納するサンプルバンク。</td></tr>
+    <tr><td>PCM トーンバンク</td><td>40スロット</td><td>WAVファイル / マイク録音 / MUCOM88バイナリ を格納するサンプルバンク。ビット深度・サンプルレート・ゲイン・PAN もスロット毎に保持。</td></tr>
   </table>
 
   <div class="callout">
@@ -1254,7 +1318,7 @@ G L16 %K R %S R %K %K %S R</pre>
     <tr><td><code>A B C</code></td><td>FM1〜3</td><td>MUCOM88形式</td></tr>
     <tr><td><code>H I J</code></td><td>FM4〜6</td><td></td></tr>
     <tr><td><code>D E F</code></td><td>PSG/SSG 1〜3</td><td></td></tr>
-    <tr><td><code>G</code></td><td>ドラム（リズム）</td><td>%K=KICK %S=SNARE %H=HAT %OH=OpenHH</td></tr>
+    <tr><td><code>G</code></td><td>リズム（→ 26RY）</td><td>%K=BD %S=SD %H=HH %TH/%TM/%TL=TOM %OH=TOP %CH=HH %P=PCM</td></tr>
     <tr><td><code>K</code></td><td>ADPCM / PCM</td><td></td></tr>
     <tr><td><code>@0</code> チャンネル</td><td>SUB シンセ</td><td>MMLで指定可能</td></tr>
   </table>
@@ -1277,6 +1341,24 @@ G L16 %K R %S R %K %K %S R</pre>
     <tr><td>デチューン</td><td><code>D-5</code></td><td>セント単位のデチューン</td></tr>
     <tr><td>コメント</td><td><code>; これはコメント</code></td><td></td></tr>
   </table>
+
+  <h2>26RY（リズム）の MML コマンド</h2>
+  <p>G チャンネル内で、各サブキーの IL/PAN を指定できます。設定は以降の <code>%X</code> イベントに継続適用されます。</p>
+  <table>
+    <tr><th>コマンド</th><th>例</th><th>説明</th></tr>
+    <tr><td><code>iX n</code></td><td><code>iK0</code> <code>iS10</code> <code>iTH5</code></td><td>キーX（K/S/H/TH/TM/TL/OH/CH）の IL を 0〜31 で設定（0=最大）</td></tr>
+    <tr><td><code>pX n</code></td><td><code>pK-50</code> <code>pS50</code></td><td>キーX の PAN を -100〜+100 で設定（負=L、正=R）</td></tr>
+  </table>
+  <pre>; 例: kick=中央/最大、snare=右50・少し弱め
+G L16 iK0 pK0 iS6 pS50  %K %K %S %K  %K %K %S R</pre>
+
+  <div class="callout info">
+    <span class="callout-icon">🥁</span>
+    <div class="callout-text">
+      <strong>MMLモードでの26RYタブ</strong><br>
+      MMLモード中もシーケンサーパネルの <code>26RY</code> タブ（および <code>PCM</code> タブ）は表示され、IL/PAN/MASTER IL や ▶試聴をUIから操作できます。他のシーケンスタブはMMLモードでは非表示になります。
+    </div>
+  </div>
 
   <h2>FMP7形式</h2>
   <p>チャンネル行が <code>'A0</code> で始まるとFMP7モードとして自動判別されます。</p>
