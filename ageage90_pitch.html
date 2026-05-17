@@ -11367,7 +11367,7 @@ function renderPolySeq(){
   const roll = document.createElement('div'); roll.className='pseq-roll';
   const grid = document.createElement('div'); grid.className='pseq-grid';
   // C2 .. C6 (5オクターブ × 12 = 60 行 + 1)
-  const loMidi = 36, hiMidi = 84; // C2..C6
+  const loMidi = 12, hiMidi = 108; // C0..C8 (GUI鍵盤レンジに合わせる)
   const rows = hiMidi - loMidi + 1;
   grid.style.gridTemplateColumns = `48px repeat(${len}, minmax(14px,1fr))`;
   grid.style.gridTemplateRows = `16px repeat(${rows}, 13px)`;
@@ -11532,7 +11532,7 @@ setTimeout(() => {
 const tranceState = {
   activeVoice: 'ssaw',
   armPiano: true,
-  sub:  { cut: 35, res: 5,  a: 5,   d: 200, s: 90, r: 200, gain: 80, subMix: 60, drive: 10, glide: 8, sendRev: 10, sendDly: 0,  sendDist: 0 },
+  sub:  { cut: 50, res: 5,  a: 5,   d: 200, s: 90, r: 200, gain: 80, subMix: 70, drive: 22, glide: 8, sawMix: 25, unison: 7, sendRev: 10, sendDly: 0,  sendDist: 0 },
   roll: { cut: 55, res: 30, a: 2,   d: 120, s: 0,  r: 80,  gain: 75, fenv: 70, detune: 8, glide: 4, sendRev: 5,  sendDly: 15, sendDist: 0 },
   pluck:{ mode:'uplift', cut: 65, res: 35, a: 1, d: 150, s: 0, r: 250, gain: 90, fenv: 80, fm: 30, sendRev: 25, sendDly: 50, sendDist: 0 },
 };
@@ -11588,25 +11588,28 @@ function playTranceSub(noteName, velocity, when, sustainSec){
   const hz = noteToHz(noteName);
   const vol = (velocity ?? 100)/127;
 
-  // OSC: sine main + sine sub (-1oct) + tri overtone
-  const o1 = audioCtx.createOscillator(); o1.type='sine'; o1.frequency.value = hz;
-  const o2 = audioCtx.createOscillator(); o2.type='sine'; o2.frequency.value = hz/2;
-  const o3 = audioCtx.createOscillator(); o3.type='triangle'; o3.frequency.value = hz;
+  // OSC: メインsine + ユニゾンsine(±detune cents) + sub sine(-1oct) + tri overtone + saw harmonic
+  const unisonCents = fx.unison ?? 7;
+  const o1  = audioCtx.createOscillator(); o1.type='sine';     o1.frequency.value  = hz; o1.detune.value  = +unisonCents;
+  const o1b = audioCtx.createOscillator(); o1b.type='sine';    o1b.frequency.value = hz; o1b.detune.value = -unisonCents;
+  const o2  = audioCtx.createOscillator(); o2.type='sine';     o2.frequency.value  = hz/2;
+  const o3  = audioCtx.createOscillator(); o3.type='triangle'; o3.frequency.value  = hz;
+  const o4  = audioCtx.createOscillator(); o4.type='sawtooth'; o4.frequency.value  = hz; // 倍音層
   // Glide
   if (_tranceLastFreq.sub && fx.glide > 0){
-    o1.frequency.setValueAtTime(_tranceLastFreq.sub, t0);
+    [o1,o1b,o3,o4].forEach(o => o.frequency.setValueAtTime(_tranceLastFreq.sub, t0));
     o2.frequency.setValueAtTime(_tranceLastFreq.sub/2, t0);
-    o3.frequency.setValueAtTime(_tranceLastFreq.sub, t0);
     const gT = fx.glide/100 * 0.3;
-    o1.frequency.exponentialRampToValueAtTime(hz, t0+gT);
+    [o1,o1b,o3,o4].forEach(o => o.frequency.exponentialRampToValueAtTime(hz, t0+gT));
     o2.frequency.exponentialRampToValueAtTime(hz/2, t0+gT);
-    o3.frequency.exponentialRampToValueAtTime(hz, t0+gT);
   }
   _tranceLastFreq.sub = hz;
+  const mainG = audioCtx.createGain(); mainG.gain.value = 0.5; // o1+o1b は0.5ずつで合算ピーク1.0相当
   const subG = audioCtx.createGain();
   // SUB OSC (hz/2) は 30Hz 未満になるなら ミュート (インフラサウンドの混信→周期クリック源を排除)
   subG.gain.value = (hz/2 < 30) ? 0 : (fx.subMix/100);
-  const triG = audioCtx.createGain(); triG.gain.value = 0.15;
+  const triG = audioCtx.createGain(); triG.gain.value = 0.22; // 旧 0.15 → 倍音強化
+  const sawG = audioCtx.createGain(); sawG.gain.value = (fx.sawMix ?? 0)/100 * 0.5;
   // Drive (waveshaper for warmth) — drive=0 ならスキップで余計なノード削減
   let shaper = null;
   if ((fx.drive ?? 0) > 0){
@@ -11623,21 +11626,24 @@ function playTranceSub(noteName, velocity, when, sustainSec){
   lpf.Q.value = fx.res/100 * 6;
   // AMP
   const amp = audioCtx.createGain();
-  const peak = (fx.gain/100) * vol * 0.9;
+  const peak = (fx.gain/100) * vol * 1.6;
   const sus = peak * (fx.s/100);
   amp.gain.setValueAtTime(0.0001, t0);
   amp.gain.exponentialRampToValueAtTime(Math.max(0.0001,peak), t0 + fx.a/1000);
   amp.gain.exponentialRampToValueAtTime(Math.max(0.0001,sus),  t0 + fx.a/1000 + fx.d/1000);
   const pan = audioCtx.createStereoPanner(); pan.pan.value = 0;
   // wiring
-  o1.connect(amp); o2.connect(subG); subG.connect(amp); o3.connect(triG); triG.connect(amp);
+  o1.connect(mainG); o1b.connect(mainG); mainG.connect(amp);
+  o2.connect(subG); subG.connect(amp);
+  o3.connect(triG); triG.connect(amp);
+  o4.connect(sawG); sawG.connect(amp);
   if (shaper){ amp.connect(shaper); shaper.connect(hpf); }
   else { amp.connect(hpf); }
   hpf.connect(lpf); lpf.connect(pan);
   pan.connect(masterGainNode);
   _tranceSend(pan, fx);
-  o1.start(t0); o2.start(t0); o3.start(t0);
-  const nodeEntry = { amp, oscs:[o1,o2,o3] };
+  o1.start(t0); o1b.start(t0); o2.start(t0); o3.start(t0); o4.start(t0);
+  const nodeEntry = { amp, oscs:[o1,o1b,o2,o3,o4] };
   const releaseFn = (relT) => {
     const tr = relT ?? audioCtx.currentTime;
     if (typeof amp.gain.cancelAndHoldAtTime === 'function') amp.gain.cancelAndHoldAtTime(tr);
@@ -11648,7 +11654,7 @@ function playTranceSub(noteName, velocity, when, sustainSec){
     amp.gain.setValueAtTime(0, relEnd + 0.001);
     // 0 ホールド時間を十分に取ってからオシレータ停止 (重なりノートのフェーズ整列待ち)
     const stopT = relEnd + 0.10;
-    try{ o1.stop(stopT); o2.stop(stopT); o3.stop(stopT); }catch(e){}
+    try{ o1.stop(stopT); o1b.stop(stopT); o2.stop(stopT); o3.stop(stopT); o4.stop(stopT); }catch(e){}
     txAllNodes.delete(nodeEntry);
   };
   if (sustainSec && sustainSec > 0){
@@ -11918,9 +11924,11 @@ function buildTrancePanel(){
   ]));
   if (tranceState.activeVoice === 'sub'){
     rack.appendChild(sect('SUB', [
-      K('SUB', ()=>fx.subMix, v=>fx.subMix=v, 0, 100, v=>Math.round(v)),
-      K('DRV', ()=>fx.drive, v=>fx.drive=v, 0, 100, v=>Math.round(v)),
-      K('GLIDE', ()=>fx.glide, v=>fx.glide=v, 0, 100, v=>Math.round(v)),
+      K('SUB',  ()=>fx.subMix, v=>fx.subMix=v, 0, 100, v=>Math.round(v)),
+      K('SAW',  ()=>fx.sawMix ?? 0, v=>fx.sawMix=v, 0, 100, v=>Math.round(v)),
+      K('UNI',  ()=>fx.unison ?? 0, v=>fx.unison=v, 0, 30, v=>Math.round(v)+'¢'),
+      K('DRV',  ()=>fx.drive, v=>fx.drive=v, 0, 100, v=>Math.round(v)),
+      K('GLIDE',()=>fx.glide, v=>fx.glide=v, 0, 100, v=>Math.round(v)),
     ]));
   } else if (tranceState.activeVoice === 'roll'){
     rack.appendChild(sect('VOICE', [
