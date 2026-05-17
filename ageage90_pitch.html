@@ -11603,12 +11603,20 @@ function playTranceSub(noteName, velocity, when, sustainSec){
     o3.frequency.exponentialRampToValueAtTime(hz, t0+gT);
   }
   _tranceLastFreq.sub = hz;
-  const subG = audioCtx.createGain(); subG.gain.value = fx.subMix/100;
+  const subG = audioCtx.createGain();
+  // SUB OSC (hz/2) は 30Hz 未満になるなら ミュート (インフラサウンドの混信→周期クリック源を排除)
+  subG.gain.value = (hz/2 < 30) ? 0 : (fx.subMix/100);
   const triG = audioCtx.createGain(); triG.gain.value = 0.15;
-  // Drive (waveshaper for warmth)
-  const shaper = audioCtx.createWaveShaper();
-  shaper.curve = s1kMakeDistCurve(fx.drive);
-  shaper.oversample = '2x';
+  // Drive (waveshaper for warmth) — drive=0 ならスキップで余計なノード削減
+  let shaper = null;
+  if ((fx.drive ?? 0) > 0){
+    shaper = audioCtx.createWaveShaper();
+    shaper.curve = s1kMakeDistCurve(fx.drive);
+    shaper.oversample = '2x';
+  }
+  // HPF: サブソニック除去 (低音重ね打ち時の周期的ポップ防止) — 固定 35Hz
+  const hpf = audioCtx.createBiquadFilter(); hpf.type='highpass';
+  hpf.frequency.value = 35; hpf.Q.value = 0.5;
   // LPF
   const lpf = audioCtx.createBiquadFilter(); lpf.type='lowpass';
   lpf.frequency.value = 60 + (fx.cut/100) * 2000; // sub範囲
@@ -11623,7 +11631,9 @@ function playTranceSub(noteName, velocity, when, sustainSec){
   const pan = audioCtx.createStereoPanner(); pan.pan.value = 0;
   // wiring
   o1.connect(amp); o2.connect(subG); subG.connect(amp); o3.connect(triG); triG.connect(amp);
-  amp.connect(shaper); shaper.connect(lpf); lpf.connect(pan);
+  if (shaper){ amp.connect(shaper); shaper.connect(hpf); }
+  else { amp.connect(hpf); }
+  hpf.connect(lpf); lpf.connect(pan);
   pan.connect(masterGainNode);
   _tranceSend(pan, fx);
   o1.start(t0); o2.start(t0); o3.start(t0);
@@ -11633,19 +11643,20 @@ function playTranceSub(noteName, velocity, when, sustainSec){
     if (typeof amp.gain.cancelAndHoldAtTime === 'function') amp.gain.cancelAndHoldAtTime(tr);
     else { amp.gain.cancelScheduledValues(tr); amp.gain.setValueAtTime(amp.gain.value, tr); }
     const relEnd = tr + Math.max(0.005, fx.r/1000);
-    amp.gain.exponentialRampToValueAtTime(0.0001, relEnd);
-    amp.gain.linearRampToValueAtTime(0, relEnd + 0.015); // 0までフラット線形
-    amp.gain.setValueAtTime(0, relEnd + 0.020);          // 念のため0固定
-    const stopT = relEnd + 0.05;
+    // 純線形リリース(指数→線形混在による傾き不連続を回避): 現値→0 まで一発
+    amp.gain.linearRampToValueAtTime(0, relEnd);
+    amp.gain.setValueAtTime(0, relEnd + 0.001);
+    // 0 ホールド時間を十分に取ってからオシレータ停止 (重なりノートのフェーズ整列待ち)
+    const stopT = relEnd + 0.10;
     try{ o1.stop(stopT); o2.stop(stopT); o3.stop(stopT); }catch(e){}
     txAllNodes.delete(nodeEntry);
   };
   if (sustainSec && sustainSec > 0){
     releaseFn(t0 + sustainSec);
-    txRegisterNode(nodeEntry, t0 + sustainSec + Math.max(0.005, fx.r/1000) + 0.05);
+    txRegisterNode(nodeEntry, t0 + sustainSec + Math.max(0.005, fx.r/1000) + 0.10);
   } else {
     activeTranceNodes.set(noteName, { release: releaseFn });
-    txRegisterNode(nodeEntry, t0 + 60); // 押下中: 大きめタイマー (release で個別削除)
+    txRegisterNode(nodeEntry, t0 + 60);
   }
 }
 
