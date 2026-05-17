@@ -1552,6 +1552,7 @@ function createEmptySeqData(stepLen) {
       on:    Array(stepLen).fill(false),
       tie:   Array(stepLen).fill(false),
       pan:   Array(stepLen).fill(0),
+      arp:   { on:false, mode:'up', rate:1, octaves:1, gate:90 },
     },
     subTone: { on: Array(stepLen).fill(false), slot: Array(stepLen).fill(-1) },
     // SSAW チャンネルFXセンドシーケンス (null=ミキサー値使用)
@@ -1579,12 +1580,13 @@ function createEmptySeqData(stepLen) {
       holds: Array(stepLen).fill(null).map(() => []), // POLY SEQ HOLD
       vol:   Array(stepLen).fill(80),
       pan:   Array(stepLen).fill(0),
+      arp:   { on:false, mode:'up', rate:1, octaves:1, gate:90 },
     })),
     // TRANCE SYNTH (TX) シーケンス: SUB / ROLL / PLUCK (sub と同形式)
     txSeq: {
-      sub:   { on: Array(stepLen).fill(false), notes: Array(stepLen).fill(null).map(()=>[]), holds: Array(stepLen).fill(null).map(()=>[]), vols: Array(stepLen).fill(80) },
-      roll:  { on: Array(stepLen).fill(false), notes: Array(stepLen).fill(null).map(()=>[]), holds: Array(stepLen).fill(null).map(()=>[]), vols: Array(stepLen).fill(80) },
-      pluck: { on: Array(stepLen).fill(false), notes: Array(stepLen).fill(null).map(()=>[]), holds: Array(stepLen).fill(null).map(()=>[]), vols: Array(stepLen).fill(80) },
+      sub:   { on: Array(stepLen).fill(false), notes: Array(stepLen).fill(null).map(()=>[]), holds: Array(stepLen).fill(null).map(()=>[]), vols: Array(stepLen).fill(80), arp: { on:false, mode:'up', rate:1, octaves:1, gate:90 } },
+      roll:  { on: Array(stepLen).fill(false), notes: Array(stepLen).fill(null).map(()=>[]), holds: Array(stepLen).fill(null).map(()=>[]), vols: Array(stepLen).fill(80), arp: { on:false, mode:'up', rate:1, octaves:1, gate:90 } },
+      pluck: { on: Array(stepLen).fill(false), notes: Array(stepLen).fill(null).map(()=>[]), holds: Array(stepLen).fill(null).map(()=>[]), vols: Array(stepLen).fill(80), arp: { on:false, mode:'up', rate:1, octaves:1, gate:90 } },
     },
     // CHORD シーケンス (4パッド共通 or パッドごと選択)
     chordSeq: {
@@ -3387,7 +3389,7 @@ function scheduleStep() {
       if (subFs.comp.on[step] && subFs.comp.vals[step] != null) state.mix.sendCompSub = subFs.comp.vals[step];
     }
 
-    // ===== SSAW 演奏 (和音 + HOLD対応) =====
+    // ===== SSAW 演奏 (和音 + HOLD対応) — ARP は APPLY で実データ書き込み済 =====
     {
       const nArr = seq.sub.notes[step] || [];
       const hArr = seq.sub.holds ? (seq.sub.holds[step] || []) : [];
@@ -3431,16 +3433,15 @@ function scheduleStep() {
         if (!tx || !tx.on[step]) return;
         const nArr = tx.notes[step] || [];
         const hArr = Array.isArray(tx.holds) ? (tx.holds[step] || []) : [];
+        const vol = (tx.vols && tx.vols[step] != null) ? tx.vols[step] : 80;
         nArr.forEach(nm => {
-          if (hArr.includes(nm)) return; // 持続: 頭ではない
-          // 後続HOLD連続数で持続長計算
+          if (hArr.includes(nm)) return;
           let holdLen = 1;
           for (let k=step+1; k<stepLen; k++){
             const nk = tx.notes[k] || [];
             const hk = Array.isArray(tx.holds) ? (tx.holds[k] || []) : [];
             if (tx.on[k] && nk.includes(nm) && hk.includes(nm)) holdLen++; else break;
           }
-          const vol = (tx.vols && tx.vols[step] != null) ? tx.vols[step] : 80;
           if (typeof playTranceVoice === 'function'){
             playTranceVoice(nm, Math.round(vol*1.27), swungTime, stepDur*holdLen, tm.voice);
           }
@@ -3516,6 +3517,8 @@ function scheduleStep() {
 
         // POLY SEQ HOLD: 持続音は再トリガしない / 頭ノートは後続HOLD連続数だけ持続
         const holdArr = Array.isArray(str.holds?.[step]) ? str.holds[step] : [];
+        const v127 = Math.max(1, Math.min(127, Math.round((volPct ?? 80) * 1.27)));
+        {
         noteArr.forEach(noteName => {
           if (holdArr.includes(noteName)) return;
           let holdLen = 1;
@@ -3527,9 +3530,9 @@ function scheduleStep() {
             if (nk.includes(noteName) && hk.includes(noteName)) holdLen++;
             else break;
           }
-          const v127 = Math.max(1, Math.min(127, Math.round((volPct ?? 80) * 1.27)));
           s1kPlayPadPcm(p, noteName, v127, swungTime, stepDur * holdLen);
         });
+        }
       }
     }
 
@@ -3599,6 +3602,8 @@ function stopPlay() {
     activePcmSources.forEach(src => { try { src.stop(); } catch(e){} });
     activePcmSources.clear();
   }
+  // 全TX(SUB/ROLL/PLUCK)ノードをフェードアウトで停止
+  if (typeof txStopAll === 'function') txStopAll();
   if (activeSubNode) {
     try { activeSubNode.oscs.forEach(o => o.stop(audioCtx.currentTime + 0.05)); } catch(e){}
     activeSubNode = null;
@@ -11108,6 +11113,135 @@ function polySeqResolveTarget(padIdx){
   if (padIdx === -4) return seq.txSeq?.pluck|| null;
   return seq.samplerSeq ? seq.samplerSeq[padIdx] : null;
 }
+// アルペジエーター ヘルパ
+// arp: { on, mode:'up'|'down'|'updn'|'rand'|'as-is', rate:N, octaves:1-4, gate:0-100 }
+// 直近の和音入力ステップを見つける
+function findArpSource(target, step){
+  if (!target || !target.on) return -1;
+  for (let k = step; k >= 0; k--){
+    if (!target.on[k]) continue;
+    const ns = target.notes?.[k];
+    if (Array.isArray(ns) && ns.length > 0) return k;
+  }
+  return -1;
+}
+// ソート + オクターブ展開 + モード適用
+function buildArpSequence(noteArr, arp){
+  const baseMidi = noteArr.map(n => noteNameToMidi(n)).filter(m => m != null && !isNaN(m)).sort((a,b)=>a-b);
+  if (baseMidi.length === 0) return { seq:[], wrap:true };
+  const oct = Math.max(1, Math.min(4, arp.octaves|0));
+  let pool = [];
+  for (let o=0; o<oct; o++) baseMidi.forEach(m => pool.push(m + o*12));
+  if (arp.mode === 'down')  return { seq: pool.slice().reverse(), wrap:true };
+  if (arp.mode === 'updn')  return { seq: pool.concat(pool.slice(1,-1).reverse()), wrap:true };
+  if (arp.mode === 'rand')  return { seq: pool.slice(), wrap:true };
+  if (arp.mode === 'as-is') return { seq: baseMidi.slice(), wrap:true };
+  if (arp.mode === 'phrased-up'){
+    // OCT=1: 1相だけ (pool 上昇 → 終わり; 残ステップは無音)
+    // OCT>=2: フレーズ0=pool全部 / フレーズk=pool[k..end] を連結 (k=0..chordLen-1)
+    if (oct <= 1) return { seq: pool.slice(), wrap:false };
+    const N = baseMidi.length;
+    const out = [];
+    for (let k=0; k<N; k++){
+      for (let j=k; j<pool.length; j++) out.push(pool[j]);
+    }
+    return { seq: out, wrap:false };
+  }
+  return { seq: pool.slice(), wrap:true }; // 'up'
+}
+// 指定ステップ (経過数 stepsElapsed) の arp 発音をスケジュール
+function scheduleArpStep(sourceNotes, arp, when, stepDur, stepsElapsed, playFn){
+  if (!arp || !arp.on) return;
+  const { seq, wrap } = buildArpSequence(sourceNotes, arp);
+  if (seq.length === 0) return;
+  const rate = Math.max(1, Math.min(16, arp.rate|0));
+  const subDur = stepDur / rate;
+  const gate = Math.max(5, Math.min(100, arp.gate ?? 80)) / 100;
+  const baseIdx = stepsElapsed * rate;
+  for (let i=0; i<rate; i++){
+    let midi;
+    if (arp.mode === 'rand') midi = seq[Math.floor(Math.random()*seq.length)];
+    else {
+      const idx = baseIdx + i;
+      midi = wrap ? seq[idx % seq.length] : (idx < seq.length ? seq[idx] : null);
+    }
+    if (midi == null) continue; // no-wrap で末尾を越えた: 無音
+    const nm = midiNoteToName(midi);
+    playFn(nm, when + i*subDur, subDur * gate);
+  }
+}
+
+// ARP APPLY: 直近の和音入力をソースとして、ソースから末尾までを arp 展開し
+// notes[step]/on[step] を実データとして書き込む (元の和音は置換)
+function arpApplyToTarget(target, stepLen){
+  if (!target || !target.arp) return false;
+  const arp = target.arp;
+  let src = -1;
+  for (let s=0; s<stepLen; s++){
+    if (target.on[s] && Array.isArray(target.notes[s]) && target.notes[s].length>0){ src = s; break; }
+  }
+  if (src < 0) return false;
+  const sourceNotes = target.notes[src].slice();
+  const { seq, wrap } = buildArpSequence(sourceNotes, arp);
+  if (seq.length === 0) return false;
+  // src..末尾 を一旦クリア
+  for (let s=src; s<stepLen; s++){
+    target.on[s] = false;
+    target.notes[s] = [];
+    if (Array.isArray(target.holds)) target.holds[s] = [];
+  }
+  const N = stepLen - src;
+  for (let i=0; i<N; i++){
+    let midi;
+    if (arp.mode === 'rand') midi = seq[Math.floor(Math.random()*seq.length)];
+    else midi = wrap ? seq[i % seq.length] : (i < seq.length ? seq[i] : null);
+    if (midi == null) break;
+    const nm = midiNoteToName(midi);
+    target.notes[src+i] = [nm];
+    target.on[src+i] = true;
+  }
+  return true;
+}
+
+// (旧)GUI表示用: 各ステップで arp が鳴らすノート名配列を計算 ※APPLY方式に変更後は未使用
+function computeArpDisplay(target, arp, stepLen){
+  // 戻り値: Map<step, [noteName...]>
+  const map = new Map();
+  if (!arp || !arp.on || !target) return map;
+  // 全ソースステップ (on=true かつ notes 非空) を昇順に
+  const sources = [];
+  for (let s=0; s<stepLen; s++){
+    if (target.on[s] && Array.isArray(target.notes?.[s]) && target.notes[s].length>0) sources.push(s);
+  }
+  if (sources.length === 0) return map;
+  for (let s=0; s<stepLen; s++){
+    // 直近のソース
+    let src = -1;
+    for (let i=sources.length-1; i>=0; i--){ if (sources[i] <= s){ src = sources[i]; break; } }
+    if (src < 0) continue;
+    // 次ソース直前まで描画
+    const nextSrc = sources.find(x => x > src);
+    if (nextSrc != null && s >= nextSrc) continue; // 次フェーズが始まる
+    const { seq, wrap } = buildArpSequence(target.notes[src], arp);
+    if (seq.length === 0) continue;
+    const rate = Math.max(1, Math.min(16, arp.rate|0));
+    const elapsed = s - src;
+    const baseIdx = elapsed * rate;
+    const notesHere = [];
+    for (let i=0; i<rate; i++){
+      let midi;
+      if (arp.mode === 'rand') midi = seq[0]; // ランダムは代表だけ表示
+      else {
+        const idx = baseIdx + i;
+        midi = wrap ? seq[idx % seq.length] : (idx < seq.length ? seq[idx] : null);
+      }
+      if (midi != null) notesHere.push(midiNoteToName(midi));
+    }
+    if (notesHere.length) map.set(s, notesHere);
+  }
+  return map;
+}
+
 function polySeqPadLabel(padIdx){
   if (padIdx === -1) return 'SSAW';
   if (padIdx === -2) return 'SUB';
@@ -11179,6 +11313,52 @@ function renderPolySeq(){
   };
   tb.appendChild(clr);
   wrap.appendChild(tb);
+
+  // ===== ARPEGGIATOR (入力補助: APPLY で実データに書き込み) =====
+  const tgtForArp = polySeqResolveTarget(polySeqActivePad);
+  if (tgtForArp){
+    if (!tgtForArp.arp) tgtForArp.arp = { on:false, mode:'up', rate:1, octaves:1, gate:90 };
+    const arp = tgtForArp.arp;
+    const arpBar = document.createElement('div');
+    arpBar.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#251608;border:1px solid #553a1a;border-radius:3px;padding:4px 8px;font-family:monospace;font-size:9px;color:#fc8';
+    const arpLbl = document.createElement('span'); arpLbl.style.cssText='font-weight:bold;letter-spacing:2px;color:#c4803a'; arpLbl.textContent='ARP';
+    arpBar.appendChild(arpLbl);
+    const mkArpSel = (label, vals, getCur, onCh) => {
+      const w = document.createElement('label'); w.style.cssText='display:flex;align-items:center;gap:3px';
+      const l = document.createElement('span'); l.style.color='#fc8'; l.textContent=label;
+      const sel = document.createElement('select');
+      sel.style.cssText='background:#1a1006;color:#fc8;border:1px solid #553a1a;font-family:monospace;font-size:9px;padding:1px 3px';
+      vals.forEach(v => {
+        const o = document.createElement('option');
+        const val = Array.isArray(v) ? v[0] : v;
+        const txt = Array.isArray(v) ? v[1] : v;
+        o.value = val; o.textContent = txt;
+        if (val == getCur()) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.onchange = e => { onCh(e.target.value); };
+      w.appendChild(l); w.appendChild(sel); return w;
+    };
+    arpBar.appendChild(mkArpSel('MODE', [['up','UP'],['down','DOWN'],['updn','UP-DN'],['rand','RAND'],['as-is','AS-IS'],['phrased-up','PHRASED-UP']], ()=>arp.mode, v=>{ arp.mode=v; }));
+    arpBar.appendChild(mkArpSel('OCT',  [[1,'1'],[2,'2'],[3,'3'],[4,'4']], ()=>arp.octaves, v=>{ arp.octaves=parseInt(v); }));
+    // APPLY ボタン
+    const applyBtn = document.createElement('button');
+    applyBtn.style.cssText = 'font-family:monospace;font-size:9px;padding:2px 12px;border-radius:2px;cursor:pointer;background:#c4803a;color:#1a1006;border:1px solid #fc8;font-weight:bold;letter-spacing:1px';
+    applyBtn.textContent = 'APPLY';
+    applyBtn.onclick = () => {
+      const ok = arpApplyToTarget(tgtForArp, len);
+      if (!ok){ showToast('和音入力ステップが見つかりません (まず和音をPOLY SEQに入力)', 'warn', 2200); return; }
+      showToast(`ARP 適用: ${arp.mode.toUpperCase()} / OCT ${arp.octaves}`, 'ok', 1500);
+      renderPolySeq();
+    };
+    arpBar.appendChild(applyBtn);
+    // ヒント
+    const hint = document.createElement('span');
+    hint.style.cssText = 'color:#888;font-size:8px;margin-left:auto';
+    hint.textContent = '使い方: ① 最初に鳴らしたいSTEPに和音をクリック入力 ② APPLY でグリッドに単音展開 (RAND は毎回ランダム / OCT=1は1ループ分のみ)';
+    arpBar.appendChild(hint);
+    wrap.appendChild(arpBar);
+  }
 
   // piano roll
   const roll = document.createElement('div'); roll.className='pseq-roll';
@@ -11354,6 +11534,29 @@ const tranceState = {
   pluck:{ mode:'uplift', cut: 65, res: 35, a: 1, d: 150, s: 0, r: 250, gain: 90, fenv: 80, fm: 30, sendRev: 25, sendDly: 50, sendDist: 0 },
 };
 const activeTranceNodes = new Map(); // noteName -> { release(t), stopAt }
+// 全ての発音中TXノード追跡 (STOP時の強制停止/フェードアウト用)
+const txAllNodes = new Set(); // entries: { amp, oscs }
+function txRegisterNode(entry, stopAt){
+  txAllNodes.add(entry);
+  // 自然終了時に自動削除
+  setTimeout(() => { txAllNodes.delete(entry); }, Math.max(50, (stopAt - (audioCtx?.currentTime ?? 0)) * 1000) + 200);
+}
+// STOP/RESET時に全TXノードを20msフェードアウトしてから停止 (クリック防止)
+function txStopAll(){
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const FADE = 0.02;
+  txAllNodes.forEach(n => {
+    try {
+      const g = n.amp.gain;
+      if (typeof g.cancelAndHoldAtTime === 'function') g.cancelAndHoldAtTime(t);
+      else { g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); }
+      g.linearRampToValueAtTime(0, t + FADE);
+      n.oscs.forEach(o => { try{ o.stop(t + FADE + 0.005); }catch(e){} });
+    } catch(e){}
+  });
+  txAllNodes.clear();
+}
 let _tranceLastFreq = { sub: null, roll: null, pluck: null };
 
 function _tranceSend(panner, fx){
@@ -11421,18 +11624,25 @@ function playTranceSub(noteName, velocity, when, sustainSec){
   pan.connect(masterGainNode);
   _tranceSend(pan, fx);
   o1.start(t0); o2.start(t0); o3.start(t0);
+  const nodeEntry = { amp, oscs:[o1,o2,o3] };
   const releaseFn = (relT) => {
     const tr = relT ?? audioCtx.currentTime;
-    amp.gain.cancelScheduledValues(tr);
-    amp.gain.setValueAtTime(amp.gain.value, tr);
-    amp.gain.exponentialRampToValueAtTime(0.0001, tr + fx.r/1000);
-    const stopT = tr + fx.r/1000 + 0.05;
+    if (typeof amp.gain.cancelAndHoldAtTime === 'function') amp.gain.cancelAndHoldAtTime(tr);
+    else { amp.gain.cancelScheduledValues(tr); amp.gain.setValueAtTime(amp.gain.value, tr); }
+    const relEnd = tr + Math.max(0.005, fx.r/1000);
+    amp.gain.exponentialRampToValueAtTime(0.0001, relEnd);
+    amp.gain.linearRampToValueAtTime(0, relEnd + 0.015); // 0までフラット線形
+    amp.gain.setValueAtTime(0, relEnd + 0.020);          // 念のため0固定
+    const stopT = relEnd + 0.05;
     try{ o1.stop(stopT); o2.stop(stopT); o3.stop(stopT); }catch(e){}
+    txAllNodes.delete(nodeEntry);
   };
   if (sustainSec && sustainSec > 0){
     releaseFn(t0 + sustainSec);
+    txRegisterNode(nodeEntry, t0 + sustainSec + Math.max(0.005, fx.r/1000) + 0.05);
   } else {
     activeTranceNodes.set(noteName, { release: releaseFn });
+    txRegisterNode(nodeEntry, t0 + 60); // 押下中: 大きめタイマー (release で個別削除)
   }
 }
 
@@ -11476,17 +11686,24 @@ function playTranceRoll(noteName, velocity, when, sustainSec){
   pan.connect(masterGainNode);
   _tranceSend(pan, fx);
   o1.start(t0); o2.start(t0);
+  const nodeEntry = { amp, oscs:[o1,o2] };
   const releaseFn = (relT) => {
     const tr = relT ?? audioCtx.currentTime;
-    amp.gain.cancelScheduledValues(tr);
-    amp.gain.setValueAtTime(amp.gain.value, tr);
-    amp.gain.exponentialRampToValueAtTime(0.0001, tr + fx.r/1000);
-    const stopT = tr + fx.r/1000 + 0.05;
+    if (typeof amp.gain.cancelAndHoldAtTime === 'function') amp.gain.cancelAndHoldAtTime(tr);
+    else { amp.gain.cancelScheduledValues(tr); amp.gain.setValueAtTime(amp.gain.value, tr); }
+    const relEnd = tr + Math.max(0.005, fx.r/1000);
+    amp.gain.exponentialRampToValueAtTime(0.0001, relEnd);
+    amp.gain.linearRampToValueAtTime(0, relEnd + 0.015);
+    amp.gain.setValueAtTime(0, relEnd + 0.020);
+    const stopT = relEnd + 0.05;
     try{ o1.stop(stopT); o2.stop(stopT); }catch(e){}
+    txAllNodes.delete(nodeEntry);
   };
   if (sustainSec && sustainSec > 0){
     releaseFn(t0 + sustainSec);
+    txRegisterNode(nodeEntry, t0 + sustainSec + Math.max(0.005, fx.r/1000) + 0.05);
   } else {
+    txRegisterNode(nodeEntry, t0 + 60);
     activeTranceNodes.set(noteName, { release: releaseFn });
   }
 }
