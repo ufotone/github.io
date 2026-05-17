@@ -11190,15 +11190,17 @@ function arpApplyToTarget(target, stepLen){
     target.notes[s] = [];
     if (Array.isArray(target.holds)) target.holds[s] = [];
   }
-  const N = stepLen - src;
-  for (let i=0; i<N; i++){
+  const gap = Math.max(1, Math.min(8, (arp.stepGap|0) || 1)); // 何ステップごとに1音
+  for (let i=0; ; i++){
+    const stepPos = src + i * gap;
+    if (stepPos >= stepLen) break;
     let midi;
     if (arp.mode === 'rand') midi = seq[Math.floor(Math.random()*seq.length)];
     else midi = wrap ? seq[i % seq.length] : (i < seq.length ? seq[i] : null);
     if (midi == null) break;
     const nm = midiNoteToName(midi);
-    target.notes[src+i] = [nm];
-    target.on[src+i] = true;
+    target.notes[stepPos] = [nm];
+    target.on[stepPos] = true;
   }
   return true;
 }
@@ -11341,6 +11343,7 @@ function renderPolySeq(){
     };
     arpBar.appendChild(mkArpSel('MODE', [['up','UP'],['down','DOWN'],['updn','UP-DN'],['rand','RAND'],['as-is','AS-IS'],['phrased-up','PHRASED-UP']], ()=>arp.mode, v=>{ arp.mode=v; }));
     arpBar.appendChild(mkArpSel('OCT',  [[1,'1'],[2,'2'],[3,'3'],[4,'4']], ()=>arp.octaves, v=>{ arp.octaves=parseInt(v); }));
+    arpBar.appendChild(mkArpSel('STEP', [[1,'1step'],[2,'2step'],[3,'3step'],[4,'4step']], ()=>arp.stepGap || 1, v=>{ arp.stepGap=parseInt(v); }));
     // APPLY ボタン
     const applyBtn = document.createElement('button');
     applyBtn.style.cssText = 'font-family:monospace;font-size:9px;padding:2px 12px;border-radius:2px;cursor:pointer;background:#c4803a;color:#1a1006;border:1px solid #fc8;font-weight:bold;letter-spacing:1px';
