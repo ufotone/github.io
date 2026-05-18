@@ -1142,6 +1142,8 @@
     <div class="row">
       <button class="btn" id="saveCfgBtn">SAVE CONFIG</button>
       <button class="btn" id="loadCfgBtn">LOAD CONFIG</button>
+      <button class="btn" id="savePatBtn">SAVE PATTERN</button>
+      <button class="btn" id="loadPatBtn">LOAD PATTERN</button>
       <button class="btn primary" id="savePcmBtn">SAVE PCM BANK</button>
       <button class="btn primary" id="loadPcmBtn">LOAD PCM BANK</button>
       <button class="btn warn" id="resetBtn">RESET ALL</button>
@@ -2524,7 +2526,12 @@ function updateVocoderUI() {
 
 function initAudio() {
   if (audioCtx) return;
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const _AC = window.AudioContext || window.webkitAudioContext;
+  try {
+    audioCtx = new _AC({ sampleRate: 44100 });
+  } catch (_e) {
+    audioCtx = new _AC();
+  }
   masterGainNode = audioCtx.createGain();
   masterGainNode.gain.value = 0.85;
 
@@ -6076,7 +6083,7 @@ function buildPcmBankPanel() {
 
   const desc = document.createElement('div');
   desc.style.cssText = 'font-size:9px;color:#888;margin-bottom:8px';
-  desc.innerHTML = 'クリック=アクティブ選択　右クリック/長押し=メニュー(LOAD/REC/EDIT WAVE/RENAME/STEP/BIT/RATE/GAIN/MATCH STEP/CLEAR)　DEF SRで登録時のサンプリングレートを設定可能';
+  desc.innerHTML = 'クリック=アクティブ選択　右クリック/長押し=メニュー(LOAD/REC/EDIT WAVE/RENAME/STEP/BIT/RATE/MATCH STEP/CLEAR)　DEF SRで登録時のサンプリングレートを設定可能';
   container.appendChild(desc);
 
   // スロットグリッド
@@ -6219,67 +6226,7 @@ function showPcmCtxMenu(e, slotIdx) {
       const nm = await mobilePrompt('音色名:', slot.name);
       if (nm !== null) { slot.name = nm.slice(0, 12); renderPcmToneBank(); }
     }});
-    items.push({ label: `📐 STEPS (現:${slot.slotSteps ?? 1}step)`, action: async () => {
-      const nm = await mobilePrompt('ステップ数(1〜64):', slot.slotSteps ?? 1);
-      if (nm !== null) {
-        const s = Math.max(1, Math.min(64, parseInt(nm) || 1));
-        slot.slotSteps = s; applyPcmSlotStretch(slotIdx); renderPcmToneBank();
-        showToast(`S${slotIdx+1} STEPS → ${s}`, 'ok');
-      }
-    }});
-    if ((slot.initialSlotSteps != null) && slot.slotSteps !== slot.initialSlotSteps) {
-      items.push({ label: `↩ 元のSTEPに戻す (→${slot.initialSlotSteps}step)`, action: () => {
-        slot.slotSteps = slot.initialSlotSteps;
-        applyPcmSlotStretch(slotIdx);
-        renderPcmToneBank();
-        showToast(`S${slotIdx+1} STEPS → ${slot.initialSlotSteps} (元に戻しました)`, 'ok');
-      }});
-    }
-    items.push({ label: `🎚 BIT (現:${slot.bits}b)`, action: async () => {
-      const nm = await mobilePrompt('ビット深度 (1〜16):', slot.bits);
-      if (nm !== null) {
-        const b = Math.max(1, Math.min(16, parseInt(nm) || 16));
-        slot.bits = b; applyPcmSlotBits(slotIdx); renderPcmToneBank();
-      }
-    }});
-    items.push({ label: `🔉 RATE (現:${slot.sampleRate}Hz)`, action: async () => {
-      const nm = await mobilePrompt('サンプリングレート(2000〜48000Hz):', slot.sampleRate);
-      if (nm !== null) {
-        const r = Math.max(2000, Math.min(48000, parseInt(nm) || 16000));
-        slot.sampleRate = r; applyPcmSlotBits(slotIdx); renderPcmToneBank();
-      }
-    }});
-    items.push({ label: `🔊 GAIN (現:${slot.gain ?? 100}%)`, action: async () => {
-      const nm = await mobilePrompt('ゲイン(0〜200%):', slot.gain ?? 100);
-      if (nm !== null) {
-        const g = Math.max(0, Math.min(200, parseInt(nm) || 100));
-        slot.gain = g; renderPcmToneBank();
-      }
-    }});
-    items.push({ label: `⏱ MATCH STEP (${slot.slotSteps ?? 1}に合わせる)`, action: () => {
-      const targetSteps = slot.slotSteps ?? 1;
-      const bank = state.banks[state.currentBank];
-      if (targetSteps === bank.stepLen) {
-        showToast(`既に${targetSteps}stepです`, 'warn');
-        return;
-      }
-      // ステップ数を変更
-      resizeStepLen(bank, targetSteps);
-      bank.stepLen = targetSteps;
-      normalizeBeatGroups(bank);
-      renderSeq();
-      // STEPS入力欄に値を自動入力
-      const customInput = document.getElementById('stepLenCustom');
-      if (customInput) customInput.value = targetSteps;
-      showToast(`Sequencer STEP → ${targetSteps}`, 'ok');
-    }});
-    items.push({ label: `🗑 CLEAR`, action: async () => {
-      releasePcmSlot(slotIdx);
-      renderPcmToneBank();
-      if (state.currentSeqTab === 'pcmseq') renderSeq();
-    }});
     items.push({ label: `📋 COPY (S${slotIdx+1})`, action: () => {
-      // rawBuffer のチャンネルデータを複製して独立したコピーを保持
       const src = state.pcmToneBank[slotIdx];
       const rb = src.rawBuffer;
       const newRaw = audioCtx.createBuffer(rb.numberOfChannels, rb.length, rb.sampleRate);
@@ -6296,14 +6243,37 @@ function showPcmCtxMenu(e, slotIdx) {
       };
       showToast(`S${slotIdx+1} [${src.name}] をコピーしました`, 'ok', 2000);
     }});
-    // ===== MULTI-SAMPLE 設定 =====
-    const _grpSep = document.createElement('div');
-    _grpSep.className = 'ctx-sep';
-    pcmCtxMenu.appendChild(_grpSep);
-    const _grpTitle = document.createElement('div');
-    _grpTitle.style.cssText = 'padding:3px 10px;font-size:8px;color:#888;letter-spacing:1px';
-    _grpTitle.textContent = '── MULTI-SAMPLE ──';
-    pcmCtxMenu.appendChild(_grpTitle);
+    items.push({ label: `📐 STEPS (現:${slot.slotSteps ?? 1}step)`, action: async () => {
+      const nm = await mobilePrompt('ステップ数(1〜64):', slot.slotSteps ?? 1);
+      if (nm !== null) {
+        const s = Math.max(1, Math.min(64, parseInt(nm) || 1));
+        slot.slotSteps = s; applyPcmSlotStretch(slotIdx); renderPcmToneBank();
+        showToast(`S${slotIdx+1} STEPS → ${s}`, 'ok');
+      }
+    }});
+    if ((slot.initialSlotSteps != null) && slot.slotSteps !== slot.initialSlotSteps) {
+      items.push({ label: `↩ 元のSTEPに戻す (→${slot.initialSlotSteps}step)`, action: () => {
+        slot.slotSteps = slot.initialSlotSteps;
+        applyPcmSlotStretch(slotIdx);
+        renderPcmToneBank();
+        showToast(`S${slotIdx+1} STEPS → ${slot.initialSlotSteps} (元に戻しました)`, 'ok');
+      }});
+    }
+    items.push({ label: `⏱ MATCH STEP (${slot.slotSteps ?? 1}に合わせる)`, action: () => {
+      const targetSteps = slot.slotSteps ?? 1;
+      const bank = state.banks[state.currentBank];
+      if (targetSteps === bank.stepLen) {
+        showToast(`既に${targetSteps}stepです`, 'warn');
+        return;
+      }
+      resizeStepLen(bank, targetSteps);
+      bank.stepLen = targetSteps;
+      normalizeBeatGroups(bank);
+      renderSeq();
+      const customInput = document.getElementById('stepLenCustom');
+      if (customInput) customInput.value = targetSteps;
+      showToast(`Sequencer STEP → ${targetSteps}`, 'ok');
+    }});
     const curRoot = slot.rootNote != null ? slot.rootNote : 60;
     const midiToName = m => { const ns=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; return ns[m%12]+(Math.floor(m/12)-1); };
     items.push({ label: `🎵 ROOT NOTE (現: ${midiToName(curRoot)} / MIDI ${curRoot})`, action: async () => {
@@ -6375,13 +6345,35 @@ function showPcmCtxMenu(e, slotIdx) {
         if (typeof s1kRefresh === 'function') s1kRefresh();
       }
     });
+    items.push({ label: `🎚 BIT (現:${slot.bits}b)`, action: async () => {
+      const nm = await mobilePrompt('ビット深度 (1〜16):', slot.bits);
+      if (nm !== null) {
+        const b = Math.max(1, Math.min(16, parseInt(nm) || 16));
+        slot.bits = b; applyPcmSlotBits(slotIdx); renderPcmToneBank();
+      }
+    }});
+    items.push({ label: `🔉 RATE (現:${slot.sampleRate}Hz)`, action: async () => {
+      const nm = await mobilePrompt('サンプリングレート(2000〜48000Hz):', slot.sampleRate);
+      if (nm !== null) {
+        const r = Math.max(2000, Math.min(48000, parseInt(nm) || 16000));
+        slot.sampleRate = r; applyPcmSlotBits(slotIdx); renderPcmToneBank();
+      }
+    }});
+    items.push({ label: `🗑 CLEAR`, action: async () => {
+      releasePcmSlot(slotIdx);
+      renderPcmToneBank();
+      if (state.currentSeqTab === 'pcmseq') renderSeq();
+    }});
+  }
+
+  // COLOR (常時表示)
+  items.push({ label: `🎨 カラー設定${state.pcmSlotColors[slotIdx] ? ' ●' : ''}`, action: () => showPcmSlotColorPicker(slotIdx) });
+  if (state.pcmSlotColors[slotIdx]) {
+    items.push({ label: '✕ カラーをリセット', action: () => { state.pcmSlotColors[slotIdx] = null; renderPcmToneBank(); } });
   }
 
   // PASTE (クリップボードにデータがある場合のみ表示)
   if (pcmClipboard) {
-    const _pasteSep = document.createElement('div');
-    _pasteSep.className = 'ctx-sep';
-    pcmCtxMenu.appendChild(_pasteSep);
     items.push({ label: `📌 PASTE [${pcmClipboard.name}] → S${slotIdx+1}`, action: () => {
       if (!audioCtx) initAudio();
       const cb = pcmClipboard;
@@ -6407,26 +6399,6 @@ function showPcmCtxMenu(e, slotIdx) {
     }});
   }
 
-  // セパレータ + カラー設定
-  const _colorSep = document.createElement('div');
-  _colorSep.className = 'ctx-sep';
-  pcmCtxMenu.appendChild(_colorSep);
-
-  const _colorItem = document.createElement('div');
-  _colorItem.className = 'ctx-item';
-  _colorItem.textContent = `🎨 カラー設定${state.pcmSlotColors[slotIdx] ? ' ●' : ''}`;
-  _colorItem.onclick = (ev) => { ev.stopPropagation(); pcmCtxMenu.style.display = 'none'; showPcmSlotColorPicker(slotIdx); };
-  pcmCtxMenu.appendChild(_colorItem);
-
-  if (state.pcmSlotColors[slotIdx]) {
-    const _clrColorItem = document.createElement('div');
-    _clrColorItem.className = 'ctx-item';
-    _clrColorItem.style.color = '#888';
-    _clrColorItem.textContent = '✕ カラーをリセット';
-    _clrColorItem.onclick = (ev) => { ev.stopPropagation(); pcmCtxMenu.style.display = 'none'; state.pcmSlotColors[slotIdx] = null; renderPcmToneBank(); };
-    pcmCtxMenu.appendChild(_clrColorItem);
-  }
-
   items.forEach(it => {
     const d = document.createElement('div');
     d.className = 'ctx-item';
@@ -6436,8 +6408,13 @@ function showPcmCtxMenu(e, slotIdx) {
   });
 
   pcmCtxMenu.style.display = 'block';
-  pcmCtxMenu.style.left = Math.min(e.clientX || 0, window.innerWidth - 200) + 'px';
-  pcmCtxMenu.style.top = Math.min(e.clientY || 0, window.innerHeight - 360) + 'px';
+  pcmCtxMenu.style.position = 'absolute';
+  const _cx = (e.pageX != null) ? e.pageX : ((e.clientX || 0) + window.scrollX);
+  const _cy = (e.pageY != null) ? e.pageY : ((e.clientY || 0) + window.scrollY);
+  const _maxL = window.scrollX + window.innerWidth  - 200;
+  const _maxT = window.scrollY + window.innerHeight - 360;
+  pcmCtxMenu.style.left = Math.min(_cx, _maxL) + 'px';
+  pcmCtxMenu.style.top  = Math.min(_cy, _maxT) + 'px';
 }
 
 
@@ -6692,15 +6669,25 @@ function openWaveEditor(slotIdx) {
       weCurrentSrc = null;
     }
   }
+  // 編集中ゲイン (dB)。slot.gain(%) を初期値として復元
+  let weGainDb = 20 * Math.log10(Math.max(0.01, (slot.gain ?? 100) / 100));
+  let wePrevGainNode = null;
+  let weGainPulseUntil = 0;
+  let gainAnimRunning = false;
+  let gainRafPending = false;
+  function pulseGain() { weGainPulseUntil = performance.now() + 450; drawWaveform(); }
   function wePlay(audioBuffer) {
     weStop();
     if (!audioCtx) initAudio();
     const s = audioCtx.createBufferSource();
     s.buffer = audioBuffer;
-    s.connect(audioCtx.destination);
+    const gn = audioCtx.createGain();
+    gn.gain.value = Math.pow(10, weGainDb / 20);
+    s.connect(gn); gn.connect(audioCtx.destination);
     s.onended = () => { if (weCurrentSrc === s) weCurrentSrc = null; };
     s.start();
     weCurrentSrc = s;
+    wePrevGainNode = gn;
     return s;
   }
 
@@ -7019,6 +7006,47 @@ function openWaveEditor(slotIdx) {
       ctx2.fillText(`FO ${fadeOutSec.toFixed(2)}s`, selStartX + selWidth - 3, 11);
     }
 
+    // ===== GAIN ピークライン (アニメーション) =====
+    {
+      const lin = Math.pow(10, weGainDb / 20);
+      const clip = lin > 1;
+      const ampNorm = Math.min(1, lin); // クリッピングは1.0で頭打ち
+      const yTopG = (1 - ampNorm) / 2 * H;
+      const yBotG = (1 + ampNorm) / 2 * H;
+      const now = performance.now();
+      const pulseDur = 450;
+      const pulseT = Math.max(0, Math.min(1, (weGainPulseUntil - now) / pulseDur));
+      const baseAlpha = 0.55 + 0.35 * pulseT;
+      const dashOff = (now / 40) % 12;
+      ctx2.save();
+      ctx2.lineWidth = 1 + 1.5 * pulseT;
+      ctx2.setLineDash([6, 4]);
+      ctx2.lineDashOffset = -dashOff;
+      ctx2.strokeStyle = clip ? `rgba(255,80,80,${baseAlpha})` : `rgba(255,210,90,${baseAlpha})`;
+      ctx2.shadowColor = ctx2.strokeStyle;
+      ctx2.shadowBlur = 4 + 8 * pulseT;
+      ctx2.beginPath(); ctx2.moveTo(0, yTopG); ctx2.lineTo(W, yTopG); ctx2.stroke();
+      ctx2.beginPath(); ctx2.moveTo(0, yBotG); ctx2.lineTo(W, yBotG); ctx2.stroke();
+      ctx2.restore();
+      // ラベル
+      ctx2.font = 'bold 9px monospace';
+      ctx2.textAlign = 'left';
+      const pct = Math.round(lin * 100);
+      const label = (weGainDb >= 0 ? '+' : '') + weGainDb.toFixed(1) + 'dB (' + pct + '%)' + (clip ? ' ⚠CLIP' : '');
+      const tw = ctx2.measureText(label).width;
+      ctx2.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx2.fillRect(4, Math.max(0, yTopG - 12), tw + 8, 12);
+      ctx2.fillStyle = clip ? '#ff8080' : '#ffd25a';
+      ctx2.fillText(label, 8, Math.max(9, yTopG - 3));
+      // パルス中またはアニメ継続中は次フレーム要求
+      if (pulseT > 0 || gainAnimRunning) {
+        if (!gainRafPending) {
+          gainRafPending = true;
+          requestAnimationFrame(() => { gainRafPending = false; drawWaveform(); });
+        }
+      }
+    }
+
     // 反転バッジ
     const badges = [];
     if (isReversed) badges.push({ text: '◀ REV', color: '#c8f' });
@@ -7209,6 +7237,53 @@ function openWaveEditor(slotIdx) {
   fadeRow.appendChild(foGroup);
   fadeRow.appendChild(fadeResetBtn);
   box.appendChild(fadeRow);
+
+  // ===== GAIN コントロール行 =====
+  const gainRow = document.createElement('div');
+  gainRow.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 0';
+  const gainLabel = document.createElement('span');
+  gainLabel.style.cssText = 'font-size:9px;color:#888;min-width:52px';
+  gainLabel.textContent = 'GAIN:';
+  const gainSlider = document.createElement('input');
+  gainSlider.type = 'range'; gainSlider.min = -20; gainSlider.max = 20; gainSlider.step = 0.1;
+  gainSlider.value = weGainDb.toFixed(2);
+  gainSlider.style.width = '160px';
+  const gainVal = document.createElement('span');
+  gainVal.style.cssText = 'color:#fc8;font-size:10px;min-width:110px;display:inline-block';
+  const updGainVal = () => {
+    const pct = Math.round(Math.pow(10, weGainDb / 20) * 100);
+    gainVal.textContent = (weGainDb >= 0 ? '+' : '') + weGainDb.toFixed(1) + 'dB (' + pct + '%)';
+    if (wePrevGainNode) wePrevGainNode.gain.value = Math.pow(10, weGainDb / 20);
+  };
+  updGainVal();
+  const clampGainDb = v => Math.max(-20, Math.min(20, v));
+  const setGainDb = v => { weGainDb = clampGainDb(v); gainSlider.value = weGainDb.toFixed(2); updGainVal(); pulseGain(); };
+  gainSlider.oninput = () => { weGainDb = parseFloat(gainSlider.value); updGainVal(); pulseGain(); };
+  gainSlider.ondblclick = () => setGainDb(0);
+  const gainDownBtn = document.createElement('button');
+  gainDownBtn.className = 'btn';
+  gainDownBtn.style.cssText = 'font-size:11px;padding:2px 9px';
+  gainDownBtn.textContent = '− DOWN';
+  gainDownBtn.title = '-0.5dB (Shift:-2dB)';
+  gainDownBtn.onclick = (e) => setGainDb(weGainDb - (e.shiftKey ? 2 : 0.5));
+  const gainUpBtn = document.createElement('button');
+  gainUpBtn.className = 'btn';
+  gainUpBtn.style.cssText = 'font-size:11px;padding:2px 9px';
+  gainUpBtn.textContent = '+ UP';
+  gainUpBtn.title = '+0.5dB (Shift:+2dB)';
+  gainUpBtn.onclick = (e) => setGainDb(weGainDb + (e.shiftKey ? 2 : 0.5));
+  const gainResetBtn = document.createElement('button');
+  gainResetBtn.className = 'btn';
+  gainResetBtn.style.cssText = 'font-size:10px;padding:2px 7px;border-color:#444;color:#aaa';
+  gainResetBtn.textContent = 'RESET';
+  gainResetBtn.onclick = () => setGainDb(0);
+  gainRow.appendChild(gainLabel);
+  gainRow.appendChild(gainDownBtn);
+  gainRow.appendChild(gainSlider);
+  gainRow.appendChild(gainUpBtn);
+  gainRow.appendChild(gainVal);
+  gainRow.appendChild(gainResetBtn);
+  box.appendChild(gainRow);
 
   // ===== 反転コントロール行 =====
   const invertRow = document.createElement('div');
@@ -7524,6 +7599,7 @@ function openWaveEditor(slotIdx) {
     slot.rawBuffer = newBuf;
     slot.buffer = null;
     slot.stretchedBuffer = null;
+    slot.gain = Math.max(0, Math.min(200, Math.round(Math.pow(10, weGainDb / 20) * 100)));
     const stepDur = (60 / state.bpm) / 4;
     slot.slotSteps = Math.max(1, Math.round(newBuf.duration / stepDur));
     applyPcmSlotBits(slotIdx);
@@ -7632,6 +7708,7 @@ function openWaveEditor(slotIdx) {
     slot.rawBuffer = newBuf;
     slot.buffer = null;
     slot.stretchedBuffer = null;
+    slot.gain = Math.max(0, Math.min(200, Math.round(Math.pow(10, weGainDb / 20) * 100)));
     const stepDur = (60 / state.bpm) / 4;
     slot.slotSteps = Math.max(1, Math.round(newBuf.duration / stepDur));
     applyPcmSlotBits(slotIdx);
@@ -8958,10 +9035,10 @@ function makeMixerCh(name, vals, onChange) {
 // PART 7: SAVE / LOAD CONFIG (.json)
 // ============================================================================
 
-function saveConfig() {
+async function saveConfig() {
   const cfg = {
-    _app: 'ageage90',
-    _version: 1,
+    _app: 'ageage90_pcm16',
+    _version: 2,
     _saved: new Date().toISOString(),
     bpm: state.bpm,
     loop: state.loop,
@@ -8976,7 +9053,6 @@ function saveConfig() {
     subActiveTone: state.subActiveTone,
     fx: state.fx,
     mix: state.mix,
-    // PCM TONE BANK は別ファイル(.hpcmb)で保存されるため、ここでは メタ(name/bits/sr/gain)のみ
     pcmToneBankMeta: state.pcmToneBank.map(s => s ? {
       name: s.name, bits: s.bits, sampleRate: s.sampleRate, gain: s.gain,
       groupId: s.groupId ?? null, rootNote: s.rootNote ?? null,
@@ -8987,30 +9063,172 @@ function saveConfig() {
     ssawPadFx: window.__ssawPadFx ? {...window.__ssawPadFx} : null,
     song: { steps: JSON.parse(JSON.stringify(songState.steps)), loop: songState.loop },
   };
-  const json = JSON.stringify(cfg, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'ageage90_pcm16.json';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  showToast('CONFIG 保存完了', 'ok');
+  try {
+    const json = JSON.stringify(cfg);
+    const ab = new TextEncoder().encode(json).buffer;
+    const gz = await gzipAb(ab);
+    const blob = new Blob([gz], { type: 'application/gzip' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'ageage90_pcm16.agag';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`CONFIG 保存完了 (${(gz.byteLength/1024).toFixed(1)}KB)`, 'ok');
+  } catch (err) {
+    showToast('保存失敗: ' + err.message, 'error');
+  }
 }
 
 async function loadConfig() {
   const inp = document.createElement('input');
-  inp.type = 'file'; inp.accept = '.json';
+  inp.type = 'file'; inp.accept = '.agag';
   inp.onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     try {
-      const text = await file.text();
+      const ab = await file.arrayBuffer();
+      const raw = await gunzipAb(ab);
+      const text = new TextDecoder().decode(raw);
       const cfg = JSON.parse(text);
       if (cfg._app !== 'ageage90_pcm16') {
         if (!await mobileConfirm('ageage90_pcm16のCONFIGではない可能性があります。読込を試みますか?')) return;
       }
       applyConfig(cfg);
       showToast('CONFIG 読込完了', 'ok');
+    } catch (err) {
+      showToast('読込失敗: ' + err.message, 'error');
+    }
+  };
+  inp.click();
+}
+
+async function savePattern() {
+  const bi = state.currentBank;
+  const b = state.banks[bi];
+  if (!b) { showToast('PATTERNがありません', 'error'); return; }
+  const pat = {
+    _app: 'ageage90_pcm16_pattern',
+    _version: 1,
+    _saved: new Date().toISOString(),
+    bankIndex: bi,
+    stepLen: b.stepLen,
+    beatGroups: Array.isArray(b.beatGroups) ? [...b.beatGroups] : [4,4,4,4],
+    seqData: b.seqData,
+  };
+  try {
+    const json = JSON.stringify(pat);
+    const ab = new TextEncoder().encode(json).buffer;
+    const gz = await gzipAb(ab);
+    const blob = new Blob([gz], { type: 'application/gzip' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `ageage90_pattern_${String(bi+1).padStart(3,'0')}.apat`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`PATTERN 保存完了 (${(gz.byteLength/1024).toFixed(1)}KB)`, 'ok');
+  } catch (err) {
+    showToast('保存失敗: ' + err.message, 'error');
+  }
+}
+
+async function loadPattern() {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.apat';
+  inp.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const ab = await file.arrayBuffer();
+      const raw = await gunzipAb(ab);
+      const text = new TextDecoder().decode(raw);
+      const pat = JSON.parse(text);
+      if (pat._app !== 'ageage90_pcm16_pattern') {
+        if (!await mobileConfirm('PATTERNファイルではない可能性があります。読込を試みますか?')) return;
+      }
+      // 現在のバンクへロード(applyConfigのbanks処理を流用)
+      const fakeCfg = { banks: [{ stepLen: pat.stepLen, beatGroups: pat.beatGroups, seqData: pat.seqData }] };
+      const bi = state.currentBank;
+      // applyConfigはbanks全体を置換するので、単一バンクだけを差し替える
+      const sl = pat.stepLen || 16;
+      const empty = createEmptySeqData(sl);
+      const sd = pat.seqData || {};
+      if (sd.sub) {
+        empty.sub.notes = _padArr(sd.sub.notes, sl, ['A3']).map(v => Array.isArray(v) ? v : [v ?? 'A3']);
+        empty.sub.vols = _padArr(sd.sub.vols, sl, 80);
+        empty.sub.on = _padArr(sd.sub.on, sl, false);
+        empty.sub.tie = _padArr(sd.sub.tie, sl, false);
+        empty.sub.pan = _padArr(sd.sub.pan, sl, 0);
+      }
+      if (sd.subTone) {
+        empty.subTone.on = _padArr(sd.subTone.on, sl, false);
+        empty.subTone.slot = _padArr(sd.subTone.slot, sl, -1);
+      }
+      if (sd.subFxSend) {
+        ['rev','dist','comp'].forEach(k => {
+          if (sd.subFxSend[k] && empty.subFxSend[k]) {
+            empty.subFxSend[k].on   = _padArr(sd.subFxSend[k].on,   sl, false);
+            empty.subFxSend[k].vals = _padArr(sd.subFxSend[k].vals, sl, null);
+          }
+        });
+      }
+      if (Array.isArray(sd.pcm)) {
+        for (let t = 0; t < 16 && t < sd.pcm.length; t++) {
+          const src = sd.pcm[t];
+          if (!src) continue;
+          empty.pcm[t].on   = _padArr(src.on,   sl, false);
+          empty.pcm[t].slot = _padArr(src.slot,  sl, null);
+          empty.pcm[t].freq = _padArr(src.freq,  sl, null);
+          empty.pcm[t].vol  = _padArr(src.vol,   sl, null);
+          empty.pcm[t].pan  = _padArr(src.pan,   sl, null);
+          ['sendRev','sendDist','sendComp'].forEach(k => {
+            if (src[k] && empty.pcm[t][k]) {
+              empty.pcm[t][k].on   = _padArr(src[k].on,   sl, false);
+              empty.pcm[t][k].vals = _padArr(src[k].vals, sl, null);
+            }
+          });
+        }
+      }
+      if (Array.isArray(sd.samplerSeq)) {
+        for (let t = 0; t < 16 && t < sd.samplerSeq.length; t++) {
+          const src = sd.samplerSeq[t];
+          if (!src) continue;
+          empty.samplerSeq[t].on  = _padArr(src.on,  sl, false);
+          const srcNotes = src.notes ?? (src.note ? src.note.map(n=>[n]) : null);
+          if (srcNotes) {
+            const padded = srcNotes.slice(0, sl).map(n => Array.isArray(n) ? n : [n]);
+            while (padded.length < sl) padded.push([]);
+            empty.samplerSeq[t].notes = padded;
+          }
+          if (Array.isArray(src.holds)){
+            const hpadded = src.holds.slice(0, sl).map(h => Array.isArray(h) ? h : []);
+            while (hpadded.length < sl) hpadded.push([]);
+            empty.samplerSeq[t].holds = hpadded;
+          }
+          empty.samplerSeq[t].vol = _padArr(src.vol, sl, 80);
+          empty.samplerSeq[t].pan = _padArr(src.pan, sl, 0);
+        }
+      }
+      if (sd.chordSeq) {
+        if (Array.isArray(sd.chordSeq.steps)) {
+          const padded = sd.chordSeq.steps.slice(0, sl).map(s => ({
+            on: s.on ?? false, root: s.root ?? 'C', type: s.type ?? 'maj',
+            octave: s.octave ?? 4, inv: s.inv ?? 0
+          }));
+          while (padded.length < sl) padded.push({ on: false, root: 'C', type: 'maj', octave: 4, inv: 0 });
+          empty.chordSeq.steps = padded;
+        }
+        if (sd.chordSeq.targetPads != null) empty.chordSeq.targetPads = sd.chordSeq.targetPads;
+        if (sd.chordSeq.targetSsaw != null) empty.chordSeq.targetSsaw = sd.chordSeq.targetSsaw;
+      }
+      state.banks[bi] = {
+        stepLen: sl,
+        beatGroups: Array.isArray(pat.beatGroups) && pat.beatGroups.length > 0 ? pat.beatGroups : [4,4,4,4],
+        seqData: empty,
+      };
+      if (typeof sanitizeAllSeqNotes === 'function') sanitizeAllSeqNotes();
+      buildBankBar();
+      renderSeq();
+      showToast(`PATTERN 読込完了 → Bank ${bi+1}`, 'ok');
     } catch (err) {
       showToast('読込失敗: ' + err.message, 'error');
     }
@@ -9241,28 +9459,28 @@ async function gunzipAb(ab) {
 }
 
 function audioBufToWavAb(audioBuf) {
-  const numCh = audioBuf.numberOfChannels;
+  const numCh = Math.max(1, audioBuf.numberOfChannels);
   const len = audioBuf.length;
   const sr = audioBuf.sampleRate;
-  const mono = new Float32Array(len);
-  for (let c = 0; c < numCh; c++) {
-    const ch = audioBuf.getChannelData(c);
-    for (let i = 0; i < len; i++) mono[i] += ch[i] / numCh;
-  }
-  const dataBytes = len * 2;
+  const channels = [];
+  for (let c = 0; c < numCh; c++) channels.push(audioBuf.getChannelData(c));
+  const blockAlign = numCh * 2;
+  const dataBytes = len * blockAlign;
   const ab = new ArrayBuffer(44 + dataBytes);
   const view = new DataView(ab);
   const w = (o, v, s) => s === 4 ? view.setUint32(o, v, true) : view.setUint16(o, v, true);
   const ws = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
   ws(0, 'RIFF'); w(4, 36 + dataBytes, 4); ws(8, 'WAVE');
-  ws(12, 'fmt '); w(16, 16, 4); w(20, 1, 2); w(22, 1, 2);
-  w(24, sr, 4); w(28, sr * 2, 4); w(32, 2, 2); w(34, 16, 2);
+  ws(12, 'fmt '); w(16, 16, 4); w(20, 1, 2); w(22, numCh, 2);
+  w(24, sr, 4); w(28, sr * blockAlign, 4); w(32, blockAlign, 2); w(34, 16, 2);
   ws(36, 'data'); w(40, dataBytes, 4);
   let off = 44;
   for (let i = 0; i < len; i++) {
-    const s = Math.max(-1, Math.min(1, mono[i]));
-    view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-    off += 2;
+    for (let c = 0; c < numCh; c++) {
+      const s = Math.max(-1, Math.min(1, channels[c][i]));
+      view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      off += 2;
+    }
   }
   return ab;
 }
@@ -9302,7 +9520,7 @@ async function savePcmToneBank() {
   const blob = new Blob([json], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = 'ageage90_pcm.hpcmb';
+  a.href = url; a.download = 'ageage90_pcm.apcm';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
   showToast(`PCM BANK保存: ${done}スロット (失敗 ${failed})`, 'ok');
@@ -9310,7 +9528,7 @@ async function savePcmToneBank() {
 
 async function loadPcmToneBank() {
   const input = document.createElement('input');
-  input.type = 'file'; input.accept = '.hpcmb';
+  input.type = 'file'; input.accept = '.apcm';
   input.onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -9458,6 +9676,8 @@ function init() {
   // SAVE/LOAD
   document.getElementById('saveCfgBtn').onclick = saveConfig;
   document.getElementById('loadCfgBtn').onclick = loadConfig;
+  document.getElementById('savePatBtn').onclick = savePattern;
+  document.getElementById('loadPatBtn').onclick = loadPattern;
   document.getElementById('savePcmBtn').onclick = savePcmToneBank;
   document.getElementById('loadPcmBtn').onclick = loadPcmToneBank;
   document.getElementById('resetBtn').onclick = async () => {
