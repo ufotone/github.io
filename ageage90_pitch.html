@@ -11808,28 +11808,24 @@ function playTranceSub(noteName, velocity, when, sustainSec){
   const hz = noteToHz(noteName);
   const vol = (velocity ?? 100)/127;
 
-  // OSC: メインsine + ユニゾンsine(±detune cents) + sub sine(-1oct) + tri overtone + saw harmonic
-  const unisonCents = fx.unison ?? 7;
-  const o1  = audioCtx.createOscillator(); o1.type='sine';     o1.frequency.value  = hz; o1.detune.value  = +unisonCents;
-  const o1b = audioCtx.createOscillator(); o1b.type='sine';    o1b.frequency.value = hz; o1b.detune.value = -unisonCents;
-  const o2  = audioCtx.createOscillator(); o2.type='sine';     o2.frequency.value  = hz/2;
-  const o3  = audioCtx.createOscillator(); o3.type='triangle'; o3.frequency.value  = hz;
-  const o4  = audioCtx.createOscillator(); o4.type='sawtooth'; o4.frequency.value  = hz; // 倍音層
+  // Moog風 2VCO 構成: square × 2 (片方 -1oct), detune で太さを出す
+  // 旧 5OSC 構成は持続音でフェーズロック → PCMループ感 が出ていたため廃止
+  const detuneCents = fx.unison ?? 7;
+  const o1  = audioCtx.createOscillator(); o1.type='square'; o1.frequency.value = hz;   o1.detune.value = +detuneCents;
+  const o2  = audioCtx.createOscillator(); o2.type='square'; o2.frequency.value = hz/2; o2.detune.value = -detuneCents;
   // Glide
   if (_tranceLastFreq.sub && fx.glide > 0){
-    [o1,o1b,o3,o4].forEach(o => o.frequency.setValueAtTime(_tranceLastFreq.sub, t0));
+    o1.frequency.setValueAtTime(_tranceLastFreq.sub, t0);
     o2.frequency.setValueAtTime(_tranceLastFreq.sub/2, t0);
     const gT = fx.glide/100 * 0.3;
-    [o1,o1b,o3,o4].forEach(o => o.frequency.exponentialRampToValueAtTime(hz, t0+gT));
+    o1.frequency.exponentialRampToValueAtTime(hz, t0+gT);
     o2.frequency.exponentialRampToValueAtTime(hz/2, t0+gT);
   }
   _tranceLastFreq.sub = hz;
-  const mainG = audioCtx.createGain(); mainG.gain.value = 0.5; // o1+o1b は0.5ずつで合算ピーク1.0相当
-  const subG = audioCtx.createGain();
-  // SUB OSC (hz/2) は 30Hz 未満になるなら ミュート (インフラサウンドの混信→周期クリック源を排除)
-  subG.gain.value = (hz/2 < 30) ? 0 : (fx.subMix/100);
-  const triG = audioCtx.createGain(); triG.gain.value = 0.22; // 旧 0.15 → 倍音強化
-  const sawG = audioCtx.createGain(); sawG.gain.value = (fx.sawMix ?? 0)/100 * 0.5;
+  const mainG = audioCtx.createGain(); mainG.gain.value = 0.5;
+  const subG  = audioCtx.createGain();
+  // -1oct square が 30Hz 未満になるならミュート (インフラサウンド回避)
+  subG.gain.value = (hz/2 < 30) ? 0 : Math.max(0.3, (fx.subMix/100));
   // Drive (waveshaper for warmth) — drive=0 ならスキップで余計なノード削減
   let shaper = null;
   if ((fx.drive ?? 0) > 0){
@@ -11853,17 +11849,15 @@ function playTranceSub(noteName, velocity, when, sustainSec){
   amp.gain.exponentialRampToValueAtTime(Math.max(0.0001,sus),  t0 + fx.a/1000 + fx.d/1000);
   const pan = audioCtx.createStereoPanner(); pan.pan.value = 0;
   // wiring
-  o1.connect(mainG); o1b.connect(mainG); mainG.connect(amp);
-  o2.connect(subG); subG.connect(amp);
-  o3.connect(triG); triG.connect(amp);
-  o4.connect(sawG); sawG.connect(amp);
+  o1.connect(mainG); mainG.connect(amp);
+  o2.connect(subG);  subG.connect(amp);
   if (shaper){ amp.connect(shaper); shaper.connect(hpf); }
   else { amp.connect(hpf); }
   hpf.connect(lpf); lpf.connect(pan);
   pan.connect(masterGainNode);
   _tranceSend(pan, fx);
-  o1.start(t0); o1b.start(t0); o2.start(t0); o3.start(t0); o4.start(t0);
-  const nodeEntry = { amp, oscs:[o1,o1b,o2,o3,o4] };
+  o1.start(t0); o2.start(t0);
+  const nodeEntry = { amp, oscs:[o1,o2] };
   const releaseFn = (relT) => {
     const tr = relT ?? audioCtx.currentTime;
     if (typeof amp.gain.cancelAndHoldAtTime === 'function') amp.gain.cancelAndHoldAtTime(tr);
@@ -11874,7 +11868,7 @@ function playTranceSub(noteName, velocity, when, sustainSec){
     amp.gain.setValueAtTime(0, relEnd + 0.001);
     // 0 ホールド時間を十分に取ってからオシレータ停止 (重なりノートのフェーズ整列待ち)
     const stopT = relEnd + 0.10;
-    try{ o1.stop(stopT); o1b.stop(stopT); o2.stop(stopT); o3.stop(stopT); o4.stop(stopT); }catch(e){}
+    try{ o1.stop(stopT); o2.stop(stopT); }catch(e){}
     txAllNodes.delete(nodeEntry);
   };
   if (sustainSec && sustainSec > 0){
