@@ -11692,7 +11692,7 @@ renderSeq = function(){
   btn.onclick = () => {
     open = !open;
     body.style.display = open ? '' : 'none';
-    btn.textContent = open ? '▼' : '▲';
+    btn.textContent = open ? '▼' : '▶';
   };
 })();
 
@@ -11752,8 +11752,8 @@ setTimeout(() => {
 const tranceState = {
   activeVoice: 'ssaw',
   armPiano: true,
-  sub:  { cut: 50, res: 5,  a: 5,   d: 200, s: 90, r: 200, gain: 80, subMix: 70, drive: 22, glide: 8, sawMix: 25, unison: 7, sendRev: 10, sendDly: 0,  sendDist: 0 },
-  roll: { cut: 55, res: 30, a: 2,   d: 120, s: 0,  r: 80,  gain: 75, fenv: 70, detune: 8, glide: 4, sendRev: 5,  sendDly: 15, sendDist: 0 },
+  sub:  { cut: 50, res: 5,  a: 5,   d: 200, s: 90, r: 200, gain: 55, subMix: 70, drive: 22, glide: 8, sawMix: 25, unison: 7, sendRev: 10, sendDly: 0,  sendDist: 0 },
+  roll: { cut: 55, res: 30, a: 2,   d: 120, s: 0,  r: 80,  gain: 65, fenv: 70, detune: 8, glide: 4, sendRev: 5,  sendDly: 15, sendDist: 0 },
   pluck:{ mode:'uplift', cut: 65, res: 35, a: 1, d: 150, s: 0, r: 250, gain: 90, fenv: 80, fm: 30, sendRev: 25, sendDly: 50, sendDist: 0 },
 };
 const activeTranceNodes = new Map(); // noteName -> { release(t), stopAt }
@@ -12115,6 +12115,9 @@ function buildTrancePanel(){
       K('WET',   ()=>sp.ssawRevWet,  v=>{ sp.ssawRevWet=v; if(ssawRevWetGain) ssawRevWetGain.gain.value=v/100; if(ssawDryGain && sp.ssawRevOn) ssawDryGain.gain.value = 1.0 - v/100; }, 0, 100, v=>Math.round(v)),
       K('DECAY', ()=>sp.ssawRevDecay,v=>{ sp.ssawRevDecay=v; if(ssawRevConv && audioCtx) ssawRevConv.buffer = buildReverbIR(v); }, 0.1, 8, v=>v.toFixed(1)+'s'),
       K('PRE',   ()=>sp.ssawRevPreDelay, v=>{ sp.ssawRevPreDelay=v; if(ssawRevPreDelayNode) ssawRevPreDelayNode.delayTime.value=v/1000; }, 0, 150, v=>Math.round(v)+'ms'),
+    ]));
+    rack.appendChild(sect('MIX', [
+      K('GAIN', ()=>state.mix.sub, v=>{ state.mix.sub = v; const sv = document.getElementById('subVolSlider'); if (sv){ sv.value = v; const sl = document.getElementById('subVolSliderVal'); if (sl) sl.textContent = Math.round(v); } }, 0, 100, v=>Math.round(v)),
     ]));
     rack.appendChild(sect('MISC', [
       K('LEN', ()=>sp.length, v=>sp.length=v, 50, 2000, v=>Math.round(v)+'ms'),
