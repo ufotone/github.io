@@ -1146,6 +1146,7 @@
       <button class="btn" id="loadPatBtn">LOAD PATTERN</button>
       <button class="btn primary" id="savePcmBtn">SAVE PCM BANK</button>
       <button class="btn primary" id="loadPcmBtn">LOAD PCM BANK</button>
+      <button class="btn primary" id="loadPcmSelBtn">LOAD PCM (選択)</button>
       <button class="btn warn" id="resetBtn">RESET ALL</button>
     </div>
   </div>
@@ -9526,7 +9527,26 @@ async function savePcmToneBank() {
   showToast(`PCM BANK保存: ${done}スロット (失敗 ${failed})`, 'ok');
 }
 
-async function loadPcmToneBank() {
+function parseSlotSelection(input, available) {
+  if (!input) return null;
+  const set = new Set();
+  const avail = new Set(available);
+  for (const part of input.split(/[,\s]+/)) {
+    if (!part) continue;
+    const m = part.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (m) {
+      let a = parseInt(m[1], 10), b = parseInt(m[2], 10);
+      if (a > b) [a, b] = [b, a];
+      for (let n = a; n <= b; n++) if (avail.has(n - 1)) set.add(n - 1);
+    } else {
+      const n = parseInt(part, 10);
+      if (!isNaN(n) && avail.has(n - 1)) set.add(n - 1);
+    }
+  }
+  return set;
+}
+
+async function loadPcmToneBank(selective = false) {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = '.apcm';
   input.onchange = async (e) => {
@@ -9538,8 +9558,27 @@ async function loadPcmToneBank() {
       if (data._app !== 'ageage90' || data._type !== 'pcmToneBank') {
         showToast('PCM TONE BANKファイルではありません', 'error'); return;
       }
-      const validSlots = (data.slots || []).filter(s => s && s.slot != null && s.wav);
+      let validSlots = (data.slots || []).filter(s => s && s.slot != null && s.wav);
       if (validSlots.length === 0) { showToast('有効データがありません', 'warn'); return; }
+      if (selective) {
+        const list = validSlots
+          .map(s => `S${s.slot + 1}${s.name ? ': ' + s.name : ''}`)
+          .join('\n');
+        const avail = validSlots.map(s => s.slot);
+        const ans = window.prompt(
+          `読み込むスロット番号を指定 (例: 1,3,5-8 / 空欄で全て)\n\n含まれるスロット:\n${list}`,
+          validSlots.map(s => s.slot + 1).join(',')
+        );
+        if (ans === null) { showToast('キャンセルしました', 'warn'); return; }
+        const trimmed = ans.trim();
+        if (trimmed !== '') {
+          const picked = parseSlotSelection(trimmed, avail);
+          if (!picked || picked.size === 0) {
+            showToast('有効なスロット指定がありません', 'warn'); return;
+          }
+          validSlots = validSlots.filter(s => picked.has(s.slot));
+        }
+      }
       if (!audioCtx) initAudio();
       let loaded = 0, failed = 0;
       for (const s of validSlots) {
@@ -9679,7 +9718,8 @@ function init() {
   document.getElementById('savePatBtn').onclick = savePattern;
   document.getElementById('loadPatBtn').onclick = loadPattern;
   document.getElementById('savePcmBtn').onclick = savePcmToneBank;
-  document.getElementById('loadPcmBtn').onclick = loadPcmToneBank;
+  document.getElementById('loadPcmBtn').onclick = () => loadPcmToneBank(false);
+  document.getElementById('loadPcmSelBtn').onclick = () => loadPcmToneBank(true);
   document.getElementById('resetBtn').onclick = async () => {
     if (!await mobileConfirm('全状態をリセットしますか? (PCM TONE BANK含む)')) return;
     location.reload();
