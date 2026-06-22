@@ -195,6 +195,20 @@ button:disabled { color: var(--gray); border-color: var(--gray); box-shadow: non
 }
 .rec-controls { display: flex; flex-direction: column; gap: 4px; }
 .rec-controls #recMeter { width: 100%; height: 24px; }
+.rec-sync { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; cursor: pointer; }
+/* 白黒チェックボックス */
+input[type=checkbox] {
+  -webkit-appearance: none; appearance: none;
+  width: 12px; height: 12px; margin: 0;
+  border: 1px solid var(--black); background: var(--white);
+  border-radius: 0; cursor: pointer; position: relative;
+}
+input[type=checkbox]:checked { background: var(--black); }
+input[type=checkbox]:checked::after {
+  content: ''; position: absolute; left: 3px; top: 0px;
+  width: 3px; height: 7px; border: solid var(--white);
+  border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
 .rec-controls .fw-progress { height: 6px; }
 .group-title {
   font-weight: bold;
@@ -216,6 +230,8 @@ button:disabled { color: var(--gray); border-color: var(--gray); box-shadow: non
 .fw-body ol { margin: 6px 0 10px 18px; padding: 0; }
 .fw-body li { margin: 2px 0; }
 #fwMeter, #recMeter { border: 1px solid var(--black); display: block; margin: 8px 0; background: var(--white); width: 100%; }
+#weCanvas { border: 1px solid var(--black); display: block; margin: 4px 0 6px; background: var(--white); width: 100%; height: 120px; cursor: ew-resize; }
+#waveEditorWindow { max-width: 500px; }
 .fw-progress { border: 1px solid var(--black); height: 12px; background: var(--white); }
 #fwBar { height: 100%; width: 0; background: var(--black); }
 #fwInfo { font-size: 10px; }
@@ -335,7 +351,6 @@ input[type=number], input[type=text], textarea {
   border: 1px solid var(--black); background: var(--white); color: var(--black);
   padding: 2px 4px; border-radius: 0;
 }
-
 </style>
 </head>
 <body>
@@ -391,7 +406,9 @@ input[type=number], input[type=text], textarea {
             <div class="row">
               <button id="recPlay" class="seq-btn" disabled>▶ PLAY</button>
               <button id="recPlayStop" class="seq-btn" disabled>■</button>
+              <label class="rec-sync"><input type="checkbox" id="recSync" checked> SYNC seq</label>
               <button id="recSave" class="seq-btn" disabled>SAVE WAV</button>
+              <button id="recEdit" class="seq-btn" disabled>EDIT</button>
               <button id="recClear" class="seq-btn" disabled>CLEAR</button>
               <button id="recLoad" class="seq-btn">LOAD WAV</button>
               <input type="file" id="recFile" accept="audio/*,.wav" class="hidden">
@@ -454,6 +471,44 @@ input[type=number], input[type=text], textarea {
         <span id="beatTotal" class="hint">16/16</span>
       </div>
       <div class="seq-grid" id="seqGrid"></div>
+    </div>
+  </div>
+
+  <!-- Wave Editor window -->
+  <div class="window dialog hidden" id="waveEditorWindow">
+    <div class="titlebar"><span class="closebox" id="weClose"></span><span class="title">Wave Editor</span></div>
+    <div class="fw-body">
+      <canvas id="weCanvas" width="460" height="120"></canvas>
+      <div class="row">
+        <span id="weDur" class="hint">—</span>
+        <span id="weSel" class="hint"></span>
+      </div>
+      <div class="row">
+        <button id="wePreview" class="seq-btn">▶ PREVIEW SEL</button>
+        <button id="wePreviewStop" class="seq-btn">■</button>
+        <button id="weTrim" class="seq-btn">TRIM to SEL</button>
+      </div>
+      <div class="group-title">TIME STRETCH</div>
+      <div class="row">
+        <label>Ratio %</label>
+        <input type="number" id="weStretchPct" value="100" min="10" max="400" step="1" style="width:64px">
+        <button id="weStretchApply" class="seq-btn">STRETCH</button>
+        <label>or → sec</label>
+        <input type="number" id="weStretchSec" value="1.000" min="0.05" step="0.01" style="width:72px">
+        <button id="weStretchSecApply" class="seq-btn">FIT</button>
+      </div>
+      <div class="group-title">FADE / FX</div>
+      <div class="row">
+        <label>In</label><input type="number" id="weFadeIn" value="0" min="0" step="0.01" style="width:60px">
+        <label>Out</label><input type="number" id="weFadeOut" value="0" min="0" step="0.01" style="width:60px">
+        <button id="weFadeApply" class="seq-btn">APPLY FADE</button>
+      </div>
+      <div class="row">
+        <button id="weReverse" class="seq-btn">REVERSE</button>
+        <button id="weNormalize" class="seq-btn">NORMALIZE</button>
+        <button id="weRevert" class="seq-btn">REVERT</button>
+      </div>
+      <p class="hint">Edits apply to the recorder buffer. Drag the canvas edges to set the trim selection.</p>
     </div>
   </div>
 
@@ -624,9 +679,6 @@ const SINGLE_CC = [
   // Part6
   { select:89, level:90, modamt:96, modrate:97, pitch:98, egatt:99, egrel:100, send:108, pan:114 },
 ];
-
-</script>
-<script>
 // Web MIDI ラッパー
 const MIDI = {
   access: null,
@@ -686,9 +738,6 @@ const MIDI = {
     this.out.send([0x80 | ((ch - 1) & 0x0f), note & 0x7f, 0]);
   },
 };
-
-</script>
-<script>
 // ファームウェア WAV 再生 (Web Audio)
 const Firmware = {
   ctx: null,
@@ -757,9 +806,6 @@ const Firmware = {
     if (this.raf) cancelAnimationFrame(this.raf);
   },
 };
-
-</script>
-<script>
 // ===== WebAudio Recorder (WAV) =====
 // MediaRecorder で PC入力(マイク/ライン)を録音 → decodeAudioData → WAV(PCM16) で保存
 const Recorder = {
@@ -773,6 +819,7 @@ const Recorder = {
   startMs: 0,
   rafMeter: null,
   decodedBuffer: null,   // AudioBuffer (録音結果)
+  sync: true,            // シーケンサー再生と同期
   playSource: null,
   inputs: [],
 
@@ -994,9 +1041,242 @@ const Recorder = {
     if (this.playSource) { try { this.playSource.onended = null; this.playSource.stop(); } catch (e) {} this.playSource = null; }
   },
 };
+// ===== WAVE EDITOR (trim / time-stretch / fade / reverse / normalize) =====
+// アルゴリズムは ageage90 から移植。対象は Recorder.decodedBuffer。
+const WaveEd = {
+  original: null,   // 開いた時点のバッファ (REVERT用)
+  trimStart: 0,     // 0..1
+  trimEnd: 1,
+  playSource: null,
+  canvas: null,
+  cctx: null,
 
-</script>
-<script>
+  buf() { return Recorder.decodedBuffer; },
+
+  open() {
+    if (!Recorder.hasRecording()) return;
+    this.original = this.cloneBuffer(Recorder.decodedBuffer);
+    this.trimStart = 0; this.trimEnd = 1;
+    document.getElementById('waveEditorWindow').classList.remove('hidden');
+    this.canvas = document.getElementById('weCanvas');
+    this.cctx = this.canvas.getContext('2d');
+    this.draw();
+    this.updateInfo();
+  },
+  close() {
+    this.playStop();
+    document.getElementById('waveEditorWindow').classList.add('hidden');
+  },
+
+  cloneBuffer(src) {
+    const ctx = Recorder.ensureCtx();
+    const out = ctx.createBuffer(src.numberOfChannels, src.length, src.sampleRate);
+    for (let c = 0; c < src.numberOfChannels; c++) out.getChannelData(c).set(src.getChannelData(c));
+    return out;
+  },
+
+  // ===== 描画 =====
+  draw() {
+    const cv = this.canvas, ctx = this.cctx;
+    if (!cv) return;
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H);
+    const buf = this.buf(); if (!buf) return;
+    const data = buf.getChannelData(0);
+    const len = data.length;
+    const mid = H / 2;
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(W, mid); ctx.stroke();
+    // 波形 (列ごとにmin/max)
+    ctx.beginPath();
+    for (let x = 0; x < W; x++) {
+      const i0 = Math.floor(x / W * len), i1 = Math.floor((x + 1) / W * len);
+      let mn = 1, mx = -1;
+      for (let i = i0; i < i1; i++) { const v = data[i]; if (v < mn) mn = v; if (v > mx) mx = v; }
+      ctx.moveTo(x + 0.5, mid - mx * mid);
+      ctx.lineTo(x + 0.5, mid - mn * mid);
+    }
+    ctx.stroke();
+    // トリム範囲外を網掛け
+    const xs = this.trimStart * W, xe = this.trimEnd * W;
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(0, 0, xs, H);
+    ctx.fillRect(xe, 0, W - xe, H);
+    // ハンドル
+    ctx.fillStyle = '#000';
+    ctx.fillRect(xs - 1, 0, 2, H);
+    ctx.fillRect(xe - 1, 0, 2, H);
+    ctx.fillRect(xs - 4, 0, 8, 6);
+    ctx.fillRect(xe - 4, H - 6, 8, 6);
+  },
+
+  updateInfo() {
+    const buf = this.buf(); if (!buf) return;
+    const dur = buf.duration;
+    const s = (this.trimStart * dur), e = (this.trimEnd * dur);
+    const set = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+    set('weDur', dur.toFixed(3) + 's / ' + buf.sampleRate + 'Hz / ' + buf.numberOfChannels + 'ch');
+    set('weSel', 'sel: ' + s.toFixed(3) + '–' + e.toFixed(3) + 's (' + (e - s).toFixed(3) + 's)');
+  },
+
+  // ===== トリム =====
+  sliceBuffer(startFrac, endFrac) {
+    const buf = this.buf();
+    const ctx = Recorder.ensureCtx();
+    const s = Math.floor(startFrac * buf.length);
+    const e = Math.max(s + 1, Math.floor(endFrac * buf.length));
+    const len = e - s;
+    const out = ctx.createBuffer(buf.numberOfChannels, len, buf.sampleRate);
+    for (let c = 0; c < buf.numberOfChannels; c++) out.getChannelData(c).set(buf.getChannelData(c).subarray(s, e));
+    return out;
+  },
+  applyTrim() {
+    if (this.trimEnd - this.trimStart < 0.001) return;
+    Recorder.decodedBuffer = this.sliceBuffer(this.trimStart, this.trimEnd);
+    this.trimStart = 0; this.trimEnd = 1;
+    this.afterEdit();
+  },
+
+  // ===== タイムストレッチ (WSOLA, ageage90 olaStretch移植) =====
+  olaStretch(srcBuf, ratio) {
+    const ctx = Recorder.ensureCtx();
+    if (Math.abs(ratio - 1.0) < 0.02) return this.cloneBuffer(srcBuf);
+    const nCh = srcBuf.numberOfChannels, srcLen = srcBuf.length, sr = srcBuf.sampleRate;
+    const grainSize = Math.floor(sr * 0.046);
+    const hopIn = Math.floor(grainSize / 4);
+    const hopOut = Math.floor(hopIn * ratio);
+    const searchRange = Math.floor(hopIn / 2);
+    const dstLen = Math.max(1, Math.floor(srcLen * ratio));
+    const dstBuf = ctx.createBuffer(nCh, dstLen, sr);
+    const win = new Float32Array(grainSize);
+    for (let i = 0; i < grainSize; i++) win[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (grainSize - 1)));
+    const corrLen = Math.floor(grainSize / 2);
+    const ch0 = srcBuf.getChannelData(0);
+    const prevGrain = new Float32Array(corrLen);
+    const offsets = [];
+    let nominalIn = 0, outPos = 0;
+    while (outPos < dstLen) {
+      let bestOffset = nominalIn, bestCorr = -Infinity;
+      const lo = Math.max(0, nominalIn - searchRange);
+      const hi = Math.min(srcLen - 1, nominalIn + searchRange);
+      for (let cand = lo; cand <= hi; cand++) {
+        let acc = 0;
+        for (let i = 0; i < corrLen; i++) { const si = cand + i; acc += (si < srcLen ? ch0[si] : 0) * prevGrain[i]; }
+        if (acc > bestCorr) { bestCorr = acc; bestOffset = cand; }
+      }
+      offsets.push(bestOffset);
+      for (let i = 0; i < corrLen; i++) { const si = bestOffset + i; prevGrain[i] = si < srcLen ? ch0[si] : 0; }
+      nominalIn += hopIn; outPos += hopOut;
+    }
+    for (let ch = 0; ch < nCh; ch++) {
+      const src = srcBuf.getChannelData(ch), dst = dstBuf.getChannelData(ch);
+      let op = 0;
+      for (let gi = 0; gi < offsets.length; gi++) {
+        const inPos = offsets[gi];
+        for (let i = 0; i < grainSize; i++) { if (op + i >= dstLen) break; const si = inPos + i; dst[op + i] += (si < srcLen ? src[si] : 0) * win[i]; }
+        op += hopOut;
+      }
+    }
+    return dstBuf;
+  },
+  applyStretchRatio(ratio) {
+    if (!(ratio > 0)) return;
+    Recorder.decodedBuffer = this.olaStretch(this.buf(), ratio);
+    this.trimStart = 0; this.trimEnd = 1;
+    this.afterEdit();
+  },
+  applyStretchToSeconds(targetSec) {
+    const buf = this.buf();
+    if (!buf || !(targetSec > 0)) return;
+    this.applyStretchRatio(targetSec / buf.duration);
+  },
+
+  // ===== フェード / リバース / ノーマライズ / 極性反転 =====
+  applyFade(fiSec, foSec) {
+    const buf = this.buf(); const sr = buf.sampleRate, len = buf.length;
+    const fi = Math.min(Math.floor(fiSec * sr), len);
+    const fo = Math.min(Math.floor(foSec * sr), len);
+    const fiSafe = Math.min(fi, len - fo);
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = 0; i < fiSafe; i++) d[i] *= i / fiSafe;
+      for (let i = 0; i < fo; i++) d[len - 1 - i] *= i / fo;
+    }
+    this.afterEdit();
+  },
+  reverse() {
+    const buf = this.buf();
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const d = buf.getChannelData(c);
+      let l = 0, r = d.length - 1;
+      while (l < r) { const t = d[l]; d[l++] = d[r]; d[r--] = t; }
+    }
+    this.afterEdit();
+  },
+  normalize() {
+    const buf = this.buf();
+    let peak = 0;
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = 0; i < d.length; i++) { const a = Math.abs(d[i]); if (a > peak) peak = a; }
+    }
+    if (peak < 1e-6) return;
+    const g = 0.99 / peak;
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = 0; i < d.length; i++) d[i] *= g;
+    }
+    this.afterEdit();
+  },
+
+  revert() {
+    if (this.original) Recorder.decodedBuffer = this.cloneBuffer(this.original);
+    this.trimStart = 0; this.trimEnd = 1;
+    this.afterEdit();
+  },
+
+  afterEdit() {
+    this.draw();
+    this.updateInfo();
+    if (typeof onWaveEdited === 'function') onWaveEdited();
+  },
+
+  // 選択範囲(またはトリム範囲)をプレビュー再生
+  preview() {
+    this.playStop();
+    const ctx = Recorder.ensureCtx(); ctx.resume();
+    const region = this.sliceBuffer(this.trimStart, this.trimEnd);
+    const src = ctx.createBufferSource();
+    src.buffer = region; src.connect(ctx.destination); src.start();
+    this.playSource = src;
+    src.onended = () => { this.playSource = null; };
+  },
+  playStop() {
+    if (this.playSource) { try { this.playSource.onended = null; this.playSource.stop(); } catch (e) {} this.playSource = null; }
+  },
+
+  // キャンバス上のトリムハンドルドラッグ
+  setupCanvasDrag() {
+    const cv = document.getElementById('weCanvas');
+    let drag = null; // 'L' | 'R'
+    const fracFromX = x => Math.max(0, Math.min(1, x / cv.width));
+    cv.addEventListener('mousedown', e => {
+      const x = e.offsetX, W = cv.width;
+      const xs = this.trimStart * W, xe = this.trimEnd * W;
+      drag = Math.abs(x - xs) <= Math.abs(x - xe) ? 'L' : 'R';
+      this.dragMove(e, drag, fracFromX);
+    });
+    window.addEventListener('mousemove', e => { if (drag && e.target === cv) this.dragMove(e, drag, fracFromX); });
+    cv.addEventListener('mousemove', e => { if (drag) this.dragMove(e, drag, fracFromX); });
+    window.addEventListener('mouseup', () => drag = null);
+  },
+  dragMove(e, which, fracFromX) {
+    const f = fracFromX(e.offsetX);
+    if (which === 'L') this.trimStart = Math.min(f, this.trimEnd - 0.001);
+    else this.trimEnd = Math.max(f, this.trimStart + 0.001);
+    this.draw(); this.updateInfo();
+  },
+};
 // ===== 状態 =====
 const state = {
   chMode: 'split',
@@ -1396,7 +1676,7 @@ function setup() {
 
   // Init
   document.getElementById('menuInit').addEventListener('click', () => {
-    if (!confirm('Reset all parameters to init values (power-on default). Continue?')) return;
+    if (!confirm('Reset all parameters to init values . Continue?')) return;
     initState();
     rebuildUI();
     if (typeof clearAllMotion === 'function') clearAllMotion();
@@ -1420,8 +1700,7 @@ function setup() {
 
   // 全パラメーター送信
   document.getElementById('midiSendAll').addEventListener('click', () => {
-    if (!MIDI.out) { alert('No MIDI output port selected'); return; }
-    if (!MIDI.enabled) { alert('MIDI output is OFF. Please turn it ON.'); return; }
+    if (!MIDI.out || !MIDI.enabled) return;
     sendAll(); state.parts.forEach((_, p) => sendQPI(p));
   });
 
@@ -1539,6 +1818,7 @@ function setupRecorderUI() {
   const startBtn = document.getElementById('recStart');
   const overdubBtn = document.getElementById('recOverdub');
   const clearBtn = document.getElementById('recClear');
+  const editBtn = document.getElementById('recEdit');
   const loadBtn = document.getElementById('recLoad');
   const recFile = document.getElementById('recFile');
   const stopBtn = document.getElementById('recStop');
@@ -1598,6 +1878,7 @@ function setupRecorderUI() {
     playBtn.disabled = !has;
     saveBtn.disabled = !has;
     clearBtn.disabled = !has;
+    editBtn.disabled = !has;
     overdubBtn.disabled = !has;
     if (has) {
       info.textContent = Recorder.duration().toFixed(1) + 's / ' + Recorder.sampleRate() + 'Hz / ' + Recorder.channels() + 'ch';
@@ -1609,6 +1890,7 @@ function setupRecorderUI() {
   function setRecordingUI(on) {
     startBtn.disabled = on; overdubBtn.disabled = on || !Recorder.hasRecording();
     loadBtn.disabled = on; clearBtn.disabled = on || !Recorder.hasRecording();
+    editBtn.disabled = on || !Recorder.hasRecording();
     stopBtn.disabled = !on;
     if (on) { playBtn.disabled = true; saveBtn.disabled = true; }
   }
@@ -1622,9 +1904,8 @@ function setupRecorderUI() {
       if (!overdub) info.textContent = '';
       fillInputs(); // 許可後にラベル取得
     } catch (e) {
-      statusEl.textContent = 'error: ' + e.message;
+      statusEl.textContent = 'mic error: ' + e.message;
       setRecordingUI(false);
-      alert('Recording start failed: ' + e.message);
     }
   }
 
@@ -1636,7 +1917,7 @@ function setupRecorderUI() {
     statusEl.textContent = 'processing...';
     Recorder.stop(
       () => { statusEl.textContent = 'stopped'; setRecordingUI(false); updateRecState(); mctx.clearRect(0, 0, meter.width, meter.height); },
-      (err) => { statusEl.textContent = 'decode error'; setRecordingUI(false); updateRecState(); alert('Recording decode failed: ' + err.message); }
+      (err) => { statusEl.textContent = 'decode error: ' + err.message; setRecordingUI(false); updateRecState(); }
     );
   });
 
@@ -1656,22 +1937,42 @@ function setupRecorderUI() {
       await Recorder.loadFile(f);
       statusEl.textContent = 'loaded: ' + f.name;
       updateRecState();
-    } catch (err) { statusEl.textContent = 'load error'; alert('Load failed: ' + err.message); }
+    } catch (err) { statusEl.textContent = 'load error: ' + err.message; }
     e.target.value = '';
   });
 
-  playBtn.addEventListener('click', async () => {
+  // 録音再生 (UI更新込み)。sequencer同期から呼べるよう共通化
+  function doRecPlay() {
+    if (!Recorder.hasRecording() || Recorder.playSource) return;
     playBtn.disabled = true; playStopBtn.disabled = false;
-    try {
-      await Recorder.play(
-        (prog, peak) => { bar.style.width = (prog * 100) + '%'; drawMeter(peak, false); },
-        () => { playBtn.disabled = false; playStopBtn.disabled = true; bar.style.width = '100%'; }
-      );
-    } catch (e) { playBtn.disabled = false; playStopBtn.disabled = true; alert('Play error: ' + e.message); }
+    Recorder.play(
+      (prog, peak) => { bar.style.width = (prog * 100) + '%'; drawMeter(peak, false); },
+      () => { playBtn.disabled = false; playStopBtn.disabled = true; bar.style.width = '100%'; }
+    );
+  }
+  function doRecStop() {
+    Recorder.playStop(); playBtn.disabled = false; playStopBtn.disabled = true;
+  }
+  // sequencer同期用フック
+  window.__recSyncPlay = () => { if (Recorder.sync) doRecPlay(); };
+  window.__recSyncStop = () => { if (Recorder.sync) doRecStop(); };
+
+  playBtn.addEventListener('click', () => {
+    doRecPlay();
+    // 同期: シーケンサーも開始
+    if (Recorder.sync && typeof SEQ !== 'undefined' && !SEQ.playing && typeof seqStart === 'function') seqStart();
   });
   playStopBtn.addEventListener('click', () => {
-    Recorder.playStop(); playBtn.disabled = false; playStopBtn.disabled = true;
+    doRecStop();
+    if (Recorder.sync && typeof SEQ !== 'undefined' && SEQ.playing && typeof seqStop === 'function') seqStop();
   });
+
+  // SYNC トグル
+  const syncChk = document.getElementById('recSync');
+  if (syncChk) {
+    Recorder.sync = syncChk.checked;
+    syncChk.addEventListener('change', () => { Recorder.sync = syncChk.checked; });
+  }
 
   saveBtn.addEventListener('click', async () => {
     const blob = Recorder.buildWav(); if (!blob) return;
@@ -1692,6 +1993,33 @@ function setupRecorderUI() {
     a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
   });
+
+  // ===== Wave Editor =====
+  editBtn.addEventListener('click', () => WaveEd.open());
+  document.getElementById('weClose').addEventListener('click', () => WaveEd.close());
+  makeDraggable(document.getElementById('waveEditorWindow'));
+  WaveEd.setupCanvasDrag();
+  // 編集が反映されたらレコーダー情報を更新
+  window.onWaveEdited = () => { Recorder.playStop(); bar.style.width = '0'; updateRecState(); };
+
+  document.getElementById('wePreview').addEventListener('click', () => WaveEd.preview());
+  document.getElementById('wePreviewStop').addEventListener('click', () => WaveEd.playStop());
+  document.getElementById('weTrim').addEventListener('click', () => WaveEd.applyTrim());
+  document.getElementById('weStretchApply').addEventListener('click', () => {
+    const pct = parseFloat(document.getElementById('weStretchPct').value);
+    if (pct > 0) WaveEd.applyStretchRatio(pct / 100);
+  });
+  document.getElementById('weStretchSecApply').addEventListener('click', () => {
+    const sec = parseFloat(document.getElementById('weStretchSec').value);
+    if (sec > 0) WaveEd.applyStretchToSeconds(sec);
+  });
+  document.getElementById('weFadeApply').addEventListener('click', () => {
+    WaveEd.applyFade(parseFloat(document.getElementById('weFadeIn').value) || 0,
+                     parseFloat(document.getElementById('weFadeOut').value) || 0);
+  });
+  document.getElementById('weReverse').addEventListener('click', () => WaveEd.reverse());
+  document.getElementById('weNormalize').addEventListener('click', () => WaveEd.normalize());
+  document.getElementById('weRevert').addEventListener('click', () => WaveEd.revert());
 }
 
 // ===== パッチ Save / Load / Share =====
@@ -1801,21 +2129,15 @@ function updatePatchNameDisplay() {
 function setupPatch() {
   document.getElementById('patchName').addEventListener('input', updatePatchNameDisplay);
   updatePatchNameDisplay();
-  document.getElementById('patchSave').addEventListener('click', () => {
-    if (!confirm('Save current patch?')) return;
-    downloadPatch();
-  });
-  document.getElementById('patchLoadBtn').addEventListener('click', () => {
-    if (!confirm('Load a patch file? Current patch settings will be replaced.')) return;
-    document.getElementById('patchFile').click();
-  });
+  document.getElementById('patchSave').addEventListener('click', downloadPatch);
+  document.getElementById('patchLoadBtn').addEventListener('click', () => document.getElementById('patchFile').click());
   document.getElementById('patchFile').addEventListener('change', async e => {
     const f = e.target.files[0];
     if (!f) return;
     try {
       const obj = JSON.parse(await f.text());
       applyPatch(obj, true);  // auto-send all parameters to unit after load
-    } catch (err) { alert('Load error: ' + err.message); }
+    } catch (err) { console.warn('Patch load error:', err); }
     e.target.value = '';
   });
   document.getElementById('patchShare').addEventListener('click', () => {
@@ -1831,9 +2153,6 @@ function setupPatch() {
 }
 
 document.addEventListener('DOMContentLoaded', setup);
-
-</script>
-<script>
 // ===== 16ステップ ドラムシーケンサー =====
 // honodori_synth SUBシンセのシーケンサーを参考。volca drum向けに ON + VEL のみ
 // (PAN=MIX側のため除外, NOTE/TIE=メロディ用途のため除外)。
@@ -2444,7 +2763,6 @@ function clearHighlight() {
 
 function seqStart() {
   if (SEQ.playing) return;
-  if (!MIDI.out) { alert('No MIDI output port selected'); return; }
   SEQ.playing = true;
   SEQ.current = 0;
   SEQ.scheduled = [];
@@ -2452,6 +2770,8 @@ function seqStart() {
   SEQ.timer = setInterval(seqScheduler, LOOKAHEAD);
   SEQ.raf = requestAnimationFrame(seqPlayheadLoop);
   document.getElementById('seqPlay').classList.add('on');
+  // RECORDER再生と同期
+  if (typeof Recorder !== 'undefined' && Recorder.sync && typeof window.__recSyncPlay === 'function') window.__recSyncPlay();
 }
 function seqStop() {
   SEQ.playing = false;
@@ -2460,6 +2780,7 @@ function seqStop() {
   SEQ.timer = null;
   clearHighlight();
   document.getElementById('seqPlay').classList.remove('on');
+  if (typeof Recorder !== 'undefined' && Recorder.sync && typeof window.__recSyncStop === 'function') window.__recSyncStop();
 }
 
 function seqClearAll() {
@@ -2581,18 +2902,12 @@ function setupSeq() {
     if (!isNaN(v)) setStepLen(v); else updateStepLenUI();
   });
   updateStepLenUI();
-  document.getElementById('seqSave').addEventListener('click', () => {
-    if (!confirm('Save current sequence?')) return;
-    downloadSeq();
-  });
-  document.getElementById('seqLoad').addEventListener('click', () => {
-    if (!confirm('Load a sequence file? Current sequence will be replaced.')) return;
-    document.getElementById('seqFile').click();
-  });
+  document.getElementById('seqSave').addEventListener('click', downloadSeq);
+  document.getElementById('seqLoad').addEventListener('click', () => document.getElementById('seqFile').click());
   document.getElementById('seqFile').addEventListener('change', async e => {
     const f = e.target.files[0]; if (!f) return;
     try { applySeq(JSON.parse(await f.text())); }
-    catch (err) { alert('Load error: ' + err.message); }
+    catch (err) { console.warn('Sequence load error:', err); }
     e.target.value = '';
   });
   document.getElementById('seqPlay').addEventListener('click', () => SEQ.playing ? seqStop() : seqStart());
@@ -2611,8 +2926,6 @@ function setupSeq() {
 }
 
 document.addEventListener('DOMContentLoaded', setupSeq);
-
 </script>
 </body>
 </html>
-
