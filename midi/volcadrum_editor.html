@@ -570,7 +570,9 @@ input[type=number], input[type=text], textarea {
 // レイヤー毎のパラメータ: [Layer1 CC, Layer2 CC]
 // init: 各レイヤーの初期値 [Layer1, Layer2] (synthmata init_patch.js 準拠)
 const LAYER_PARAMS = [
-  { key: 'select',  name: 'SELECT',   cc: [14, 15], min: 0, max: 7, labels: ['Sin','Saw','HiQ','LoQ','Click','Noise','Bend','Tri'], init: [0, 0] },
+  { key: 'source',  name: 'SOURCE',   cc: [14, 15], min: 0, max: 4, labels: ['Sin','Saw','HP Nz','LP Nz','BP Nz'], init: [0, 0], selectGroup: 'source' },
+  { key: 'modtype', name: 'MOD TYPE', cc: [14, 15], min: 0, max: 2, labels: ['EG','LFO','Rnd'], init: [0, 0], selectGroup: 'modtype' },
+  { key: 'ampeg',   name: 'AMP EG',   cc: [14, 15], min: 0, max: 2, labels: ['A-D','Exp','Multi'], init: [0, 0], selectGroup: 'ampeg' },
   { key: 'pitch',   name: 'PITCH',    cc: [26, 27], init: [12, 18] },
   { key: 'egatt',   name: 'EG ATT',   cc: [20, 21], init: [0, 0] },
   { key: 'egrel',   name: 'EG REL',   cc: [23, 24], init: [127, 127] },
@@ -599,6 +601,12 @@ const WAVEGUIDE_PARAMS = [
 ];
 
 const NUM_PARTS = 6;
+
+const SELECT_VALUE_TABLES = {
+  source: [0, 26, 52, 77, 103],
+  modtype: [0, 9, 18],
+  ampeg: [0, 3, 6],
+};
 
 // Single channel モード用 CC (Part毎の Layer統合コントロール = 1-2)
 // Part1..6 それぞれ別CC。{select,level,modamt,modrate,pitch,egatt,egrel,send,pan}
@@ -1027,19 +1035,33 @@ function partChannel(partIndex) {
 // 離散選択 (labels あり) は本体が 0-127 を選択肢数のバンドに分割して解釈するため、
 // 内部インデックスをバンド中心の CC 値へスケールする。連続値はそのまま。
 function ccValue(par, v) {
+  if (par.selectGroup && SELECT_VALUE_TABLES[par.selectGroup]) {
+    const table = SELECT_VALUE_TABLES[par.selectGroup];
+    return table[v] != null ? table[v] : table[0];
+  }
   if (par.labels && par.labels.length > 1) {
     const n = par.labels.length;
     return Math.min(127, Math.max(0, Math.round((v + 0.5) * 127 / n)));
   }
   return v;
 }
+function layerSelectValue(partIndex, layer, overrides) {
+  const lstate = state.parts[partIndex].layers[layer];
+  return ['source', 'modtype', 'ampeg'].reduce((sum, key) => {
+    const par = LAYER_PARAMS.find(x => x.key === key);
+    const id = 'L' + layer + '.' + key;
+    const v = overrides && overrides[id] != null ? overrides[id] : lstate[key];
+    return sum + ccValue(par, v || 0);
+  }, 0);
+}
 function sendLayerParam(partIndex, layer, par) {
-  const val = ccValue(par, state.parts[partIndex].layers[layer][par.key]);
+  const val = par.selectGroup ? layerSelectValue(partIndex, layer) : ccValue(par, state.parts[partIndex].layers[layer][par.key]);
   if (state.chMode === 'split') {
     MIDI.sendCC(partChannel(partIndex), par.cc[layer], val);
   } else {
     const map = SINGLE_CC[partIndex];
-    if (map && map[par.key] != null) MIDI.sendCC(state.baseCh, map[par.key], val);
+    const key = par.selectGroup ? 'select' : par.key;
+    if (map && map[key] != null) MIDI.sendCC(state.baseCh, map[key], val);
   }
 }
 function sendPartParam(partIndex, par) {
@@ -1062,7 +1084,16 @@ function sendGlobal(par) {
   }
 }
 
-function sendLayer(p, l) { LAYER_PARAMS.forEach(par => sendLayerParam(p, l, par)); }
+function sendLayer(p, l) {
+  let sentSelect = false;
+  LAYER_PARAMS.forEach(par => {
+    if (par.selectGroup) {
+      if (sentSelect) return;
+      sentSelect = true;
+    }
+    sendLayerParam(p, l, par);
+  });
+}
 function sendMix(p) { PART_PARAMS.forEach(par => sendPartParam(p, par)); }
 function sendPart(p) {
   [0, 1].forEach(l => sendLayer(p, l));
@@ -1691,6 +1722,9 @@ function applyPatch(obj, send) {
     if (!state.parts[p]) return;
     if (sp.layers) sp.layers.forEach((sl, l) => {
       LAYER_PARAMS.forEach(par => { if (sl[par.key] != null) state.parts[p].layers[l][par.key] = sl[par.key]; });
+      if (sl.select != null && sl.source == null && sl.modtype == null && sl.ampeg == null) {
+        decodeLegacySelect(sl.select, state.parts[p].layers[l]);
+      }
     });
     PART_PARAMS.forEach(par => { if (sp[par.key] != null) state.parts[p][par.key] = sp[par.key]; });
     state.parts[p].qpi = !!sp.qpi;
@@ -1699,6 +1733,23 @@ function applyPatch(obj, send) {
 
   rebuildUI();
   if (send && MIDI.out) { sendAll(); state.parts.forEach((_, p) => sendQPI(p)); }
+}
+
+function decodeLegacySelect(value, layer) {
+  const raw = Math.max(0, Math.min(127, Math.round((value + 0.5) * 127 / 8)));
+  let best = { diff: Infinity, source: 0, modtype: 0, ampeg: 0 };
+  for (let source = 0; source < SELECT_VALUE_TABLES.source.length; source++) {
+    for (let modtype = 0; modtype < SELECT_VALUE_TABLES.modtype.length; modtype++) {
+      for (let ampeg = 0; ampeg < SELECT_VALUE_TABLES.ampeg.length; ampeg++) {
+        const total = SELECT_VALUE_TABLES.source[source] + SELECT_VALUE_TABLES.modtype[modtype] + SELECT_VALUE_TABLES.ampeg[ampeg];
+        const diff = Math.abs(total - raw);
+        if (diff < best.diff) best = { diff, source, modtype, ampeg };
+      }
+    }
+  }
+  layer.source = best.source;
+  layer.modtype = best.modtype;
+  layer.ampeg = best.ampeg;
 }
 
 async function downloadPatch() {
@@ -2180,8 +2231,9 @@ function motionParam(p, id) {
     const l = +id[1], key = id.slice(3);
     const par = LAYER_PARAMS.find(x => x.key === key);
     if (!par) return null;
-    const cc = (state.chMode === 'split') ? par.cc[l] : (SINGLE_CC[p] ? SINGLE_CC[p][key] : null);
-    return { par, cc, ch: state.chMode === 'split' ? partChannel(p) : state.baseCh };
+    const mapKey = par.selectGroup ? 'select' : key;
+    const cc = (state.chMode === 'split') ? par.cc[l] : (SINGLE_CC[p] ? SINGLE_CC[p][mapKey] : null);
+    return { par, cc, ch: state.chMode === 'split' ? partChannel(p) : state.baseCh, layer: l };
   } else {
     const key = id.slice(2);
     const par = PART_PARAMS.find(x => x.key === key);
@@ -2324,7 +2376,8 @@ function scheduleStep(step, time) {
     if (m) {
       for (const id in m) {
         const mp = motionParam(p, id);
-        if (mp && mp.cc != null) MIDI.sendCCAt(mp.ch, mp.cc, ccValue(mp.par, m[id]), time);
+        const val = mp && mp.par.selectGroup ? layerSelectValue(p, mp.layer, m) : (mp ? ccValue(mp.par, m[id]) : 0);
+        if (mp && mp.cc != null) MIDI.sendCCAt(mp.ch, mp.cc, val, time);
       }
     }
   }
