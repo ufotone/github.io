@@ -1,0 +1,1903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>volca drum editor</title>
+<style>
+/* 1980s Macintosh SE / モノクロ ワープロ風 */
+* { box-sizing: border-box; }
+
+:root {
+  --black: #000;
+  --white: #fff;
+  --gray: #888;
+  --font: "Chicago", "Geneva", "Osaka", "MS PGothic", monospace;
+}
+
+body {
+  margin: 0;
+  background: #c8c8c8;
+  /* ドットパターンのデスクトップ */
+  background-image:
+    linear-gradient(45deg, #b0b0b0 25%, transparent 25%),
+    linear-gradient(-45deg, #b0b0b0 25%, transparent 25%);
+  background-size: 4px 4px;
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--black);
+}
+
+.desktop { padding: 16px; }
+
+.window {
+  background: var(--white);
+  border: 2px solid var(--black);
+  box-shadow: 2px 2px 0 var(--black);
+  margin: 0 auto 16px;
+  max-width: 1100px;
+}
+
+/* タイトルバー: 横線ストライプ */
+.titlebar {
+  display: flex;
+  align-items: center;
+  height: 20px;
+  border-bottom: 2px solid var(--black);
+  background:
+    repeating-linear-gradient(to bottom, var(--black) 0, var(--black) 1px, var(--white) 1px, var(--white) 2px);
+  padding: 0 6px;
+  cursor: move;
+  user-select: none;
+}
+.title {
+  background: var(--white);
+  padding: 0 10px;
+  margin: 0 auto;
+  font-weight: bold;
+}
+.closebox, .zoombox {
+  width: 11px; height: 11px;
+  border: 1px solid var(--black);
+  background: var(--white);
+  cursor: pointer;
+}
+.closebox:active { background: var(--black); }
+.zoombox:active { background: var(--black); }
+/* 折り畳み: エディタ部分のみ隠す (タイトルバー・メニューバーは残す) */
+.window.collapsed > .editor { display: none; }
+
+/* メニューバー */
+.menubar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 2px solid var(--black);
+  padding: 3px 8px;
+  background: var(--white);
+}
+.menu-item { cursor: pointer; padding: 1px 4px; }
+.menu-item:hover { background: var(--black); color: var(--white); }
+.midi-status {
+  border: 1px solid var(--black);
+  padding: 1px 6px;
+  background: var(--white);
+}
+.patch-name {
+  margin-left: 12px;
+  font-weight: bold;
+  border: 1px solid var(--black);
+  padding: 1px 8px;
+  background: var(--white);
+}
+.midi-onoff {
+  margin-left: auto;
+  border: 1px solid var(--black);
+  padding: 1px 6px;
+  background: var(--black);
+  color: var(--white);
+  cursor: pointer;
+  font-weight: bold;
+}
+.midi-onoff.off { background: var(--white); color: var(--black); }
+
+/* 設定パネル */
+.panel { padding: 8px; border-bottom: 2px solid var(--black); }
+.row { display: flex; align-items: center; gap: 8px; margin: 4px 0; flex-wrap: wrap; }
+.row label { font-weight: bold; }
+.hint { color: var(--gray); font-size: 10px; }
+
+select, button, input[type=file] {
+  font-family: var(--font);
+  font-size: 11px;
+  border: 1px solid var(--black);
+  background: var(--white);
+  color: var(--black);
+  padding: 2px 6px;
+  border-radius: 0;
+}
+button {
+  box-shadow: 1px 1px 0 var(--black);
+  cursor: pointer;
+}
+button:active { box-shadow: none; transform: translate(1px, 1px); background: var(--black); color: var(--white); }
+button:disabled { color: var(--gray); border-color: var(--gray); box-shadow: none; cursor: default; }
+
+/* エディタ */
+.editor { padding: 10px; }
+.parts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.part {
+  border: 2px solid var(--black);
+  padding: 6px;
+}
+.part-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-weight: bold;
+  border-bottom: 1px solid var(--black);
+  margin-bottom: 4px; padding-bottom: 2px;
+}
+.head-btns { display: flex; gap: 4px; align-items: center; }
+.play-btn { width: 22px; padding: 0; font-size: 12px; }
+.rnd-btn { font-size: 9px; padding: 0 5px; line-height: 16px; }
+
+.layer { margin-bottom: 4px; }
+.layer-title {
+  font-size: 10px;
+  background: var(--black); color: var(--white);
+  padding: 0 4px; display: inline-block; margin-bottom: 2px;
+}
+.part-head small { font-weight: normal; font-size: 9px; }
+.mix-title { margin-top: 4px; }
+.part-common { padding-top: 2px; margin-top: 2px; }
+
+/* ノブ */
+.knobs { display: flex; flex-wrap: wrap; gap: 6px; }
+.knob { width: 46px; text-align: center; }
+.knob-label { font-size: 9px; white-space: nowrap; overflow: hidden; }
+.dial {
+  width: 30px; height: 30px; margin: 2px auto;
+  border: 2px solid var(--black);
+  border-radius: 50%;
+  background: var(--white);
+  position: relative;
+  cursor: ns-resize;
+}
+.dial-ind {
+  position: absolute;
+  left: 50%; top: 3px;
+  width: 2px; height: 12px;        /* 下端が中心(15px)に来る: 3+12=15 */
+  background: var(--black);
+  transform-origin: bottom center; /* = ダイヤル中心 */
+  transform: translateX(-50%) rotate(0deg);
+}
+.knob-val { font-size: 10px; min-height: 12px; }
+
+/* グローバル */
+.global-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+.global-box { border: 2px solid var(--black); padding: 8px; }
+.reserved-space {
+  grid-column: span 2;
+  border: 2px dashed var(--gray);
+}
+.group-title {
+  font-weight: bold;
+  background: var(--black); color: var(--white);
+  padding: 1px 6px; margin: 4px 0; display: inline-block;
+}
+
+/* Firmware / dialog : メインウィンドウ左肩の上に浮かせる */
+.firmware-window, .dialog {
+  max-width: 520px;
+  position: fixed;
+  top: 60px;
+  left: 32px;
+  z-index: 100;
+  margin: 0;
+}
+.hidden { display: none; }
+.fw-body { padding: 12px; line-height: 1.5; }
+.fw-body ol { margin: 6px 0 10px 18px; padding: 0; }
+.fw-body li { margin: 2px 0; }
+#fwMeter { border: 1px solid var(--black); display: block; margin: 8px 0; background: var(--white); width: 100%; }
+.fw-progress { border: 1px solid var(--black); height: 12px; background: var(--white); }
+#fwBar { height: 100%; width: 0; background: var(--black); }
+#fwInfo { font-size: 10px; }
+
+.midi-help { font-size: 11px; line-height: 1.5; border: 1px solid var(--black); padding: 6px 8px; }
+.midi-help p { margin: 4px 0; }
+
+/* ===== Step Sequencer ===== */
+/* 折り畳み時はグリッドのみ隠し、トランスポート(メニュー)は残す */
+.window.collapsed .seq-grid { display: none; }
+.seq-body { padding: 10px; }
+.seq-transport {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  border-bottom: 2px solid var(--black); padding-bottom: 8px; margin-bottom: 8px;
+}
+.seq-transport label { font-weight: bold; }
+.seq-btn { box-shadow: 1px 1px 0 var(--black); }
+.seq-btn.on { background: var(--black); color: var(--white); }
+.seq-sep { width: 1px; height: 18px; background: var(--black); margin: 0 4px; }
+.seq-pages { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; }
+.seq-pages label { font-weight: bold; }
+#pageInput { width: 42px; text-align: center; }
+
+/* BEAT グループバー */
+.seq-beatbar {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  border-bottom: 2px solid var(--black); padding-bottom: 8px; margin-bottom: 8px;
+}
+.beat-bar-label { font-weight: bold; }
+.beat-chip {
+  display: inline-flex; align-items: center;
+  border: 1px solid var(--black);
+}
+.beat-pm {
+  background: var(--white); color: var(--black);
+  border: none; font-family: var(--font); font-size: 12px;
+  padding: 1px 6px; cursor: pointer; line-height: 1;
+}
+.beat-pm:active { background: var(--black); color: var(--white); }
+.beat-num {
+  min-width: 18px; text-align: center;
+  padding: 1px 6px; font-weight: bold;
+  background: var(--black); color: var(--white);
+}
+
+.seq-grid { display: flex; flex-direction: column; gap: 2px; }
+.seq-row {
+  display: grid;
+  grid-template-columns: 60px repeat(16, 1fr);
+  gap: 2px;
+  align-items: stretch;
+}
+.seq-label {
+  font-size: 10px; font-weight: bold;
+  display: flex; align-items: center;
+  padding-right: 4px; white-space: nowrap;
+}
+.seq-step-head {
+  font-size: 9px; text-align: center;
+  border-bottom: 1px solid var(--black);
+  padding-bottom: 1px;
+}
+.seq-step-head.beat { font-weight: bold; }
+.seq-step-head.playhead { background: var(--black); color: var(--white); }
+
+.seq-cell {
+  height: 15px;
+  border: 1px solid var(--black);
+  background: var(--white);
+  cursor: pointer;
+}
+.seq-cell.beat { border-left-width: 2px; }
+.seq-cell.on { background: var(--black); }
+.seq-cell.on.playhead { background: var(--white); border: 2px solid var(--black); }
+.seq-cell.playhead { outline: 2px solid var(--black); outline-offset: -1px; }
+
+.vel-row { margin-bottom: 4px; }
+/* モーションレック */
+.mot-row { margin-bottom: 6px; }
+.mot-cell { height: 10px; background: var(--white); }
+.mot-cell.on { background: var(--gray); }
+.mot-cell.sel { outline: 2px solid var(--black); outline-offset: -1px; background: var(--black); }
+.mrec-status {
+  border: 1px solid var(--black); padding: 1px 6px; font-weight: bold;
+}
+.mrec-status.on { background: var(--black); color: var(--white); }
+.mrec-btn.on { background: var(--black); color: var(--white); }
+/* 記録済みパラメータの強調 (画像のグレー背景) */
+.knob.has-motion { background: var(--gray); border-radius: 3px; }
+.knob.has-motion .dial { background: #ddd; }
+.seq-vel {
+  font-family: var(--font); font-size: 9px;
+  border: 1px solid var(--gray); background: var(--white); color: var(--black);
+  padding: 0; height: 16px; width: 100%; border-radius: 0;
+}
+.seq-vel.beat { border-left: 2px solid var(--black); }
+.seq-note { color: var(--black); }
+.seq-note.note-disabled { color: var(--gray); border-color: var(--gray); background: #f0f0f0; }
+.seq-label.qpi-on { text-decoration: underline; }
+.note-row { margin-top: 4px; }
+
+/* QPI */
+.qpi-row { gap: 6px; }
+.mix-title-row { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+.qpi-btn {
+  font-size: 9px; padding: 0 4px; line-height: 14px;
+  border: 1px solid var(--black); background: var(--white);
+  box-shadow: 1px 1px 0 var(--black); cursor: pointer;
+}
+.qpi-btn.on { background: var(--black); color: var(--white); }
+input[type=number], input[type=text], textarea {
+  font-family: var(--font); font-size: 11px;
+  border: 1px solid var(--black); background: var(--white); color: var(--black);
+  padding: 2px 4px; border-radius: 0;
+}
+</style>
+</head>
+<body>
+<div class="desktop">
+  <div class="window" id="mainWindow">
+    <div class="titlebar">
+      <span class="closebox"></span>
+      <span class="title">volca drum editor</span>
+      <span class="zoombox" id="mainZoom" title="Collapse"></span>
+    </div>
+
+    <div class="menubar">
+      <span class="menu-item" id="menuMidi">◈ MIDI</span>
+      <span class="menu-item" id="menuPatch">◈ Patch</span>
+      <span class="menu-item" id="menuFirmware">◈ Firmware</span>
+      <span class="menu-item" id="menuInit">◈ Init</span>
+      <span class="menu-item" id="menuAbout">◈ About</span>
+      <span class="patch-name" id="patchNameDisplay">♪ My Kit</span>
+      <span class="midi-onoff" id="midiOnOff">● ON</span>
+      <span class="midi-status" id="midiStatus">MIDI: Not connected</span>
+    </div>
+
+    <!-- Editor -->
+    <div class="editor" id="editor">
+      <div class="parts" id="parts"></div>
+
+      <div class="global-row">
+        <div class="global-box">
+          <div class="mix-title-row">
+            <span class="group-title">WAVE GUIDE</span>
+            <button class="rnd-btn" id="waveguideRnd" title="Randomize WAVE GUIDE">RANDOM</button>
+          </div>
+          <div class="knobs" id="globalWaveguide"></div>
+        </div>
+        <div class="reserved-space" title="Reserved space"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step Sequencer window (main flow, below editor) -->
+  <div class="window" id="seqWindow">
+    <div class="titlebar">
+      <span class="closebox"></span>
+      <span class="title">16 step sequencer</span>
+      <span class="zoombox" id="seqZoom" title="Collapse"></span>
+    </div>
+    <div class="seq-body">
+      <div class="seq-transport">
+        <button id="seqPlay" class="seq-btn">▶ PLAY</button>
+        <button id="seqStop" class="seq-btn">■ STOP</button>
+        <label>TEMPO</label>
+        <input type="number" id="seqBpm" min="20" max="300" value="120" style="width:56px"> BPM
+        <span class="seq-sep"></span>
+        <button id="seqRandom" class="seq-btn">RANDOM</button>
+        <button id="seqClear" class="seq-btn">CLEAR</button>
+        <span class="seq-sep"></span>
+        <button id="seqSave" class="seq-btn">SAVE</button>
+        <button id="seqLoad" class="seq-btn">LOAD</button>
+        <input type="file" id="seqFile" accept="application/json,.json" class="hidden">
+        <span class="seq-sep"></span>
+        <span id="mrecStatus" class="mrec-status">MREC: OFF</span>
+        <span class="seq-pages">
+          <label>PAGE</label>
+          <button id="pagePrev" class="seq-btn">◀</button>
+          <input type="number" id="pageInput" min="1" max="16" value="1">
+          <button id="pageNext" class="seq-btn">▶</button>
+          <span id="pageTotal" class="hint">/ 1</span>
+        </span>
+      </div>
+      <div class="seq-beatbar">
+        <span class="beat-bar-label">BEAT</span>
+        <span id="beatChips"></span>
+        <button id="beatAdd" class="seq-btn">＋ ADD</button>
+        <button id="beatReset" class="seq-btn">RESET</button>
+        <span id="beatTotal" class="hint">16/16</span>
+      </div>
+      <div class="seq-grid" id="seqGrid"></div>
+    </div>
+  </div>
+
+  <!-- Firmware window -->
+  <div class="window firmware-window hidden" id="firmwareWindow">
+    <div class="titlebar">
+      <span class="closebox" id="fwClose"></span>
+      <span class="title">Firmware Update (audio)</span>
+    </div>
+    <div class="fw-body">
+      <p>The volca drum firmware is audio (WAV) data. Put the unit into update mode, connect your PC's headphone output to the unit's <b>SYNC IN</b>, and play the WAV below.</p>
+      <ol>
+        <li>Turn the unit off</li>
+        <li>Hold <b>FUNC</b> and power on to enter update standby</li>
+        <li>Set volume near maximum and play the WAV below</li>
+        <li>Do not touch the unit until transfer completes</li>
+      </ol>
+      <div class="row">
+        <label>Firmware WAV</label>
+        <input type="file" id="fwFile" accept="audio/wav,.wav">
+      </div>
+      <div class="row">
+        <button id="fwPlay" disabled>▶ PLAY</button>
+        <button id="fwStop" disabled>■ STOP</button>
+        <span id="fwInfo">Not loaded</span>
+      </div>
+      <canvas id="fwMeter" width="460" height="40"></canvas>
+      <div class="fw-progress"><div id="fwBar"></div></div>
+    </div>
+  </div>
+
+  <!-- MIDI window -->
+  <div class="window dialog hidden" id="midiWindow">
+    <div class="titlebar"><span class="closebox" id="midiClose"></span><span class="title">MIDI</span></div>
+    <div class="fw-body">
+      <div class="row">
+        <button id="midiToggle" class="qpi-btn on">MIDI OUT: ON</button>
+        <span class="hint">Turning OFF stops all MIDI output.</span>
+      </div>
+      <div class="row">
+        <label>Output Port</label>
+        <select id="midiOut" style="flex:1"><option>—</option></select>
+        <button id="midiRefresh">Refresh</button>
+      </div>
+      <div class="row">
+        <label>Ch Mode</label>
+        <select id="chMode">
+          <option value="split" selected>Split (Ch1-6 = Part1-6) factory</option>
+          <option value="single">Single (all parts same Ch)</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>Base Ch</label>
+        <select id="baseCh"></select>
+        <span class="hint">Split uses consecutive Ch per Part</span>
+      </div>
+      <div class="row">
+        <button id="midiSendAll">Send all parameters to unit</button>
+      </div>
+
+      <div class="group-title">Channel mode setup (on the unit)</div>
+      <div class="midi-help">
+        <p>Hold <b>[REC] and power on</b> to enter setup mode. The lit state of step buttons 1-6 indicates the mode.</p>
+        <p><b>■ Split Channel (multi Ch)</b><br>
+          Step buttons <b>1-6 all lit</b> = Part1-6 controlled individually on separate MIDI channels 1-6.<br>
+          If only one is lit, <b>press any of [1]-[6]</b> to switch to all lit.<br>
+          → Part1=Ch1, Part2=Ch2 … Part6=Ch6 (editor: Ch Mode = Split)</p>
+        <p><b>■ Single Channel (omni)</b><br>
+          The mode where <b>only one</b> of step buttons 1-6 is lit.<br>
+          <b>Use the keyboard keys to select 1-16</b> MIDI channel (all parts sound on the same MIDI channel).</p>
+        <p><b>■ Save</b><br>
+          Press <b>[REC] to save</b>; the unit restarts and applies the setting.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Patch window -->
+  <div class="window dialog hidden" id="patchWindow">
+    <div class="titlebar"><span class="closebox" id="patchClose"></span><span class="title">Patch</span></div>
+    <div class="fw-body">
+      <div class="row">
+        <label>Patch Name</label>
+        <input type="text" id="patchName" value="My Kit" style="flex:1">
+      </div>
+      <div class="row">
+        <button id="patchSave">Save (.json)</button>
+        <button id="patchLoadBtn">Load</button>
+        <input type="file" id="patchFile" accept="application/json,.json" class="hidden">
+      </div>
+      <div class="row">
+        <button id="patchShare">Copy share link</button>
+        <button id="patchSend">Send all to unit</button>
+      </div>
+      <p class="hint">The share link embeds the whole patch in the URL. Opening the link restores it automatically.</p>
+      <textarea id="patchShareUrl" rows="3" style="width:100%" readonly placeholder="The share link appears here"></textarea>
+    </div>
+  </div>
+
+  <div class="window dialog hidden" id="aboutDialog">
+    <div class="titlebar"><span class="closebox" id="aboutClose"></span><span class="title">About</span></div>
+    <div class="fw-body">
+      <p><b>volca drum editor</b></p>
+      <p>by ufotone</p>
+      <p>Made with Web MIDI / Web Audio. Parameter editor for KORG volca drum.</p>
+      <p>CC map: based on the official MIDI Implementation Chart (Ver.1.00).</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// volca drum パラメータ定義 (公式 MIDI Implementation Chart Ver.1.00 準拠)
+// Split channel モード: Part N は MIDI Ch (baseCh + N-1) で送信。CC番号は固定。
+// 各 Part は Layer1 / Layer2 を持つ。
+
+// レイヤー毎のパラメータ: [Layer1 CC, Layer2 CC]
+// init: 各レイヤーの初期値 [Layer1, Layer2] (synthmata init_patch.js 準拠)
+const LAYER_PARAMS = [
+  { key: 'select',  name: 'SELECT',   cc: [14, 15], min: 0, max: 7, labels: ['Sin','Saw','HiQ','LoQ','Click','Noise','Bend','Tri'], init: [0, 0] },
+  { key: 'pitch',   name: 'PITCH',    cc: [26, 27], init: [12, 18] },
+  { key: 'egatt',   name: 'EG ATT',   cc: [20, 21], init: [0, 0] },
+  { key: 'egrel',   name: 'EG REL',   cc: [23, 24], init: [127, 127] },
+  { key: 'modamt',  name: 'MOD AMT',  cc: [29, 30], init: [64, 64] },
+  { key: 'modrate', name: 'MOD RATE', cc: [46, 47], init: [0, 0] },
+  { key: 'level',   name: 'LEVEL',    cc: [17, 18], init: [127, 127] },
+];
+
+// Part 毎の MIX セクション (Split モードでは各パートが別Ch = 各パートに効く)
+// 単一CC。pan/send は SINGLE_CC マップ、shaper系は単一モードでは共有 CC。
+const PART_PARAMS = [
+  { key: 'gain',   name: 'GAIN',    cc: 52,  def: 127, init: 64 }, // DRY GAIN
+  { key: 'pan',    name: 'PAN',     cc: 10,  def: 64, init: 64 },
+  { key: 'send',   name: 'WG SEND', cc: 103, def: 0,  init: 0 },
+  { key: 'bitred', name: 'BIT RED', cc: 49,  def: 0,  init: 0 },
+  { key: 'fold',   name: 'FOLD',    cc: 50,  def: 0,  init: 0 },
+  { key: 'drive',  name: 'DRIVE',   cc: 51,  def: 0,  init: 0 },
+];
+
+// グローバル: WAVEGUIDE RESONATOR (本体に1基のみ)
+const WAVEGUIDE_PARAMS = [
+  { key: 'wgmodel', name: 'MODEL', cc: 116, min: 0, max: 4, labels: ['Off','String','Tube','Plate','Drum'], init: 0 },
+  { key: 'decay',   name: 'DECAY', cc: 117, init: 0 },
+  { key: 'body',    name: 'BODY',  cc: 118, init: 0 },
+  { key: 'tune',    name: 'TUNE',  cc: 119, init: 15 },
+];
+
+const NUM_PARTS = 6;
+
+// Single channel モード用 CC (Part毎の Layer統合コントロール = 1-2)
+// Part1..6 それぞれ別CC。{select,level,modamt,modrate,pitch,egatt,egrel,send,pan}
+const SINGLE_CC = [
+  // Part1
+  { select:14, level:15, modamt:16, modrate:17, pitch:18, egatt:19, egrel:20, send:103, pan:109 },
+  // Part2
+  { select:23, level:24, modamt:25, modrate:26, pitch:27, egatt:28, egrel:29, send:104, pan:110 },
+  // Part3
+  { select:46, level:47, modamt:48, modrate:49, pitch:50, egatt:51, egrel:52, send:105, pan:111 },
+  // Part4
+  { select:55, level:56, modamt:57, modrate:58, pitch:59, egatt:60, egrel:61, send:106, pan:112 },
+  // Part5
+  { select:80, level:81, modamt:82, modrate:83, pitch:84, egatt:85, egrel:86, send:107, pan:113 },
+  // Part6
+  { select:89, level:90, modamt:96, modrate:97, pitch:98, egatt:99, egrel:100, send:108, pan:114 },
+];
+// Web MIDI ラッパー
+const MIDI = {
+  access: null,
+  out: null,
+  outputs: [],
+  enabled: true,   // MIDI 出力 ON/OFF
+
+  async init() {
+    if (!navigator.requestMIDIAccess) {
+      throw new Error('このブラウザは Web MIDI に未対応です (Chrome/Edge を推奨)');
+    }
+    this.access = await navigator.requestMIDIAccess({ sysex: false });
+    this.access.onstatechange = () => this.refresh();
+    this.refresh();
+  },
+
+  refresh() {
+    this.outputs = this.access ? Array.from(this.access.outputs.values()) : [];
+    if (this.out && !this.outputs.includes(this.out)) this.out = null;
+    if (typeof this.onchange === 'function') this.onchange(this.outputs);
+  },
+
+  selectOutput(id) {
+    this.out = this.outputs.find(o => o.id === id) || null;
+    return this.out;
+  },
+
+  // ch: 1-16
+  sendCC(ch, cc, value) {
+    if (!this.out || !this.enabled) return false;
+    const status = 0xB0 | ((ch - 1) & 0x0f);
+    this.out.send([status, cc & 0x7f, value & 0x7f]);
+    return true;
+  },
+
+  // テスト発音 (Note On/Off)
+  noteOn(ch, note = 60, vel = 100) {
+    if (!this.out || !this.enabled) return;
+    this.out.send([0x90 | ((ch - 1) & 0x0f), note & 0x7f, vel & 0x7f]);
+  },
+  // タイムスタンプ指定送信 (シーケンサー用, time = performance.now() 基準ms)
+  sendCCAt(ch, cc, value, time) {
+    if (!this.out || !this.enabled) return;
+    this.out.send([0xB0 | ((ch - 1) & 0x0f), cc & 0x7f, value & 0x7f], time);
+  },
+  noteOnAt(ch, note, vel, time) {
+    if (!this.out || !this.enabled) return;
+    this.out.send([0x90 | ((ch - 1) & 0x0f), note & 0x7f, vel & 0x7f], time);
+  },
+  noteOffAt(ch, note, time) {
+    if (!this.out || !this.enabled) return;
+    this.out.send([0x80 | ((ch - 1) & 0x0f), note & 0x7f, 0], time);
+  },
+
+  noteOff(ch, note = 60) {
+    if (!this.out || !this.enabled) return;
+    this.out.send([0x80 | ((ch - 1) & 0x0f), note & 0x7f, 0]);
+  },
+};
+// ファームウェア WAV 再生 (Web Audio)
+const Firmware = {
+  ctx: null,
+  buffer: null,
+  source: null,
+  analyser: null,
+  startTime: 0,
+  raf: null,
+
+  ensureCtx() {
+    if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    return this.ctx;
+  },
+
+  async loadArrayBuffer(arrBuf, name) {
+    this.ensureCtx();
+    this.buffer = await this.ctx.decodeAudioData(arrBuf);
+    const dur = this.buffer.duration;
+    return { name, duration: dur, channels: this.buffer.numberOfChannels, rate: this.buffer.sampleRate };
+  },
+
+  play(onProgress, onEnd) {
+    if (!this.buffer) return;
+    this.stop();
+    const ctx = this.ctx;
+    ctx.resume();
+    const src = ctx.createBufferSource();
+    src.buffer = this.buffer;
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 1024;
+    src.connect(analyser);
+    analyser.connect(ctx.destination);
+    src.start();
+    this.source = src;
+    this.analyser = analyser;
+    this.startTime = ctx.currentTime;
+    const dur = this.buffer.duration;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+
+    const tick = () => {
+      const t = ctx.currentTime - this.startTime;
+      analyser.getByteTimeDomainData(data);
+      let peak = 0;
+      for (let i = 0; i < data.length; i++) {
+        const v = Math.abs(data[i] - 128) / 128;
+        if (v > peak) peak = v;
+      }
+      onProgress(Math.min(t / dur, 1), peak, data);
+      if (t < dur) {
+        this.raf = requestAnimationFrame(tick);
+      }
+    };
+    src.onended = () => {
+      cancelAnimationFrame(this.raf);
+      this.source = null;
+      onEnd && onEnd();
+    };
+    this.raf = requestAnimationFrame(tick);
+  },
+
+  stop() {
+    if (this.source) {
+      try { this.source.onended = null; this.source.stop(); } catch (e) {}
+      this.source = null;
+    }
+    if (this.raf) cancelAnimationFrame(this.raf);
+  },
+};
+// ===== 状態 =====
+const state = {
+  chMode: 'split',
+  baseCh: 1,
+  parts: [],   // parts[i] = { layers:[{},{}], pan, send }
+  global: {},
+};
+
+// 初期値生成
+function initState() {
+  state.parts = [];
+  for (let p = 0; p < NUM_PARTS; p++) {
+    const layers = [{}, {}];
+    LAYER_PARAMS.forEach(par => {
+      const fb = par.def != null ? par.def : (par.max != null ? 0 : 64);
+      layers[0][par.key] = par.init ? par.init[0] : fb;
+      layers[1][par.key] = par.init ? par.init[1] : fb;
+    });
+    const part = { layers, qpi: false };
+    PART_PARAMS.forEach(par => part[par.key] = par.init != null ? par.init : (par.def != null ? par.def : 64));
+    state.parts.push(part);
+  }
+  state.global = {};
+  WAVEGUIDE_PARAMS.forEach(par => {
+    state.global[par.key] = par.init != null ? par.init : (par.def != null ? par.def : (par.max != null ? 0 : 64));
+  });
+}
+
+// Part -> 送信先 ch
+function partChannel(partIndex) {
+  if (state.chMode === 'split') return ((state.baseCh - 1 + partIndex) % 16) + 1;
+  return state.baseCh;
+}
+
+// ===== CC 送信 =====
+// 離散選択 (labels あり) は本体が 0-127 を選択肢数のバンドに分割して解釈するため、
+// 内部インデックスをバンド中心の CC 値へスケールする。連続値はそのまま。
+function ccValue(par, v) {
+  if (par.labels && par.labels.length > 1) {
+    const n = par.labels.length;
+    return Math.min(127, Math.max(0, Math.round((v + 0.5) * 127 / n)));
+  }
+  return v;
+}
+function sendLayerParam(partIndex, layer, par) {
+  const val = ccValue(par, state.parts[partIndex].layers[layer][par.key]);
+  if (state.chMode === 'split') {
+    MIDI.sendCC(partChannel(partIndex), par.cc[layer], val);
+  } else {
+    const map = SINGLE_CC[partIndex];
+    if (map && map[par.key] != null) MIDI.sendCC(state.baseCh, map[par.key], val);
+  }
+}
+function sendPartParam(partIndex, par) {
+  const val = ccValue(par, state.parts[partIndex][par.key]);
+  if (state.chMode === 'split') {
+    MIDI.sendCC(partChannel(partIndex), par.cc, val);
+  } else {
+    const map = SINGLE_CC[partIndex];
+    const cc = (map && map[par.key] != null) ? map[par.key] : par.cc;
+    if (cc != null) MIDI.sendCC(state.baseCh, cc, val);
+  }
+}
+function sendGlobal(par) {
+  // グローバルは全Part channel に送る (split) / baseCh (single)
+  const val = ccValue(par, state.global[par.key]);
+  if (state.chMode === 'split') {
+    MIDI.sendCC(partChannel(0), par.cc, val);
+  } else {
+    MIDI.sendCC(state.baseCh, par.cc, val);
+  }
+}
+
+function sendLayer(p, l) { LAYER_PARAMS.forEach(par => sendLayerParam(p, l, par)); }
+function sendMix(p) { PART_PARAMS.forEach(par => sendPartParam(p, par)); }
+function sendPart(p) {
+  [0, 1].forEach(l => sendLayer(p, l));
+  sendMix(p);
+}
+
+function sendAll() {
+  for (let p = 0; p < NUM_PARTS; p++) sendPart(p);
+  WAVEGUIDE_PARAMS.forEach(par => sendGlobal(par));
+}
+
+// ランダマイズ
+function randInt(min, max) { return min + Math.floor(Math.random() * (max - min + 1)); }
+function randRange(par) {
+  return randInt(par.min != null ? par.min : 0, par.max != null ? par.max : 127);
+}
+function randomizeLayer(p, l) {
+  LAYER_PARAMS.forEach(par => { state.parts[p].layers[l][par.key] = randRange(par); });
+  rebuildUI();
+  if (MIDI.out) sendLayer(p, l);
+}
+function randomizeMix(p) {
+  PART_PARAMS.forEach(par => { state.parts[p][par.key] = randRange(par); });
+  rebuildUI();
+  if (MIDI.out) sendMix(p);
+}
+function randomizeWaveguide() {
+  WAVEGUIDE_PARAMS.forEach(par => { state.global[par.key] = randRange(par); });
+  rebuildUI();
+  if (MIDI.out) WAVEGUIDE_PARAMS.forEach(par => sendGlobal(par));
+}
+function randomizePart(p) {
+  LAYER_PARAMS.forEach(par => {
+    state.parts[p].layers[0][par.key] = randRange(par);
+    state.parts[p].layers[1][par.key] = randRange(par);
+  });
+  PART_PARAMS.forEach(par => { state.parts[p][par.key] = randRange(par); });
+  rebuildUI();
+  if (MIDI.out) sendPart(p);
+}
+
+// ノブ登録簿 (モーション: ハイライト/値更新用) knobReg[part][id] = {wrap, setValue}
+const knobReg = {};
+
+// ===== UI 構築 =====
+function makeKnob(opts) {
+  // opts: {name, value, min, max, labels, onInput}
+  const min = opts.min != null ? opts.min : 0;
+  const max = opts.max != null ? opts.max : 127;
+  const wrap = document.createElement('div');
+  wrap.className = 'knob';
+  const label = document.createElement('div');
+  label.className = 'knob-label';
+  label.textContent = opts.name;
+  const dial = document.createElement('div');
+  dial.className = 'dial';
+  const ind = document.createElement('div');
+  ind.className = 'dial-ind';
+  dial.appendChild(ind);
+  const val = document.createElement('div');
+  val.className = 'knob-val';
+
+  function fmt(v) {
+    if (opts.labels) return opts.labels[v] != null ? opts.labels[v] : v;
+    return v;
+  }
+  function render(v) {
+    const ratio = (v - min) / (max - min);
+    const ang = -135 + ratio * 270;
+    ind.style.transform = `translateX(-50%) rotate(${ang}deg)`;
+    val.textContent = fmt(v);
+  }
+  render(opts.value);
+
+  // 値が実際に変化したときだけ送信 (CC溢れ防止しつつリアルタイム送信)
+  let lastSent = opts.value;
+  function commit(nv) {
+    render(nv);
+    if (nv === lastSent) return;
+    lastSent = nv;
+    opts.onInput(nv);
+    // モーション記録
+    if (opts.motion && typeof recordMotion === 'function') recordMotion(opts.motion.part, opts.motion.id, nv);
+  }
+
+  // ドラッグで操作
+  let dragging = false, startY = 0, startVal = 0;
+  dial.addEventListener('mousedown', e => {
+    dragging = true; startY = e.clientY; startVal = opts.getValue(); lastSent = startVal;
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const dv = Math.round((startY - e.clientY) / 3);
+    let nv = Math.max(min, Math.min(max, startVal + dv));
+    commit(nv);
+  });
+  window.addEventListener('mouseup', () => dragging = false);
+  // ホイール
+  dial.addEventListener('wheel', e => {
+    e.preventDefault();
+    let nv = Math.max(min, Math.min(max, opts.getValue() + (e.deltaY < 0 ? 1 : -1)));
+    commit(nv);
+  }, { passive: false });
+  // ダブルクリックでセンター/0
+  dial.addEventListener('dblclick', () => {
+    const nv = opts.def != null ? opts.def : Math.round((min + max) / 2);
+    commit(nv);
+  });
+
+  // 右クリックでモーション消去
+  if (opts.motion) {
+    dial.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      if (typeof eraseMotionKnob === 'function') eraseMotionKnob(opts.motion.part, opts.motion.id);
+    });
+  }
+
+  wrap.append(label, dial, val);
+  wrap._render = render;
+  // モーション用に登録 (ハイライト/再生時のリアルタイム更新に使用)
+  if (opts.motion) {
+    knobReg[opts.motion.part] = knobReg[opts.motion.part] || {};
+    knobReg[opts.motion.part][opts.motion.id] = {
+      wrap,
+      setValue: v => { if (opts.setState) opts.setState(v); render(v); lastSent = v; },
+    };
+  }
+  return wrap;
+}
+
+function buildParts() {
+  const container = document.getElementById('parts');
+  container.innerHTML = '';
+  for (const k in knobReg) delete knobReg[k];
+  for (let p = 0; p < NUM_PARTS; p++) {
+    const partDiv = document.createElement('div');
+    partDiv.className = 'part';
+
+    const head = document.createElement('div');
+    head.className = 'part-head';
+    head.innerHTML = `<span>PART ${p + 1} <small>(DRUM ${p + 1})</small></span>`;
+    const headBtns = document.createElement('span');
+    headBtns.className = 'head-btns';
+    const rndBtn = document.createElement('button');
+    rndBtn.className = 'rnd-btn';
+    rndBtn.textContent = 'RANDOM';
+    rndBtn.title = 'Randomize this part';
+    rndBtn.addEventListener('click', () => randomizePart(p));
+    const mrecBtn = document.createElement('button');
+    mrecBtn.className = 'rnd-btn mrec-btn';
+    mrecBtn.textContent = 'MREC';
+    mrecBtn.title = 'Motion record (store this part\'s CC changes per step)';
+    if (typeof SEQ !== 'undefined' && SEQ.mrec && SEQ.recPart === p) mrecBtn.classList.add('on');
+    mrecBtn.addEventListener('click', () => { if (typeof toggleMrecPart === 'function') toggleMrecPart(p); });
+    const playBtn = document.createElement('button');
+    playBtn.className = 'play-btn';
+    playBtn.textContent = '♪';
+    playBtn.title = 'Test trigger';
+    playBtn.addEventListener('mousedown', () => MIDI.noteOn(partChannel(p), 60, 110));
+    playBtn.addEventListener('mouseup', () => MIDI.noteOff(partChannel(p), 60));
+    playBtn.addEventListener('mouseleave', () => MIDI.noteOff(partChannel(p), 60));
+    headBtns.append(rndBtn, mrecBtn, playBtn);
+    head.appendChild(headBtns);
+    partDiv.appendChild(head);
+
+    // 2 レイヤー
+    [0, 1].forEach(l => {
+      const layerDiv = document.createElement('div');
+      layerDiv.className = 'layer';
+      const ltRow = document.createElement('div');
+      ltRow.className = 'mix-title-row';
+      const lt = document.createElement('span');
+      lt.className = 'layer-title';
+      lt.textContent = 'LAYER ' + (l + 1);
+      const layerRnd = document.createElement('button');
+      layerRnd.className = 'rnd-btn';
+      layerRnd.textContent = 'RND';
+      layerRnd.title = 'Randomize this layer only';
+      layerRnd.addEventListener('click', () => randomizeLayer(p, l));
+      ltRow.append(lt, layerRnd);
+      layerDiv.appendChild(ltRow);
+      const knobs = document.createElement('div');
+      knobs.className = 'knobs';
+      LAYER_PARAMS.forEach(par => {
+        knobs.appendChild(makeKnob({
+          name: par.name,
+          value: state.parts[p].layers[l][par.key],
+          min: par.min, max: par.max, labels: par.labels, def: par.def,
+          getValue: () => state.parts[p].layers[l][par.key],
+          onInput: v => { state.parts[p].layers[l][par.key] = v; sendLayerParam(p, l, par); },
+          setState: v => { state.parts[p].layers[l][par.key] = v; },
+          motion: { part: p, id: 'L' + l + '.' + par.key },
+        }));
+      });
+      layerDiv.appendChild(knobs);
+      partDiv.appendChild(layerDiv);
+    });
+
+    // MIX セクション (Part 毎)
+    const mixTitle = document.createElement('div');
+    mixTitle.className = 'mix-title-row';
+    const mixLabel = document.createElement('span');
+    mixLabel.className = 'layer-title';
+    mixLabel.textContent = 'MIX';
+    const qpiBtn = document.createElement('button');
+    qpiBtn.className = 'qpi-btn';
+    qpiBtn.textContent = 'QPI ' + (state.parts[p].qpi ? 'ON' : 'OFF');
+    qpiBtn.classList.toggle('on', state.parts[p].qpi);
+    qpiBtn.title = 'Pitch Quantize (EDIT menu)';
+    qpiBtn.addEventListener('click', () => {
+      state.parts[p].qpi = !state.parts[p].qpi;
+      qpiBtn.textContent = 'QPI ' + (state.parts[p].qpi ? 'ON' : 'OFF');
+      qpiBtn.classList.toggle('on', state.parts[p].qpi);
+      sendQPI(p);
+      if (typeof buildSeqGrid === 'function') buildSeqGrid(); // シーケンサーのNOTE行表示を更新
+    });
+    const mixRnd = document.createElement('button');
+    mixRnd.className = 'rnd-btn';
+    mixRnd.textContent = 'RND';
+    mixRnd.title = 'Randomize MIX only';
+    mixRnd.addEventListener('click', () => randomizeMix(p));
+    const mixBtns = document.createElement('span');
+    mixBtns.className = 'head-btns';
+    mixBtns.append(qpiBtn, mixRnd);
+    mixTitle.append(mixLabel, mixBtns);
+    partDiv.appendChild(mixTitle);
+    const common = document.createElement('div');
+    common.className = 'knobs part-common';
+    PART_PARAMS.forEach(par => {
+      common.appendChild(makeKnob({
+        name: par.name, value: state.parts[p][par.key], def: par.def,
+        getValue: () => state.parts[p][par.key],
+        onInput: v => { state.parts[p][par.key] = v; sendPartParam(p, par); },
+        setState: v => { state.parts[p][par.key] = v; },
+        motion: { part: p, id: 'M.' + par.key },
+      }));
+    });
+    partDiv.appendChild(common);
+    container.appendChild(partDiv);
+  }
+}
+
+function buildGlobal() {
+  const wg = document.getElementById('globalWaveguide');
+  wg.innerHTML = '';
+  WAVEGUIDE_PARAMS.forEach(par => wg.appendChild(makeKnob({
+    name: par.name, value: state.global[par.key], min: par.min, max: par.max, labels: par.labels, def: par.def,
+    getValue: () => state.global[par.key],
+    onInput: v => { state.global[par.key] = v; sendGlobal(par); },
+  })));
+}
+
+function rebuildUI() { buildParts(); buildGlobal(); if (typeof highlightMotionKnobs === 'function') highlightMotionKnobs(); }
+
+// ===== MIDI UI =====
+function refreshMidiUI(outputs) {
+  const sel = document.getElementById('midiOut');
+  const cur = MIDI.out ? MIDI.out.id : '';
+  sel.innerHTML = '';
+  if (!outputs.length) {
+    sel.innerHTML = '<option>(no output port)</option>';
+  } else {
+    outputs.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.id; opt.textContent = o.name;
+      if (o.id === cur) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    if (!MIDI.out) MIDI.selectOutput(outputs[0].id);
+  }
+  updateStatus();
+}
+
+function updateStatus() {
+  const s = document.getElementById('midiStatus');
+  s.textContent = MIDI.out ? ('MIDI: ' + MIDI.out.name) : 'MIDI: Not connected';
+}
+
+// ===== 初期化 =====
+function setup() {
+  initState();
+  rebuildUI();
+
+  const baseSel = document.getElementById('baseCh');
+  for (let i = 1; i <= 16; i++) {
+    const o = document.createElement('option'); o.value = i; o.textContent = 'Ch ' + i;
+    baseSel.appendChild(o);
+  }
+
+  document.getElementById('midiOut').addEventListener('change', e => { MIDI.selectOutput(e.target.value); updateStatus(); });
+  document.getElementById('midiRefresh').addEventListener('click', () => MIDI.refresh());
+  document.getElementById('chMode').addEventListener('change', e => { state.chMode = e.target.value; });
+  baseSel.addEventListener('change', e => { state.baseCh = parseInt(e.target.value, 10); });
+
+  MIDI.onchange = refreshMidiUI;
+  MIDI.init().catch(err => {
+    document.getElementById('midiStatus').textContent = 'MIDI: ' + err.message;
+  });
+
+  // Init
+  document.getElementById('menuInit').addEventListener('click', () => {
+    if (!confirm('Reset all parameters to init values (power-on default). Continue?')) return;
+    initState();
+    rebuildUI();
+    if (MIDI.out && confirm('Also send INIT values to the unit?\n(MIDI-controllable parameters only. Global settings and sequences are not reset.)')) {
+      sendAll();
+      state.parts.forEach((_, p) => sendQPI(p));
+    }
+  });
+  // MIDI ON/OFF トグル
+  const onoff = document.getElementById('midiOnOff');
+  const toggleBtn = document.getElementById('midiToggle');
+  function applyMidiEnabled() {
+    onoff.textContent = MIDI.enabled ? '● ON' : '○ OFF';
+    onoff.classList.toggle('off', !MIDI.enabled);
+    toggleBtn.textContent = 'MIDI OUT: ' + (MIDI.enabled ? 'ON' : 'OFF');
+    toggleBtn.classList.toggle('on', MIDI.enabled);
+  }
+  toggleBtn.addEventListener('click', () => { MIDI.enabled = !MIDI.enabled; applyMidiEnabled(); });
+  onoff.addEventListener('click', () => { MIDI.enabled = !MIDI.enabled; applyMidiEnabled(); });
+  applyMidiEnabled();
+
+  // 全パラメーター送信
+  document.getElementById('midiSendAll').addEventListener('click', () => {
+    if (!MIDI.out) { alert('No MIDI output port selected'); return; }
+    if (!MIDI.enabled) { alert('MIDI output is OFF. Please turn it ON.'); return; }
+    sendAll(); state.parts.forEach((_, p) => sendQPI(p));
+    alert('All parameters sent');
+  });
+
+  document.getElementById('waveguideRnd').addEventListener('click', randomizeWaveguide);
+  setupPatch();
+  setupFirmwareUI();
+  setupWindows();
+  loadFromHash();
+}
+
+// QPI (Pitch Quantize) : 各パートのEDITメニュー機能。CC53で各パートのChに ON=127/OFF=0。
+const QPI_CC = 53;
+function sendQPI(partIndex) {
+  const ch = state.chMode === 'split' ? partChannel(partIndex) : state.baseCh;
+  MIDI.sendCC(ch, QPI_CC, state.parts[partIndex].qpi ? 127 : 0);
+}
+
+function setupWindows() {
+  const fwWin = document.getElementById('firmwareWindow');
+  const aboutWin = document.getElementById('aboutDialog');
+  // メインウィンドウ右肩: 折り畳み (ウィンドウシェード)
+  document.getElementById('mainZoom').addEventListener('click', () => {
+    document.getElementById('mainWindow').classList.toggle('collapsed');
+  });
+
+  const midiWin = document.getElementById('midiWindow');
+  document.getElementById('menuMidi').addEventListener('click', () => midiWin.classList.remove('hidden'));
+  document.getElementById('midiClose').addEventListener('click', () => midiWin.classList.add('hidden'));
+  makeDraggable(midiWin);
+  const patchWin = document.getElementById('patchWindow');
+  document.getElementById('menuPatch').addEventListener('click', () => patchWin.classList.remove('hidden'));
+  document.getElementById('patchClose').addEventListener('click', () => patchWin.classList.add('hidden'));
+  makeDraggable(patchWin);
+  document.getElementById('menuFirmware').addEventListener('click', () => fwWin.classList.remove('hidden'));
+  document.getElementById('fwClose').addEventListener('click', () => fwWin.classList.add('hidden'));
+  document.getElementById('menuAbout').addEventListener('click', () => aboutWin.classList.remove('hidden'));
+  document.getElementById('aboutClose').addEventListener('click', () => aboutWin.classList.add('hidden'));
+  makeDraggable(fwWin);
+  makeDraggable(aboutWin);
+}
+
+function makeDraggable(win) {
+  const bar = win.querySelector('.titlebar');
+  let dx = 0, dy = 0, drag = false;
+  bar.addEventListener('mousedown', e => {
+    if (e.target.classList.contains('closebox')) return;
+    drag = true;
+    const r = win.getBoundingClientRect();
+    dx = e.clientX - r.left; dy = e.clientY - r.top;
+    win.style.position = 'fixed';
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', e => {
+    if (!drag) return;
+    win.style.left = (e.clientX - dx) + 'px';
+    win.style.top = (e.clientY - dy) + 'px';
+  });
+  window.addEventListener('mouseup', () => drag = false);
+}
+
+// ===== Firmware UI =====
+function setupFirmwareUI() {
+  const playBtn = document.getElementById('fwPlay');
+  const stopBtn = document.getElementById('fwStop');
+  const info = document.getElementById('fwInfo');
+  const bar = document.getElementById('fwBar');
+  const canvas = document.getElementById('fwMeter');
+  const cctx = canvas.getContext('2d');
+
+  function setLoaded(meta) {
+    info.textContent = `${meta.name} / ${meta.duration.toFixed(1)}s / ${meta.rate}Hz / ${meta.channels}ch`;
+    playBtn.disabled = false;
+  }
+
+
+  document.getElementById('fwFile').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    info.textContent = 'Loading...';
+    try {
+      const meta = await Firmware.loadArrayBuffer(await f.arrayBuffer(), f.name);
+      setLoaded(meta);
+    } catch (err) { info.textContent = 'Error: ' + err.message; }
+  });
+
+  function drawMeter(data) {
+    cctx.clearRect(0, 0, canvas.width, canvas.height);
+    cctx.strokeStyle = '#000'; cctx.lineWidth = 1; cctx.beginPath();
+    const step = canvas.width / data.length;
+    for (let i = 0; i < data.length; i++) {
+      const y = (data[i] / 255) * canvas.height;
+      i === 0 ? cctx.moveTo(0, y) : cctx.lineTo(i * step, y);
+    }
+    cctx.stroke();
+  }
+
+  playBtn.addEventListener('click', () => {
+    playBtn.disabled = true; stopBtn.disabled = false;
+    Firmware.play(
+      (prog, peak, data) => { bar.style.width = (prog * 100) + '%'; drawMeter(data); },
+      () => { playBtn.disabled = false; stopBtn.disabled = true; bar.style.width = '100%'; }
+    );
+  });
+  stopBtn.addEventListener('click', () => {
+    Firmware.stop(); playBtn.disabled = false; stopBtn.disabled = true;
+    cctx.clearRect(0, 0, canvas.width, canvas.height);
+  });
+}
+
+// ===== パッチ Save / Load / Share =====
+function serializePatch() {
+  return {
+    v: 1,
+    app: 'volca-drum-editor',
+    name: document.getElementById('patchName') ? document.getElementById('patchName').value : 'patch',
+    chMode: state.chMode,
+    baseCh: state.baseCh,
+    parts: state.parts.map(p => ({
+      layers: p.layers.map(l => ({ ...l })),
+      qpi: p.qpi,
+      ...PART_PARAMS.reduce((o, par) => (o[par.key] = p[par.key], o), {}),
+    })),
+    global: { ...state.global },
+  };
+}
+
+function applyPatch(obj, send) {
+  if (!obj || !obj.parts) throw new Error('Invalid patch data');
+  if (obj.chMode) { state.chMode = obj.chMode; document.getElementById('chMode').value = obj.chMode; }
+  if (obj.baseCh) { state.baseCh = obj.baseCh; document.getElementById('baseCh').value = obj.baseCh; }
+  if (obj.name && document.getElementById('patchName')) document.getElementById('patchName').value = obj.name;
+  updatePatchNameDisplay();
+
+  obj.parts.forEach((sp, p) => {
+    if (!state.parts[p]) return;
+    if (sp.layers) sp.layers.forEach((sl, l) => {
+      LAYER_PARAMS.forEach(par => { if (sl[par.key] != null) state.parts[p].layers[l][par.key] = sl[par.key]; });
+    });
+    PART_PARAMS.forEach(par => { if (sp[par.key] != null) state.parts[p][par.key] = sp[par.key]; });
+    state.parts[p].qpi = !!sp.qpi;
+  });
+  if (obj.global) WAVEGUIDE_PARAMS.forEach(par => { if (obj.global[par.key] != null) state.global[par.key] = obj.global[par.key]; });
+
+  rebuildUI();
+  if (send && MIDI.out) { sendAll(); state.parts.forEach((_, p) => sendQPI(p)); }
+}
+
+function downloadPatch() {
+  const data = serializePatch();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (data.name || 'volca-drum-patch').replace(/[^\w\-]+/g, '_') + '_drum.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function makeShareUrl() {
+  const json = JSON.stringify(serializePatch());
+  const b64 = btoa(unescape(encodeURIComponent(json)));
+  return location.origin + location.pathname + '#p=' + b64;
+}
+
+function loadFromHash() {
+  const m = location.hash.match(/[#&]p=([^&]+)/);
+  if (!m) return;
+  try {
+    const json = decodeURIComponent(escape(atob(m[1])));
+    applyPatch(JSON.parse(json), false);
+  } catch (e) { console.warn('共有リンクの復元に失敗:', e); }
+}
+
+function updatePatchNameDisplay() {
+  const el = document.getElementById('patchNameDisplay');
+  const inp = document.getElementById('patchName');
+  if (el && inp) el.textContent = '♪ ' + (inp.value || '(no name)');
+}
+
+function setupPatch() {
+  document.getElementById('patchName').addEventListener('input', updatePatchNameDisplay);
+  updatePatchNameDisplay();
+  document.getElementById('patchSave').addEventListener('click', downloadPatch);
+  document.getElementById('patchLoadBtn').addEventListener('click', () => document.getElementById('patchFile').click());
+  document.getElementById('patchFile').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try {
+      const obj = JSON.parse(await f.text());
+      applyPatch(obj, true);  // auto-send all parameters to unit after load
+      alert('Patch loaded and sent to unit: ' + (obj.name || f.name));
+    } catch (err) { alert('Load error: ' + err.message); }
+    e.target.value = '';
+  });
+  document.getElementById('patchShare').addEventListener('click', () => {
+    const url = makeShareUrl();
+    const ta = document.getElementById('patchShareUrl');
+    ta.value = url;
+    ta.select();
+    if (navigator.clipboard) navigator.clipboard.writeText(url).then(
+      () => {}, () => {});
+    try { document.execCommand('copy'); } catch (e) {}
+    location.hash = 'p=' + url.split('#p=')[1];
+  });
+  document.getElementById('patchSend').addEventListener('click', () => {
+    if (!MIDI.out) { alert('No MIDI output port selected'); return; }
+    sendAll(); state.parts.forEach((_, p) => sendQPI(p));
+    alert('All parameters + QPI sent');
+  });
+}
+
+document.addEventListener('DOMContentLoaded', setup);
+// ===== 16ステップ ドラムシーケンサー =====
+// honodori_synth SUBシンセのシーケンサーを参考。volca drum向けに ON + VEL のみ
+// (PAN=MIX側のため除外, NOTE/TIE=メロディ用途のため除外)。
+const STEPS = 16;
+// 0〜127を8刻み (+ 最大127) 降順
+const VEL_OPTIONS = (() => {
+  const arr = [127];
+  for (let v = 120; v >= 0; v -= 8) arr.push(v);
+  return arr;
+})();
+
+// ノート一覧 (C1〜C7)。QPIがONのPARTではこのノートでPITCHが決まる。
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const SEQ_NOTES = [];
+for (let n = 24; n <= 96; n++) {
+  SEQ_NOTES.push({ num: n, name: NOTE_NAMES[n % 12] + (Math.floor(n / 12) - 1) });
+}
+const DEFAULT_NOTE = 60; // C4
+// PAN (CC10, 64=中央) 8刻み降順
+const PAN_OPTIONS = [127, 112, 96, 80, 64, 48, 32, 16, 0];
+
+const SEQ = {
+  bpm: 120,
+  playing: false,
+  pages: 1,           // 総ページ数 (1ページ=16STEP)
+  page: 1,            // 表示中ページ (1-based)
+  beatGroups: [4, 4, 4, 4],  // 拍グループ (合計=16)
+  parts: [],          // parts[p] = { on:[], vel:[], notes:[] } 長さ = pages*16
+  motion: [],         // motion[p][absStep] = { 'L0.pitch':val, 'M.gain':val, ... } モーションレック
+  mrec: false,        // モーション録音モード
+  recPart: -1,        // 録音対象PART
+  recStep: -1,        // 選択中ステップ(絶対index)
+  cells: [],          // cells[p][step] = ON要素 (UI)
+  velSelects: [],     // velSelects[p][step]
+  stepHeads: [],      // ステップ番号ヘッダ要素
+  timer: null,
+  nextTime: 0,
+  current: 0,
+  scheduled: [],      // {step, time} UIプレイヘッド用
+  raf: null,
+
+  init() {
+    for (let p = 0; p < NUM_PARTS; p++) {
+      this.parts.push({ on: Array(STEPS).fill(false), vel: Array(STEPS).fill(100), notes: Array(STEPS).fill(DEFAULT_NOTE), pan: Array(STEPS).fill(64) });
+      this.motion.push(Array.from({ length: STEPS }, () => ({})));
+    }
+  },
+  stepDurMs() { return 60000 / this.bpm / 4; }, // 16分音符
+  totalSteps() { return this.pages * STEPS; },
+  base() { return (this.page - 1) * STEPS; }, // 表示中ページの先頭絶対index
+};
+
+function buildSeqGrid() {
+  const grid = document.getElementById('seqGrid');
+  grid.innerHTML = '';
+  SEQ.cells = []; SEQ.velSelects = []; SEQ.stepHeads = [];
+  const heads = getBeatHeads();
+
+  // ステップ番号ヘッダ
+  const head = document.createElement('div');
+  head.className = 'seq-row';
+  head.appendChild(seqLabel(''));
+  for (let s = 0; s < STEPS; s++) {
+    const h = document.createElement('div');
+    h.className = 'seq-step-head' + (heads.has(s) ? ' beat' : '');
+    h.textContent = s + 1;
+    SEQ.stepHeads.push(h);
+    head.appendChild(h);
+  }
+  grid.appendChild(head);
+
+  for (let p = 0; p < NUM_PARTS; p++) {
+    SEQ.cells[p] = []; SEQ.velSelects[p] = []; SEQ.noteSelects = SEQ.noteSelects || []; SEQ.noteSelects[p] = [];
+
+    // NOTE 行 (QPI ON時に PITCH を決定)
+    const qpiOn = state && state.parts && state.parts[p] && state.parts[p].qpi;
+    const noteRow = document.createElement('div');
+    noteRow.className = 'seq-row note-row';
+    const dlbl = seqLabel('PART ' + (p + 1) + (qpiOn ? ' ♪QPI' : ''));
+    dlbl.title = 'Click to test trigger' + (qpiOn ? ' (QPI ON: NOTE changes PITCH)' : ' (QPI OFF: NOTE has no effect)');
+    dlbl.style.cursor = 'pointer';
+    dlbl.classList.toggle('qpi-on', !!qpiOn);
+    dlbl.addEventListener('mousedown', () => MIDI.noteOn(partChannel(p), DEFAULT_NOTE, 110));
+    dlbl.addEventListener('mouseup', () => MIDI.noteOff(partChannel(p), DEFAULT_NOTE));
+    noteRow.appendChild(dlbl);
+    for (let s = 0; s < STEPS; s++) {
+      const idx = SEQ.base() + s;
+      const sel = document.createElement('select');
+      sel.className = 'seq-vel seq-note' + (heads.has(s) ? ' beat' : '') + (qpiOn ? '' : ' note-disabled');
+      SEQ_NOTES.forEach(nt => {
+        const o = document.createElement('option');
+        o.value = nt.num; o.textContent = nt.name;
+        if (nt.num === SEQ.parts[p].notes[idx]) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', e => { SEQ.parts[p].notes[idx] = parseInt(e.target.value, 10); });
+      SEQ.noteSelects[p].push(sel);
+      noteRow.appendChild(sel);
+    }
+    grid.appendChild(noteRow);
+
+    // ON 行
+    const onRow = document.createElement('div');
+    onRow.className = 'seq-row';
+    const lbl = seqLabel('ON');
+    onRow.appendChild(lbl);
+    for (let s = 0; s < STEPS; s++) {
+      const idx = SEQ.base() + s;
+      const cell = document.createElement('div');
+      cell.className = 'seq-cell' + (heads.has(s) ? ' beat' : '') + (SEQ.parts[p].on[idx] ? ' on' : '');
+      cell.addEventListener('click', () => {
+        SEQ.parts[p].on[idx] = !SEQ.parts[p].on[idx];
+        cell.classList.toggle('on', SEQ.parts[p].on[idx]);
+      });
+      SEQ.cells[p].push(cell);
+      onRow.appendChild(cell);
+    }
+    grid.appendChild(onRow);
+
+    // VEL 行
+    const velRow = document.createElement('div');
+    velRow.className = 'seq-row vel-row';
+    velRow.appendChild(seqLabel('VEL'));
+    for (let s = 0; s < STEPS; s++) {
+      const idx = SEQ.base() + s;
+      const sel = document.createElement('select');
+      sel.className = 'seq-vel' + (heads.has(s) ? ' beat' : '');
+      VEL_OPTIONS.forEach(v => {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = v;
+        if (Math.abs(SEQ.parts[p].vel[idx] - v) < 8) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.value = nearestVel(SEQ.parts[p].vel[idx]);
+      sel.addEventListener('change', e => { SEQ.parts[p].vel[idx] = parseInt(e.target.value, 10); });
+      SEQ.velSelects[p].push(sel);
+      velRow.appendChild(sel);
+    }
+    grid.appendChild(velRow);
+
+    // PAN 行 (各PARTのMIX PAN = CC10)
+    SEQ.panSelects = SEQ.panSelects || []; SEQ.panSelects[p] = [];
+    const panRow = document.createElement('div');
+    panRow.className = 'seq-row vel-row';
+    panRow.appendChild(seqLabel('PAN'));
+    for (let s = 0; s < STEPS; s++) {
+      const idx = SEQ.base() + s;
+      const sel = document.createElement('select');
+      sel.className = 'seq-vel' + (heads.has(s) ? ' beat' : '');
+      PAN_OPTIONS.forEach(v => {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = v === 64 ? 'C' : (v < 64 ? 'L' + (64 - v) : 'R' + (v - 64));
+        sel.appendChild(o);
+      });
+      sel.value = PAN_OPTIONS.reduce((a, b) => Math.abs(b - SEQ.parts[p].pan[idx]) < Math.abs(a - SEQ.parts[p].pan[idx]) ? b : a);
+      sel.addEventListener('change', e => { SEQ.parts[p].pan[idx] = parseInt(e.target.value, 10); });
+      SEQ.panSelects[p].push(sel);
+      panRow.appendChild(sel);
+    }
+    grid.appendChild(panRow);
+
+    // MOT 行 (モーションレック: 記録ステップ選択 / データ有無表示)
+    const motRow = document.createElement('div');
+    motRow.className = 'seq-row mot-row';
+    const motLbl = seqLabel('MOT');
+    motRow.appendChild(motLbl);
+    for (let s = 0; s < STEPS; s++) {
+      const idx = SEQ.base() + s;
+      const cell = document.createElement('div');
+      const hasData = motionHasData(p, idx);
+      const selected = SEQ.recPart === p && SEQ.recStep === idx;
+      cell.className = 'seq-cell mot-cell' + (heads.has(s) ? ' beat' : '') + (hasData ? ' on' : '') + (selected ? ' sel' : '');
+      cell.addEventListener('click', () => selectMotionStep(p, idx));
+      motRow.appendChild(cell);
+    }
+    grid.appendChild(motRow);
+  }
+}
+
+// ===== ページ =====
+function ensurePages(n) {
+  if (n <= SEQ.pages) return;
+  for (const pt of SEQ.parts) {
+    while (pt.on.length < n * STEPS) { pt.on.push(false); pt.vel.push(100); pt.notes.push(DEFAULT_NOTE); pt.pan.push(64); }
+  }
+  for (const m of SEQ.motion) { while (m.length < n * STEPS) m.push({}); }
+  SEQ.pages = n;
+}
+function setPage(n) {
+  n = Math.max(1, Math.min(16, n)); // 最大16ページ
+  ensurePages(n);
+  SEQ.page = n;
+  buildSeqGrid();
+  updatePageDisplay();
+}
+function updatePageDisplay() {
+  const inp = document.getElementById('pageInput');
+  const tot = document.getElementById('pageTotal');
+  if (inp) inp.value = SEQ.page;
+  if (tot) tot.textContent = '/ ' + SEQ.pages;
+}
+
+// ===== BEAT グループ =====
+function normalizeBeat() {
+  const g = SEQ.beatGroups;
+  let total = g.reduce((a, b) => a + b, 0);
+  while (total > STEPS && g.length > 0) {
+    const diff = total - STEPS, last = g[g.length - 1];
+    if (last <= diff) { g.pop(); total -= last; }
+    else { g[g.length - 1] -= diff; total = STEPS; }
+  }
+  if (total < STEPS) g.push(STEPS - total);
+}
+// グループ境界(step 0除く)の集合
+function getBeatHeads() {
+  const heads = new Set();
+  let pos = 0;
+  SEQ.beatGroups.forEach(grp => { if (pos > 0) heads.add(pos); pos += grp; });
+  return heads;
+}
+
+function renderBeatBar() {
+  const chips = document.getElementById('beatChips');
+  const totalEl = document.getElementById('beatTotal');
+  if (!chips) return;
+  chips.innerHTML = '';
+  SEQ.beatGroups.forEach((g, gi) => {
+    const wrap = document.createElement('span');
+    wrap.className = 'beat-chip';
+    const minus = document.createElement('button');
+    minus.className = 'beat-pm'; minus.textContent = '−';
+    minus.onclick = () => {
+      if (SEQ.beatGroups[gi] > 1) SEQ.beatGroups[gi]--;
+      else if (SEQ.beatGroups.length > 1) {
+        const t = gi + 1 < SEQ.beatGroups.length ? gi + 1 : gi - 1;
+        SEQ.beatGroups[t] += SEQ.beatGroups[gi];
+        SEQ.beatGroups.splice(gi, 1);
+      }
+      normalizeBeat(); refreshBeat();
+    };
+    const num = document.createElement('span');
+    num.className = 'beat-num'; num.textContent = g;
+    const plus = document.createElement('button');
+    plus.className = 'beat-pm'; plus.textContent = '+';
+    plus.onclick = () => {
+      if (SEQ.beatGroups.reduce((a, b) => a + b, 0) < STEPS) { SEQ.beatGroups[gi]++; normalizeBeat(); refreshBeat(); }
+    };
+    wrap.append(minus, num, plus);
+    chips.appendChild(wrap);
+  });
+  const total = SEQ.beatGroups.reduce((a, b) => a + b, 0);
+  if (totalEl) totalEl.textContent = total + '/' + STEPS;
+}
+
+function refreshBeat() { renderBeatBar(); buildSeqGrid(); }
+
+function nearestVel(v) {
+  return VEL_OPTIONS.reduce((a, b) => Math.abs(b - v) < Math.abs(a - v) ? b : a);
+}
+function seqLabel(text) {
+  const d = document.createElement('div');
+  d.className = 'seq-label';
+  d.textContent = text;
+  return d;
+}
+
+// ===== モーションレック (MREC) =====
+// id 'L{layer}.{key}' または 'M.{key}' から PARAM定義/CC/チャンネルを解決
+function motionParam(p, id) {
+  if (id[0] === 'L') {
+    const l = +id[1], key = id.slice(3);
+    const par = LAYER_PARAMS.find(x => x.key === key);
+    if (!par) return null;
+    const cc = (state.chMode === 'split') ? par.cc[l] : (SINGLE_CC[p] ? SINGLE_CC[p][key] : null);
+    return { par, cc, ch: state.chMode === 'split' ? partChannel(p) : state.baseCh };
+  } else {
+    const key = id.slice(2);
+    const par = PART_PARAMS.find(x => x.key === key);
+    if (!par) return null;
+    const cc = (state.chMode === 'split') ? par.cc : (SINGLE_CC[p] && SINGLE_CC[p][key] != null ? SINGLE_CC[p][key] : par.cc);
+    return { par, cc, ch: state.chMode === 'split' ? partChannel(p) : state.baseCh };
+  }
+}
+
+function toggleMrecPart(p) {
+  if (SEQ.mrec && SEQ.recPart === p) { SEQ.mrec = false; SEQ.recPart = -1; SEQ.recStep = -1; }
+  else { SEQ.mrec = true; SEQ.recPart = p; SEQ.recStep = -1; }
+  rebuildUI();        // MRECボタン表示更新 + ハイライト
+  buildSeqGrid();     // MOT行の選択表示更新
+  updateMrecStatus();
+}
+
+function updateMrecStatus() {
+  const el = document.getElementById('mrecStatus'); if (!el) return;
+  if (!SEQ.mrec) { el.textContent = 'MREC: OFF'; el.classList.remove('on'); return; }
+  el.classList.add('on');
+  const stepTxt = SEQ.recStep >= 0 ? ('P' + (Math.floor(SEQ.recStep / STEPS) + 1) + ' ST' + (SEQ.recStep % STEPS + 1)) : 'select a step';
+  el.textContent = 'MREC● PART' + (SEQ.recPart + 1) + ' / ' + stepTxt;
+}
+
+// MOT行のステップ選択 / 同じ選択中ステップ再クリックで一括消去
+function selectMotionStep(p, abs) {
+  if (SEQ.recPart === p && SEQ.recStep === abs) {
+    SEQ.motion[p][abs] = {};   // 一括消去
+    SEQ.recStep = -1;
+  } else {
+    SEQ.recPart = p; SEQ.recStep = abs;
+    loadMotionToKnobs(p, abs); // 記録済み値をGUIに反映
+  }
+  buildSeqGrid();
+  highlightMotionKnobs();
+  updateMrecStatus();
+}
+
+function recordMotion(p, id, value) {
+  if (!SEQ.mrec || SEQ.recPart !== p || SEQ.recStep < 0) return;
+  SEQ.motion[p][SEQ.recStep][id] = value;
+  buildSeqGrid();
+  highlightMotionKnobs();
+}
+
+function eraseMotionKnob(p, id) {
+  if (SEQ.recPart !== p || SEQ.recStep < 0) return;
+  if (SEQ.motion[p][SEQ.recStep]) delete SEQ.motion[p][SEQ.recStep][id];
+  buildSeqGrid();
+  highlightMotionKnobs();
+}
+
+function motionHasData(p, abs) {
+  const m = SEQ.motion[p] && SEQ.motion[p][abs];
+  return m && Object.keys(m).length > 0;
+}
+
+// 選択中ステップの記録値をGUIノブに反映
+function loadMotionToKnobs(p, abs) {
+  const m = SEQ.motion[p][abs]; if (!m) return;
+  const reg = knobReg[p]; if (!reg) return;
+  Object.keys(m).forEach(id => { if (reg[id]) reg[id].setValue(m[id]); });
+}
+
+// パターン内のどこかに記録があるパラメータidの集合 (PART別)
+function motionIdSet(p) {
+  const set = new Set();
+  const arr = SEQ.motion[p]; if (!arr) return set;
+  for (const m of arr) { if (m) for (const id in m) set.add(id); }
+  return set;
+}
+
+// 記録済みノブをハイライト
+// MREC ON & ステップ選択中: そのステップの記録パラメータ
+// それ以外(MREC OFF含む): パターン内に記録のあるパラメータ全て
+function highlightMotionKnobs() {
+  for (const pk in knobReg) {
+    const p = +pk, reg = knobReg[pk];
+    const useStep = SEQ.mrec && SEQ.recPart === p && SEQ.recStep >= 0;
+    const m = useStep ? SEQ.motion[p][SEQ.recStep] : null;
+    const set = useStep ? null : motionIdSet(p);
+    for (const id in reg) {
+      const has = useStep ? (m && m[id] !== undefined) : set.has(id);
+      reg[id].wrap.classList.toggle('has-motion', !!has);
+    }
+  }
+}
+
+// ===== 再生エンジン (lookahead scheduler + MIDIタイムスタンプ) =====
+const LOOKAHEAD = 25;      // タイマー間隔ms
+const SCHEDULE_AHEAD = 120; // 先行スケジュールms
+
+function seqScheduler() {
+  const now = performance.now();
+  while (SEQ.nextTime < now + SCHEDULE_AHEAD) {
+    scheduleStep(SEQ.current, SEQ.nextTime);
+    SEQ.scheduled.push({ step: SEQ.current, time: SEQ.nextTime });
+    SEQ.nextTime += SEQ.stepDurMs();
+    SEQ.current = (SEQ.current + 1) % SEQ.totalSteps();
+  }
+}
+
+function scheduleStep(step, time) {
+  if (!MIDI.out) return;
+  const gate = Math.min(SEQ.stepDurMs() * 0.9, 60);
+  for (let p = 0; p < NUM_PARTS; p++) {
+    if (SEQ.parts[p].on[step]) {
+      const ch = partChannel(p);
+      const note = SEQ.parts[p].notes[step];
+      // QPI ON のPARTは NOTE を PITCH CC として送る (PITCHが半音=ノートになる)
+      const qpiOn = state && state.parts && state.parts[p] && state.parts[p].qpi;
+      if (qpiOn) sendPitchCC(p, note, time);
+      sendPanCC(p, SEQ.parts[p].pan[step], time);
+      MIDI.noteOnAt(ch, 60, SEQ.parts[p].vel[step], time);
+      MIDI.noteOffAt(ch, 60, time + gate);
+    }
+    // モーション: そのステップの記録CCを送信 (トリガー有無に関わらず)
+    const m = SEQ.motion[p] && SEQ.motion[p][step];
+    if (m) {
+      for (const id in m) {
+        const mp = motionParam(p, id);
+        if (mp && mp.cc != null) MIDI.sendCCAt(mp.ch, mp.cc, ccValue(mp.par, m[id]), time);
+      }
+    }
+  }
+}
+
+// NOTE値を PITCH CC として送信
+// 実機実測: PITCH CC 70 ≒ A4(note 69) → CC値 = ノートナンバー + 1 (1半音=1CC)
+const PITCH_CC_OFFSET = 1;
+function sendPitchCC(p, note, time) {
+  const v = Math.max(0, Math.min(127, note + PITCH_CC_OFFSET));
+  if (state.chMode === 'split') {
+    const ch = partChannel(p);
+    MIDI.sendCCAt(ch, 26, v, time); // PITCH1
+    MIDI.sendCCAt(ch, 27, v, time); // PITCH2
+  } else {
+    const map = SINGLE_CC[p];
+    if (map && map.pitch != null) MIDI.sendCCAt(state.baseCh, map.pitch, v, time);
+  }
+}
+
+// PAN を CC10 として送信 (各PARTのMIX PAN)
+function sendPanCC(p, pan, time) {
+  const v = Math.max(0, Math.min(127, pan));
+  if (state.chMode === 'split') {
+    MIDI.sendCCAt(partChannel(p), 10, v, time);
+  } else {
+    const map = SINGLE_CC[p];
+    if (map && map.pan != null) MIDI.sendCCAt(state.baseCh, map.pan, v, time);
+  }
+}
+
+function seqPlayheadLoop() {
+  const now = performance.now();
+  // 経過したスケジュールから最新ステップを得る
+  let cur = -1;
+  while (SEQ.scheduled.length && SEQ.scheduled[0].time <= now) {
+    cur = SEQ.scheduled.shift().step;
+  }
+  if (cur >= 0) {
+    const page = Math.floor(cur / STEPS) + 1;
+    const local = cur % STEPS;
+    // 再生がページをまたいだら表示ページを追従
+    if (page !== SEQ.page) { SEQ.page = page; buildSeqGrid(); updatePageDisplay(); }
+    highlightStep(local);
+    // モーション値でGUIノブをリアルタイム更新
+    for (let p = 0; p < NUM_PARTS; p++) {
+      const m = SEQ.motion[p] && SEQ.motion[p][cur];
+      if (m && knobReg[p]) for (const id in m) { if (knobReg[p][id]) knobReg[p][id].setValue(m[id]); }
+    }
+  }
+  if (SEQ.playing) SEQ.raf = requestAnimationFrame(seqPlayheadLoop);
+}
+
+function highlightStep(step) {
+  SEQ.stepHeads.forEach((h, i) => h.classList.toggle('playhead', i === step));
+  for (let p = 0; p < NUM_PARTS; p++) {
+    SEQ.cells[p].forEach((c, i) => c.classList.toggle('playhead', i === step));
+  }
+}
+function clearHighlight() {
+  SEQ.stepHeads.forEach(h => h.classList.remove('playhead'));
+  SEQ.cells.forEach(row => row.forEach(c => c.classList.remove('playhead')));
+}
+
+function seqStart() {
+  if (SEQ.playing) return;
+  if (!MIDI.out) { alert('No MIDI output port selected'); return; }
+  SEQ.playing = true;
+  SEQ.current = 0;
+  SEQ.scheduled = [];
+  SEQ.nextTime = performance.now() + 50;
+  SEQ.timer = setInterval(seqScheduler, LOOKAHEAD);
+  SEQ.raf = requestAnimationFrame(seqPlayheadLoop);
+  document.getElementById('seqPlay').classList.add('on');
+}
+function seqStop() {
+  SEQ.playing = false;
+  if (SEQ.timer) clearInterval(SEQ.timer);
+  if (SEQ.raf) cancelAnimationFrame(SEQ.raf);
+  SEQ.timer = null;
+  clearHighlight();
+  document.getElementById('seqPlay').classList.remove('on');
+}
+
+function seqClearAll() {
+  // 表示中ページをクリア
+  const base = SEQ.base();
+  SEQ.parts.forEach(pt => { for (let s = 0; s < STEPS; s++) pt.on[base + s] = false; });
+  buildSeqGrid();
+}
+function seqRandomize() {
+  // 表示中ページをランダム化
+  const base = SEQ.base();
+  SEQ.parts.forEach(pt => {
+    for (let s = 0; s < STEPS; s++) {
+      pt.on[base + s] = Math.random() < 0.3;
+      pt.vel[base + s] = VEL_OPTIONS[Math.floor(Math.random() * VEL_OPTIONS.length)];
+    }
+  });
+  buildSeqGrid();
+}
+
+// ===== シーケンス SAVE / LOAD (JSON) =====
+function serializeSeq() {
+  return {
+    v: 1,
+    app: 'volca-drum-seq',
+    bpm: SEQ.bpm,
+    pages: SEQ.pages,
+    beatGroups: SEQ.beatGroups.slice(),
+    parts: SEQ.parts.map(pt => ({
+      on: pt.on.slice(), vel: pt.vel.slice(), notes: pt.notes.slice(), pan: pt.pan.slice(),
+    })),
+    motion: SEQ.motion.map(arr => arr.map(m => ({ ...m }))),
+  };
+}
+
+function applySeq(obj) {
+  if (!obj || !obj.parts) throw new Error('Invalid sequence data');
+  SEQ.bpm = obj.bpm || 120;
+  SEQ.pages = Math.max(1, Math.min(16, obj.pages || 1));
+  SEQ.page = 1;
+  SEQ.beatGroups = (obj.beatGroups && obj.beatGroups.length) ? obj.beatGroups.slice() : [4, 4, 4, 4];
+  normalizeBeat();
+  const len = SEQ.pages * STEPS;
+  for (let p = 0; p < NUM_PARTS; p++) {
+    const sp = obj.parts[p] || {};
+    const fill = (src, def) => { const a = (src || []).slice(0, len); while (a.length < len) a.push(def); return a; };
+    SEQ.parts[p].on = fill(sp.on, false);
+    SEQ.parts[p].vel = fill(sp.vel, 100);
+    SEQ.parts[p].notes = fill(sp.notes, DEFAULT_NOTE);
+    SEQ.parts[p].pan = fill(sp.pan, 64);
+    const ms = (obj.motion && obj.motion[p]) || [];
+    SEQ.motion[p] = Array.from({ length: len }, (_, i) => ({ ...(ms[i] || {}) }));
+  }
+  SEQ.mrec = false; SEQ.recPart = -1; SEQ.recStep = -1;
+  const bpmEl = document.getElementById('seqBpm'); if (bpmEl) bpmEl.value = SEQ.bpm;
+  renderBeatBar();
+  buildSeqGrid();
+  updatePageDisplay();
+  if (typeof rebuildUI === 'function') rebuildUI(); // MRECボタン/ハイライト更新
+  updateMrecStatus();
+}
+
+function downloadSeq() {
+  const blob = new Blob([JSON.stringify(serializeSeq(), null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'volca-drum_seq.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function setupSeq() {
+  SEQ.init();
+  renderBeatBar();
+  buildSeqGrid();
+  updatePageDisplay();
+  // ページ操作
+  document.getElementById('pagePrev').addEventListener('click', () => setPage(SEQ.page - 1));
+  document.getElementById('pageNext').addEventListener('click', () => setPage(SEQ.page + 1));
+  document.getElementById('pageInput').addEventListener('change', e => {
+    const v = parseInt(e.target.value, 10);
+    if (!isNaN(v)) setPage(v); else updatePageDisplay();
+  });
+  document.getElementById('beatAdd').addEventListener('click', () => {
+    const total = SEQ.beatGroups.reduce((a, b) => a + b, 0);
+    if (total < STEPS) { SEQ.beatGroups.push(STEPS - total); refreshBeat(); }
+  });
+  document.getElementById('beatReset').addEventListener('click', () => {
+    SEQ.beatGroups = [4, 4, 4, 4]; refreshBeat();
+  });
+  document.getElementById('seqSave').addEventListener('click', downloadSeq);
+  document.getElementById('seqLoad').addEventListener('click', () => document.getElementById('seqFile').click());
+  document.getElementById('seqFile').addEventListener('change', async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try { applySeq(JSON.parse(await f.text())); alert('Sequence loaded: ' + f.name); }
+    catch (err) { alert('Load error: ' + err.message); }
+    e.target.value = '';
+  });
+  document.getElementById('seqPlay').addEventListener('click', () => SEQ.playing ? seqStop() : seqStart());
+  document.getElementById('seqStop').addEventListener('click', seqStop);
+  document.getElementById('seqClear').addEventListener('click', seqClearAll);
+  document.getElementById('seqRandom').addEventListener('click', seqRandomize);
+  const bpm = document.getElementById('seqBpm');
+  bpm.value = SEQ.bpm;
+  bpm.addEventListener('change', () => {
+    const v = parseInt(bpm.value, 10);
+    if (!isNaN(v) && v >= 20 && v <= 300) SEQ.bpm = v; else bpm.value = SEQ.bpm;
+  });
+  // メインウィンドウの折り畳みと同様、シーケンサーも折り畳み可
+  const seqZoom = document.getElementById('seqZoom');
+  if (seqZoom) seqZoom.addEventListener('click', () => document.getElementById('seqWindow').classList.toggle('collapsed'));
+}
+
+document.addEventListener('DOMContentLoaded', setupSeq);
+</script>
+</body>
+</html>
