@@ -1357,9 +1357,10 @@ function setup() {
 
   // Init
   document.getElementById('menuInit').addEventListener('click', () => {
+    if (!confirm('Reset all parameters to init values (power-on default). Continue?')) return;
     initState();
     rebuildUI();
-    if (MIDI.out) {
+    if (MIDI.out && confirm('Also send INIT values to the unit?\n(MIDI-controllable parameters only. Global settings and sequences are not reset.)')) {
       sendAll();
       state.parts.forEach((_, p) => sendQPI(p));
     }
@@ -1740,8 +1741,14 @@ function updatePatchNameDisplay() {
 function setupPatch() {
   document.getElementById('patchName').addEventListener('input', updatePatchNameDisplay);
   updatePatchNameDisplay();
-  document.getElementById('patchSave').addEventListener('click', downloadPatch);
-  document.getElementById('patchLoadBtn').addEventListener('click', () => document.getElementById('patchFile').click());
+  document.getElementById('patchSave').addEventListener('click', () => {
+    if (!confirm('Save current patch?')) return;
+    downloadPatch();
+  });
+  document.getElementById('patchLoadBtn').addEventListener('click', () => {
+    if (!confirm('Load a patch file? Current patch settings will be replaced.')) return;
+    document.getElementById('patchFile').click();
+  });
   document.getElementById('patchFile').addEventListener('change', async e => {
     const f = e.target.files[0];
     if (!f) return;
@@ -2495,8 +2502,14 @@ function setupSeq() {
     if (!isNaN(v)) setStepLen(v); else updateStepLenUI();
   });
   updateStepLenUI();
-  document.getElementById('seqSave').addEventListener('click', downloadSeq);
-  document.getElementById('seqLoad').addEventListener('click', () => document.getElementById('seqFile').click());
+  document.getElementById('seqSave').addEventListener('click', () => {
+    if (!confirm('Save current sequence?')) return;
+    downloadSeq();
+  });
+  document.getElementById('seqLoad').addEventListener('click', () => {
+    if (!confirm('Load a sequence file? Current sequence will be replaced.')) return;
+    document.getElementById('seqFile').click();
+  });
   document.getElementById('seqFile').addEventListener('change', async e => {
     const f = e.target.files[0]; if (!f) return;
     try { applySeq(JSON.parse(await f.text())); }
