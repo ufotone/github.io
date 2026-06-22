@@ -1,0 +1,1402 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>YAMAHA RX7 Web MIDI Editor / Librarian by ufotone</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font: 13px/1.4 system-ui, sans-serif; background:#353d40; color:#e8e8ea; margin:0; padding:16px; }
+  h1 { font-size:16px; margin:0 0 12px; }
+  h2 { font-size:13px; margin:14px 0 6px; color:#9bd; border-bottom:1px solid #333; padding-bottom:2px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:6px 0; }
+  button { background:#2d2d33; color:#e8e8ea; border:1px solid #444; padding:5px 10px; border-radius:4px; cursor:pointer; }
+  button:hover:not(:disabled) { background:#3a3a42; }
+  button:disabled { opacity:0.4; cursor:not-allowed; }
+  select, input { background:#222; color:#e8e8ea; border:1px solid #444; border-radius:4px; padding:4px 6px; }
+  input[type=number] { width:64px; }
+  #log { background:#111; border:1px solid #333; height:180px; overflow:auto; padding:6px; font: 11px/1.3 ui-monospace, Consolas, monospace; white-space:pre-wrap; }
+  .pill { display:inline-block; padding:2px 6px; border-radius:9px; font-size:11px; background:#333; }
+  .ok { background:#264e2a; } .ng { background:#5a2222; }
+  .tabs { display:flex; gap:4px; margin:6px 0; flex-wrap:wrap; }
+  .tab { padding:4px 10px; background:#222; border:1px solid #333; cursor:pointer; border-radius:4px 4px 0 0; }
+  .tab.active { background:#1f3050; border-color:#6af; }
+  .pane { display:none; }
+  .pane.active { display:block; }
+  .grp { display:inline-block; vertical-align:top; background:#202024; border:1px solid #333; border-radius:5px; padding:6px 8px; margin:3px; }
+  .grp h3 { margin:0 0 4px; font-size:10px; color:#9bd; letter-spacing:0.5px; text-transform:uppercase; }
+  .knobs { display:flex; flex-wrap:wrap; gap:4px; }
+  .knob { width:50px; text-align:center; font-size:9px; user-select:none; }
+  .knob svg { display:block; margin:0 auto; cursor:ns-resize; touch-action:none; }
+  .knob .lbl { color:#aaa; height:14px; line-height:14px; font-size:9px; overflow:hidden; white-space:nowrap; }
+  .knob .val { color:#fff; font: 10px ui-monospace,monospace; height:13px; }
+  #voices { display:grid; grid-template-columns:repeat(10, 1fr); gap:2px; margin-top:4px; }
+  .voice { background:#222; border:1px solid #333; padding:2px 4px; border-radius:2px; font-size:10px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .voice:hover { background:#2d2d33; }
+  .voice.cur { border-color:#6af; background:#1f3050; }
+  #patterns { display:grid; grid-template-columns:repeat(10,1fr); gap:2px; margin-top:4px; }
+  .pat { background:#222; border:1px solid #333; padding:3px 4px; border-radius:2px; font-size:10px; cursor:pointer; }
+  .pat:hover { background:#2d2d33; } .pat.empty { color:#555; cursor:default; } .pat.full { background:#1e3a1e; }
+  .remote { display:grid; grid-template-columns:repeat(8,1fr); gap:3px; }
+  .remote button { font-size:10px; padding:3px 5px; }
+  table { border-collapse:collapse; font-size:11px; }
+  td,th { border:1px solid #333; padding:2px 6px; }
+  .numw { display:inline-block; margin:3px 8px 3px 0; font-size:11px; }
+  .numw label { color:#aaa; }
+  .numw input[type=number] { width:70px; }
+  .numw select { font-size:11px; }
+  .remote { background:#262c2e; padding:6px; border-radius:5px; }
+  #ioSection button { background:#5d5d5d; }
+  #ioSection button:hover:not(:disabled) { background:#6d6d6d; }
+  /* LCD1602 display */
+  #lcdWrap { display:inline-block; background:#0c0c0c; padding:10px 12px; border-radius:6px;
+             border:2px solid #000; box-shadow:0 2px 6px rgba(0,0,0,.5) inset, 0 1px 2px rgba(0,0,0,.6); }
+  .lcd { background:#9fc20b; padding:8px 10px; border-radius:3px; line-height:1.45;
+         box-shadow:0 0 0 1px #5e7400 inset; }
+  .lcdline { font: 700 22px/1.45 "DejaVu Sans Mono","Consolas",ui-monospace,monospace;
+             letter-spacing:3px; white-space:pre; color:#16240a;
+             text-shadow:0 0 1px rgba(20,40,0,.4); }
+  /* collapsible sections */
+  details.sec { margin:8px 0; }
+  details.sec > summary { font-size:13px; color:#9bd; border-bottom:1px solid #333;
+             padding:3px 4px; margin-bottom:6px; cursor:pointer; list-style:none; user-select:none; }
+  details.sec > summary::-webkit-details-marker { display:none; }
+  details.sec > summary::before { content:'▸ '; color:#9bd; }
+  details.sec[open] > summary::before { content:'▾ '; }
+  details.sec h2 { margin:10px 0 4px; }
+  #patGrid { display:grid; grid-template-columns:repeat(20,1fr); gap:1px; margin-top:4px; max-width:560px; }
+  .pcell { background:#222; border:1px solid #333; font-size:9px; text-align:center; padding:1px 0;
+           border-radius:2px; color:#666; cursor:default; }
+  .pcell.held { background:#1e3a1e; color:#cfe; border-color:#3a6a3a; cursor:pointer; }
+  .pcell.held:hover { background:#2a5a2a; }
+  /* Instrument pads (24 keys A-X) */
+  #instPads { display:grid; grid-template-columns:repeat(12,1fr); gap:2px; max-width:680px; margin:4px 0; }
+  .ipad { background:#2a2a30; border:1px solid #444; padding:3px 2px; text-align:center;
+          font-size:10px; cursor:pointer; border-radius:3px; user-select:none; min-height:28px;
+          line-height:1.15; }
+  .ipad .ipl { font-weight:700; color:#fff; }
+  .ipad .ipv { font-size:8px; color:#9bd; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .ipad:hover { background:#3a3a45; border-color:#6af; }
+  .ipad.sel { background:#1f3050; border-color:#6af; box-shadow:0 0 0 1px #6af inset; }
+  /* Mini piano keyboard */
+  .kbd { background:#15151a; padding:6px; border-radius:4px; user-select:none; width:fit-content; }
+  .kbd-wrap { position:relative; display:flex; gap:0; height:62px; }
+  .wk { width:18px; height:62px; background:#f0f0f0; border:1px solid #555; border-top:none;
+        border-radius:0 0 2px 2px; cursor:pointer; box-sizing:border-box; position:relative; }
+  .wk:hover { background:#cce; }
+  .wk.has { background:#e85a5a; }
+  .wk.sel { background:#6af; }
+  .wk.has.sel { background:#6af; box-shadow:0 0 0 2px #e85a5a inset; }
+  .bk { width:12px; height:38px; background:#222; border:1px solid #000; border-top:none;
+        border-radius:0 0 2px 2px; cursor:pointer; box-sizing:border-box; position:absolute; top:0; z-index:2; }
+  .bk:hover { background:#36f; }
+  .bk.has { background:#a83232; }
+  .bk.sel { background:#6af; }
+  .bk.has.sel { background:#6af; box-shadow:0 0 0 2px #e85a5a inset; }
+  .wkLbl { position:absolute; bottom:1px; left:50%; transform:translateX(-50%); font-size:7px;
+           color:#333; pointer-events:none; }
+</style>
+</head>
+<body>
+<h1>YAMAHA RX7 Web MIDI Editor / Librarian by ufotone<span class="pill" id="midiState">disconnect</span></h1>
+
+<div class="row">
+  <label>Input: <select id="inSel"></select></label>
+  <label>Output: <select id="outSel"></select></label>
+</div>
+
+<div id="lcdWrap" title="RX7 Parameter Change LCD">
+  <div class="lcd">
+    <div class="lcdline" id="lcd0">                </div>
+    <div class="lcdline" id="lcd1">                </div>
+  </div>
+</div>
+
+<div style="font-size:11px; color:#c80; border:1px solid #553; background:#2a2410; border-radius:4px; padding:5px 8px; margin:4px 0;">
+  ⚠ <b>Before SysEx will work</b>, prepare the RX7:
+  <ol style="margin:4px 0 0 18px; padding:0;">
+    <li><b>Device#</b>: MIDI → JOB 07 → +1/YES → set to <b>01</b> (default is <code>off</code> and blocks all SysEx). Set the IO section <b>RX7 Device#</b> Value to the same number.</li>
+    <li><b>Memory Protect OFF</b>: UTILITY → JOB 03 → -1/NO (required for any SysEx write — Note# Assign, bulk send, etc.). Use the IO section button as a shortcut.</li>
+    <li><b>Channel Message ON</b>: MIDI → JOB 01 → +1/YES (needed to send/receive Note On/Off, Program Change, etc.).</li>
+  </ol>
+</div>
+
+<details class="sec">
+  <summary>Log</summary>
+  <div class="row">
+    <button id="clearLog">Clear</button>
+    <label><input type="checkbox" id="logSysex"> SysEx</label>
+    <label><input type="checkbox" id="logParam"> Param</label>
+    <label><input type="checkbox" id="logNotes"> Notes</label>
+  </div>
+  <div id="log"></div>
+</details>
+
+<details class="sec" open>
+  <summary>Receive / Save / Load / Send</summary>
+  <div style="font-size:11px; color:#c80; border:1px solid #553; background:#2a2410; border-radius:4px; padding:5px 8px; margin:4px 0;">
+    ⚠ Factory reset: power on while holding <b>-1/NO + +1/YES + STOP/CONTINUE + START</b> on the RX7 (erases all data).
+  </div>
+  <div id="ioSection" style="display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; margin:8px 0;">
+  <fieldset style="border:1px solid #5a6a8a; border-radius:5px; padding:6px 10px;">
+    <legend style="font-size:11px; color:#9bd; padding:0 4px;">Load .syx file → Send to RX7</legend>
+    <div class="row">
+      <input type="file" id="file" accept=".syx,application/octet-stream" multiple>
+      <button id="sendAll">Send Loaded to RX7</button>
+      <span id="loadedInfo"></span>
+    </div>
+  </fieldset>
+  <fieldset style="border:1px solid #5a6a8a; border-radius:5px; padding:6px 10px;">
+    <legend style="font-size:11px; color:#9bd; padding:0 4px;">Save</legend>
+    <div class="row"><button id="saveAll">Save Received as .syx</button></div>
+  </fieldset>
+  <fieldset style="border:1px solid #5a6a8a; border-radius:5px; padding:6px 10px;">
+    <legend style="font-size:11px; color:#9bd; padding:0 4px;">Request from RX7</legend>
+    <div class="row">
+      <button id="rqVoi">Request Voice from RX7</button>
+      <button id="rqSet">Request Setup from RX7</button>
+    </div>
+  </fieldset>
+  <fieldset style="border:1px solid #5a6a8a; border-radius:5px; padding:6px 10px;">
+    <legend style="font-size:11px; color:#9bd; padding:0 4px;">Memory Protect (required for all writes)</legend>
+    <div class="row">
+      <button id="memProtOff" title="UTILITY JOB03 → OFF: allow SysEx writes / edits">OFF (allow writes)</button>
+      <button id="memProtOn"  title="UTILITY JOB03 → ON: protect memory from accidental changes">ON</button>
+    </div>
+  </fieldset>
+  <fieldset style="border:1px solid #5a6a8a; border-radius:5px; padding:6px 10px;">
+    <legend style="font-size:11px; color:#9bd; padding:0 4px;">RX7 Device# (must match unit value)</legend>
+    <div class="row">
+      <label>Value: <input id="dev" type="number" min="1" max="16" value="1" style="width:50px"></label>
+    </div>
+    <div style="font-size:10px; color:#888; margin-top:2px;">
+      Set device# on RX7 manually: MIDI → JOB 07 → +1/YES (default = off). Then enter the same number here.
+    </div>
+  </fieldset>
+  </div>
+</details>
+
+<details class="sec" open>
+  <summary>Voice (Select / Test / Edit / Performance)</summary>
+
+  <h2>Voices (100)</h2>
+  <div id="voices"></div>
+
+  <h2>Voice Test (Channel 1)</h2>
+  <div class="row">
+    <label>Note: <input id="testNote" type="number" min="0" max="127" value="36"></label>
+    <label>Velocity: <input id="testVel" type="number" min="1" max="127" value="100"></label>
+    <button id="noteOn">Note On</button>
+    <button id="noteOff">Note Off</button>
+  </div>
+
+  <h2>Voice Edit</h2>
+  <div class="row">
+    <span id="voiceName">Voice: -</span>
+    <button id="voiceStore" style="font-size:11px;padding:3px 7px" title="JOB07: Store edited Voice to internal memory (Remote Switch sequence)">Voice Store</button>
+    <button id="voiceInit" style="font-size:11px;padding:3px 7px" title="JOB08: Initialize selected Voice (Remote Switch sequence)">Voice Init</button>
+    <button id="editRecall" style="font-size:11px;padding:3px 7px" title="JOB09: Recall last edited Voice (Remote Switch sequence)">Edit Recall</button>
+  </div>
+  <div id="voiceEd"></div>
+
+  <h2>Voice Performance (TX ch / Note# / Bend / Accent)</h2>
+  <div id="perfEd"></div>
+</details>
+
+<details class="sec">
+  <summary>Key Assign / Multi-timbre Setup</summary>
+  <div style="font-size:11px; color:#9bd; margin:4px 0;">
+    1) Select a voice in <b>Voices (100)</b> &nbsp; 2) Click a pad below to pick the target key &nbsp; 3) Press <b>Assign</b>
+  </div>
+  <div id="instPads"></div>
+  <div class="row" style="font-size:11px; margin-top:6px; align-items:center;">
+    <span id="kaTarget" style="color:#9bd;">Target Key: A</span>
+    <button id="kaAssign" style="background:#4f985a;color:#fff;">Assign Voice → Key (JOB01)</button>
+    <button id="kaPlay">Play Key</button>
+  </div>
+  <fieldset style="border:1px solid #5a6a8a; border-radius:5px; padding:4px 10px 6px; margin:8px 0 6px;">
+    <legend style="font-size:11px; color:#9bd; padding:0 4px;">Multi Voice / Multi Step (JOB03 / JOB04)</legend>
+    <div class="row" style="font-size:11px;">
+      <span style="color:#9bd;">Multi Voice:</span>
+      <button id="kaMultiVoice" title="JOB03: assign current voice to upper row A-L">Apply (curVoice → A-L)</button>
+      <button id="kaMultiCancel" title="JOB03: cancel Multi Voice (press No when prompted)">Cancel (No)</button>
+    </div>
+    <div class="row" style="font-size:11px; margin-top:6px; gap:8px;">
+      <span style="color:#9bd;">Multi Step:</span>
+      <label>Pitch <input id="msPitch" type="number" min="-200" max="200" step="10" value="0" style="width:60px"></label>
+      <button id="msApply1" title="JOB04 key 1: PITCH offset for upper-row keys">Apply</button>
+      <label>Level <input id="msLevel" type="number" min="-10" max="10" value="0" style="width:50px"></label>
+      <button id="msApply2" title="JOB04 key 2: LEVEL offset">Apply</button>
+      <label>Pan <input id="msPan" type="number" min="-5" max="5" value="0" style="width:50px"></label>
+      <button id="msApply3" title="JOB04 key 3: PAN offset">Apply</button>
+      <label>Decay <input id="msDecay" type="number" min="-10" max="10" value="0" style="width:50px"></label>
+      <button id="msApply4" title="JOB04 key 4: DECAY offset">Apply</button>
+    </div>
+    <div style="font-size:10px; color:#888; margin-top:2px;">
+      Note: Apply takes a few seconds (sets absolute value via NO×N then YES×N). Ranges: Pitch ±200 / Level・Decay ±10 / Pan ±5.
+    </div>
+  </fieldset>
+  <fieldset style="border:1px solid #5a6a8a; border-radius:5px; padding:4px 10px 6px; margin:8px 0 6px;">
+    <legend style="font-size:11px; color:#9bd; padding:0 4px;">Note# Assign (MIDI JOB04, via Setup bulk modify)</legend>
+    <div class="row" style="font-size:11px; align-items:center;">
+      <button id="kbDown" title="Transpose down 1 octave">▼ Oct</button>
+      <span id="kbRange" style="font-family:ui-monospace,monospace; color:#9bd;">C2-C4</span>
+      <button id="kbUp" title="Transpose up 1 octave">▲ Oct</button>
+      <span id="naTarget" style="color:#9bd; margin-left:8px;"></span>
+    </div>
+    <div id="kbd" class="kbd"></div>
+    <div class="row" style="font-size:11px; margin-top:4px;">
+      <button id="naAssign" style="background:#4f985a;color:#fff;" title="Modify cached Setup bulk and send back to RX7">Assign Voice Note → RX7</button>
+      <button id="naRefresh" title="Re-request Setup from RX7 (do this before Assign if RX7 state changed)">Refresh Setup</button>
+      <span style="font-size:10px; color:#888;">Requires recent Setup dump. Sends modified Setup bulk back; preserves other Setup settings.</span>
+    </div>
+  </fieldset>
+  <div class="row" style="font-size:11px; margin-top:8px;">
+    <label>Key Data Slot:
+      <select id="kaSlot" style="font-size:11px;">
+        <option value="0">0 (user)</option><option value="1">1 (user)</option><option value="2">2 (user)</option><option value="3">3 (user)</option><option value="4">4 (user)</option>
+        <option value="5">5 (factory)</option><option value="6">6 (factory)</option><option value="7">7 (factory)</option><option value="8">8 (factory)</option><option value="9">9 (factory)</option>
+      </select>
+    </label>
+    <button id="kaSave" title="JOB07 Key Data Save (slots 0-4 only)">Save (JOB07)</button>
+    <button id="kaLoad" title="JOB08 Key Data Load (0-4=user, 5-9=factory preset)">Load (JOB08)</button>
+    <button id="enterKeyAssign" title="Open Key Assign mode on RX7">Open Key Assign</button>
+  </div>
+  <div class="row" style="font-size:11px; margin-top:6px;">
+    <span style="color:#9bd; font-weight:bold;">MIDI:</span>
+    <button id="midiChOn" title="MIDI JOB01 Channel Message ON">Ch Msg ON</button>
+    <button id="midiChOff" title="MIDI JOB01 Channel Message OFF">Ch Msg OFF</button>
+    <button id="noteInit" title="MIDI JOB05 Note Initialize">Note Initialize (JOB05)</button>
+    <button id="enterMIDI" title="Open MIDI mode on RX7">Open MIDI mode</button>
+    <button id="kaRefresh" title="Request Setup to refresh pad assignments">Refresh from RX7</button>
+  </div>
+  <div style="font-size:10px; color:#888; margin-top:4px;">
+    For per-channel Receive Ch (MIDI JOB02), Note# Assign (JOB04) and per-voice Pitch Bend Range (JOB06),
+    use <em>Open MIDI mode</em> then edit on RX7 directly — they are large per-channel/per-voice tables.
+    Voice-level Transmit Ch / Pitch Bend / Accent are also available in <b>Voice Performance</b>.
+  </div>
+</details>
+
+<details class="sec">
+  <summary>System Setup</summary>
+  <div id="sysEd"></div>
+</details>
+
+<details class="sec">
+  <summary>Pattern Dump (Load / Save)</summary>
+  <div class="row" style="font-size:11px;">
+    <span>Request</span>
+    <input id="patFrom" type="number" min="0" max="99" value="0" style="width:48px">–
+    <input id="patTo" type="number" min="0" max="99" value="99" style="width:48px">
+    <button id="rqPatRange">from RX7</button>
+    <button id="patSave">Save .syx</button>
+    <input type="file" id="patFile" accept=".syx,application/octet-stream" multiple style="font-size:11px">
+    <button id="patSend">Send held to RX7</button>
+    <button id="patClear">Clear</button>
+    <span id="patInfo" style="color:#9bd"></span>
+  </div>
+  <div id="patGrid"></div>
+</details>
+
+<h2>Remote Switch</h2>
+<div class="remote" id="remoteBtns"></div>
+
+<script>
+'use strict';
+
+const YAMAHA = 0x43;
+const $ = id => document.getElementById(id);
+
+// === Voice list (table p.111) ===
+const VOICES = [
+ 'BD 1','BD 2','BD 3','J.BD 1','F.BD 1','H.BD 1','H.BD 2','P.BD 1','P.BD 2',
+ 'SD 1','SD 2','SD 3','Picol SD','H.SD 1','H.SD 2','H.SD 3','P.SD 1','P.SD 2','P.SD 3',
+ 'Rim 1','Rim 2',
+ 'Tom 1','Tom 2','Tom 3','Tom 4',
+ 'F.Tom 1','F.Tom 2','F.Tom 3',
+ 'H.Tom 1','H.Tom 2','H.Tom 3','H.Tom 4',
+ 'P.Tom 1','P.Tom 2',
+ 'E.Tom 1','E.Tom 2','E.Tom 3','E.Tom 4',
+ 'FMprc 1','FMprc 2','FMprc 3',
+ 'HHclose','HHopen','HH 1/4op','HHpedal',
+ 'Cup','Edge','Crash','China',
+ 'EbassH','EbassL','PickBas','SynBass',
+ 'D.GtrS','D.Gtr5','GtrCutD','GtrCutU',
+ 'DXorch','DXmrmb','DXclav',
+ 'Brass','Claps','Timpani','Cowbell','Tambrn','Shaker',
+ 'CongaHM','CongaHO','CongaLO',
+ 'BongoHI','BongoLO',
+ 'TimblH','TimblL',
+ 'AgogoHI','AgogoLO',
+ 'Cuica','Castnet','Whistle','Claves','BellTre','VibraSl','SteelDr','GlsCsh','Gun','DoorSlm','Camera','Punch','CarDoor',
+ 'Ha!','Bon','Hey!','Uh!',"'Ow!",'GetFunk',
+ 'RvsBD','RvsSD','RvsEdge','RvsCrsh','RvsTom','RvsETom'
+];
+
+// === Factory default note numbers (Voice list, manual p.111) ===
+// May differ from real unit if MIDI Note# Assign (MIDI JOB#04) was changed
+const NOTE_NUMBERS = [
+  45,44,39,38,37,36,35,34,33,      // 00-08 BD group
+  52,49,50,31,30,29,28,27,26,25,   // 09-18 SD group (11=SD3 estimated)
+  51,46,                           // 19-20 Rim
+  53,50,48,47,                     // 21-24 Tom
+  24,23,22,21,20,19,18,17,16,      // 25-33 F.Tom/H.Tom/P.Tom
+  43,42,41,40,                     // 34-37 E.Tom
+  101,102,103,                     // 38-40 FMprc
+  57,58,15,14,                     // 41-44 HH
+  62,66,60,61,                     // 45-48 Cup/Edge/Crash/China
+  13,                              // 49 EbassH
+  12,11,10,9,8,7,6,5,4,3,2,        // 50-60 Ebass〜Brass
+  54,76,55,58,56,                  // 61-65 Claps/Timpani/Cowbell/Tambrn/Shaker
+  66,65,64,68,67,                  // 66-70 Conga/Bongo (some estimated)
+  70,69,75,74,                     // 71-74 Timbl/Agogo
+  77,78,79,73,80,81,82,83,84,85,86,87,88, // 75-87
+  89,90,91,92,93,94,               // 88-93
+  95,96,97,98,99,100               // 94-99 Reverse group
+];
+
+// === Parameter specs ===
+// Voice Edit
+const VOICE_EDIT = [
+  {p:0,  l:'Pitch',     type:'pitch',  min:-3600, max:2400, step:10},
+  {p:1,  l:'Decay',     type:'u',      min:1,   max:32},
+  {p:2,  l:'BendRate',  type:'u',      min:0,   max:60},
+  {p:3,  l:'BendRange', type:'s',      min:-60, max:60},
+  {p:4,  l:'Level',     type:'u',      min:0,   max:63},
+  {p:5,  l:'Pan',       type:'u',      min:1,   max:15},
+  {p:6,  l:'LFO Freq',  type:'u',      min:0,   max:7},
+  {p:7,  l:'LFO PMD',   type:'u',      min:0,   max:7},
+  {p:8,  l:'LFO AMD',   type:'u',      min:0,   max:3},
+  {p:9,  l:'Poly',      type:'u',      min:1,   max:8},
+  {p:10, l:'FX Simul',  type:'u',      min:2,   max:4},
+  {p:11, l:'FX Delay',  type:'u',      min:0,   max:50},
+  {p:12, l:'2nd Pitch', type:'pitch',  min:-600,max:600,step:10},
+  {p:13, l:'2nd Level', type:'s',      min:-63, max:63},
+  {p:14, l:'2nd Pan',   type:'s',      min:-14, max:14},
+  {p:15, l:'3rd Pitch', type:'pitch',  min:-600,max:600,step:10},
+  {p:16, l:'3rd Level', type:'s',      min:-63, max:63},
+  {p:17, l:'3rd Pan',   type:'s',      min:-14, max:14},
+  {p:18, l:'4th Pitch', type:'pitch',  min:-600,max:600,step:10},
+  {p:19, l:'4th Level', type:'s',      min:-63, max:63},
+  {p:20, l:'4th Pan',   type:'s',      min:-14, max:14},
+];
+
+// Voice Performance— per voice
+const VOICE_PERF = [
+  {p:0, l:'TX Ch',     type:'ch', min:1,  max:16},   // display 1-16, send -1 (data 0-15)
+  {p:1, l:'Note#',     type:'u', min:0,  max:127},
+  {p:2, l:'BendRange', type:'u', min:0,  max:12},
+  {p:3, l:'Accent 1',  type:'s', min:-63,max:63},
+  {p:4, l:'Accent 2',  type:'s', min:-63,max:63},
+];
+
+// System Setup
+const QUANT_OPTS = ['1/2','1/4','1/6','1/8','1/12','1/16','1/24','1/32','1/48','off'];
+const SYS_SETUP = [
+  {p:0, l:'Quantize',  type:'enum', opts:QUANT_OPTS},
+  {p:1, l:'Swing',     type:'u', min:0, max:5}, // off,54,58,63,67,71
+  {p:2, l:'Click',     type:'enum', opts:QUANT_OPTS},
+  {p:3, l:'Click On',  type:'u', min:0, max:1},
+  {p:4, l:'SongRpt',   type:'u', min:0, max:1},
+  {p:5, l:'Sync',      type:'enum', opts:['Internal','MIDI']},
+  {p:6, l:'FootSw',    type:'u', min:1, max:60},
+  {p:7, l:'Ch Msg',    type:'u', min:0, max:1},
+  {p:8, l:'RxCh Voice',type:'ch', min:1, max:16},  // display 1-16, send -1
+  // 9-24 Rec Ch in Pitch Mode 1-16ch (skip in basic UI)
+  {p:25,l:'Effect',    type:'u', min:0, max:1},
+  {p:26,l:'Damp',      type:'u', min:0, max:1},
+  {p:27,l:'Tempo',     type:'tempo', min:40, max:250},
+  {p:28,l:'Device#',   type:'dev', opts:['off','1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16']}, // off=127, 1-16=0-15
+];
+
+// Remote Switch (Group 80) — 0..60
+const REMOTE_NAMES = [
+ 'POWER(restart)','Accent1 / Y','Accent2 / Z / ◁▷','Pattern/Song','RealTime Write','Step Write/Insert','Voice Edit','Key Assign',
+ '7 1/32','8 1/48','9 off','Quantize/Delete','Swing/Repeat','Click/TempoChg','Chain','Cassette/Cartridge',
+ '4 1/12','5 1/16','6 1/24','PtnEdit/VolChg','Clear','Copy','Sync','MIDI',
+ '1 1/4','2 1/6','3 1/8','Effect','Damp','Tempo','Utility','Job',
+ '-1 No','0 1/2','+1 Yes','Stop/Continue','Start',
+ 'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X'
+];
+
+// === MIDI ===
+let midi=null, input=null, output=null;
+let receivedSyx = [];   // all received SysEx (Uint8Array)
+let loadedSyx = [];     // loaded from file
+let lastSV = null;      // last Seq&Voice dump (raw)
+let lastSetup = null;
+let patterns = new Array(100).fill(null);  // single-pattern dumps
+let voiceDumps = new Array(100).fill(null);
+let curVoice = 0;
+let voiceWidgets = [], perfWidgets = [], sysWidgets = [];
+
+function log(msg, cls){
+  const el=$('log'); const line=document.createElement('div');
+  if(cls) line.className=cls;
+  const t = new Date().toTimeString().slice(0,8);
+  line.textContent = `[${t}] ${msg}`;
+  el.appendChild(line); el.scrollTop = el.scrollHeight;
+}
+function hex(b){ return b.toString(16).toUpperCase().padStart(2,'0'); }
+function hexs(arr){ return Array.from(arr).map(hex).join(' '); }
+function dev(){ return (parseInt($('dev').value,10) - 1) & 0x0F; }
+
+async function initMIDI(){
+  try{
+    midi = await navigator.requestMIDIAccess({sysex:true});
+    refreshPorts();
+    midi.onstatechange = refreshPorts;
+    $('midiState').textContent = 'MIDI Ready';
+    $('midiState').className = 'pill ok';
+  }catch(e){
+    $('midiState').textContent = 'MIDI NG';
+    $('midiState').className = 'pill ng';
+    log('Web MIDI failure: '+e.message);
+  }
+}
+function refreshPorts(){
+  const ins=$('inSel'), outs=$('outSel');
+  ins.innerHTML=''; outs.innerHTML='';
+  for(const p of midi.inputs.values()){ const o=document.createElement('option'); o.value=p.id; o.textContent=p.name; ins.appendChild(o); }
+  for(const p of midi.outputs.values()){ const o=document.createElement('option'); o.value=p.id; o.textContent=p.name; outs.appendChild(o); }
+  selectPorts();
+}
+function selectPorts(){
+  if(input) input.onmidimessage = null;
+  input = midi.inputs.get($('inSel').value) || null;
+  output = midi.outputs.get($('outSel').value) || null;
+  if(input) input.onmidimessage = onMidi;
+}
+$('inSel').onchange = selectPorts;
+$('outSel').onchange = selectPorts;
+
+function send(bytes){
+  if(!output){ log('Output Not selected'); return; }
+  output.send(bytes);
+  if($('logSysex').checked && bytes[0]===0xF0) log('TX '+hexs(bytes.slice(0,Math.min(24,bytes.length)))+(bytes.length>24?` … (${bytes.length}B)`:''));
+}
+
+// === Checksum (Yamaha standard: 2's complement of sum, 7-bit) ===
+function checksum(arr){
+  let s=0; for(const b of arr) s += b;
+  return (0x80 - (s & 0x7F)) & 0x7F;
+}
+
+// === ASCII string helper ===
+function ascii(s){ return Array.from(s).map(c=>c.charCodeAt(0)); }
+
+// === Dump Request builders ===
+function reqSeqVoice(){ send([0xF0, YAMAHA, 0x20|dev(), 0x7E, 0xF7]); }
+function reqPattern(no){
+  // F0 43 2n 0B "LM  8515P" pp F7
+  const h = ascii('LM  8515P');
+  send([0xF0, YAMAHA, 0x20|dev(), 0x0B, ...h, no & 0x7F, 0xF7]);
+}
+function reqVoice(no){
+  const h = ascii('LM  8515V');
+  send([0xF0, YAMAHA, 0x20|dev(), 0x0B, ...h, no & 0x7F, 0xF7]);
+}
+function reqSetup(){
+  const h = ascii('LM  8515SY');
+  send([0xF0, YAMAHA, 0x20|dev(), 0x0B, ...h, 0xF7]);
+}
+
+$('rqVoi').onclick = ()=> reqVoice(curVoice);
+$('rqSet').onclick = reqSetup;
+
+// === Receive ===
+function onMidi(e){
+  const d = e.data;
+  if(d[0]>=0xF8) return; // realtime
+  if(d[0]===0xF0){
+    if(d[1]!==YAMAHA){ if($('logSysex').checked) log('RX foreign sysex '+hexs(d.slice(0,8))); return; }
+    handleSysex(new Uint8Array(d));
+    return;
+  }
+  const st=d[0]&0xF0, ch=(d[0]&0x0F)+1;
+  if((st===0x90||st===0x80) && $('logNotes').checked) log(`RX ${st===0x90?'NoteOn':'NoteOff'} ch${ch} key=${d[1]} vel=${d[2]||0}`);
+}
+
+function handleSysex(d){
+  const sub = d[2] & 0xF0;
+  const ch  = d[2] & 0x0F;
+  if($('logSysex').checked) log(`RX SysEx sub=${hex(sub)} dev=${ch} len=${d.length}`);
+  if(sub===0x00) receivedSyx.push(d);  // only bulk dumps stored (exclude param echo)
+
+  if(sub===0x00){
+    // bulk dump (format byte at d[3])
+    const fmt = d[3];
+    // header text starts at d[6] for format 0B / d[6] for format 7E too (after byte count 2 bytes)
+    // try to read header to classify
+    const hdrStart = (fmt===0x7E || fmt===0x0B) ? 6 : 6;
+    const hdr = String.fromCharCode(...d.slice(hdrStart, hdrStart+10));
+    if(hdr.startsWith('LM  8515P')){
+      const pn = d[hdrStart+9] & 0x7F;
+      patterns[pn] = d;
+      renderPatGrid();
+      log(`Pattern ${pn} Received (${d.length}B) `);
+    } else if(hdr.startsWith('LM  8515V')){
+      const vn = d[hdrStart+9] & 0x7F;
+      voiceDumps[vn] = d;
+      log(`Voice ${vn} ${VOICES[vn]||''} Received (Total${d.length}B)`);
+      curVoice = vn; renderVoices(); updateVoiceName();
+      parseVoiceBulkToEditor(d);
+    } else if(hdr.startsWith('LM  8515SY')){
+      lastSetup = d;
+      log(`Setup data Received (${d.length}B)`);
+      // Verify checksum algorithm against RX7's value
+      const actualCS = d[d.length-2];
+      const sumA = (()=>{let s=0; for(let i=4;i<=d.length-3;i++) s+=d[i]; return (0x80-(s&0x7F))&0x7F;})();
+      const sumB = (()=>{let s=0; for(let i=6;i<=d.length-3;i++) s+=d[i]; return (0x80-(s&0x7F))&0x7F;})();
+      const sumC = (()=>{let s=0; for(let i=16;i<=d.length-3;i++) s+=d[i]; return (0x80-(s&0x7F))&0x7F;})();
+      log(`  checksum check: actual=0x${hex(actualCS)} algoA(BC..)=0x${hex(sumA)} algoB(hdr..)=0x${hex(sumB)} algoC(DATA..)=0x${hex(sumC)}`);
+      parseSetupNotes(d);
+    } else if(hdr.startsWith('LM  8515')){
+      lastSV = d;
+      log(`Seq&Voice Received (${d.length}B)`);
+    } else {
+      log('Unknown bulk header: '+hdr);
+    }
+  } else if(sub===0x10){
+    handleParamChange(d);
+  } else if(sub===0x20){
+    log('Dump request received');
+  }
+}
+
+// Parse incoming Parameter Change
+function handleParamChange(d){
+  const grp = d[4];
+  if(grp===0x51){            // Voice Edit: 51 vv pp dd [dd]
+    const voice=d[5], param=d[6];
+    const spec=VOICE_EDIT.find(s=>s.p===param);
+    let v;
+    if(spec && spec.type==='pitch') v=decParamPitch(d[7], d[8]);
+    else if(spec && spec.type==='s') v=decS7(d[7]);
+    else v=d[7];
+    if(voice===curVoice){ const ew=voiceWidgets.find(x=>x.spec.p===param); if(ew) ew.w.set(v); }
+    lcdVoiceEdit(param, voice, v);
+    if($('logParam').checked) log(`RX VoiceEdit v${voice}.${spec?spec.l:param}=${v}`);
+  } else if(grp===0x52){     // Voice Performance: 52 pp vv dd
+    const param=d[5], voice=d[6];
+    const spec=VOICE_PERF.find(s=>s.p===param);
+    const v = spec && spec.type==='s' ? decS7(d[7]) : (spec && spec.type==='ch' ? d[7]+1 : d[7]);
+    if(voice===curVoice){ const ew=perfWidgets.find(x=>x.spec.p===param); if(ew) ew.w.set(v); }
+    lcdPerf(param, voice, v);
+    if($('logParam').checked) log(`RX Perf v${voice}.${spec?spec.l:param}=${v}`);
+  } else if(grp===0x53){     // System Setup: 53 pp dd [dd]
+    const param=d[5];
+    const spec=SYS_SETUP.find(s=>s.p===param);
+    let v;
+    if(spec && spec.type==='tempo') v=d[6]*100+d[7];
+    else if(spec && spec.type==='ch') v=d[6]+1;
+    else if(spec && spec.type==='dev') v=(d[6]===127?0:d[6]+1);
+    else v=d[6];
+    const ew=sysWidgets.find(x=>x.spec.p===param); if(ew) ew.w.set(v);
+    lcdSys(param, v);
+    if($('logParam').checked) log(`RX Sys.${spec?spec.l:param}=${v}`);
+  } else if(grp===0x50){     // Remote Switch (Group 80): 50 pp dd
+    lcdRemote(d[5]);
+    if($('logParam').checked) log(`RX Remote #${d[5]} ${REMOTE_NAMES[d[5]]||''} ${d[6]?'ON':'OFF'}`);
+  } else {
+    log(`RX PARAM (${d.length}B): ${hexs(d)}`);
+  }
+}
+
+// === Parameter Change senders ===
+// Group 81 (decimal=0x51) Voice Edit: F0 43 1n 03 51 vv pp dd [dd] F7
+function sendVoiceEdit(param, voice, ...data){
+  const msg = [0xF0, YAMAHA, 0x10|dev(), 0x03, 0x51, voice & 0x7F, param & 0x7F, ...data.map(x=>x&0x7F), 0xF7];
+  send(msg);
+  if($('logParam').checked){
+    const spec = VOICE_EDIT.find(s=>s.p===param);
+    log(`TX VoiceEdit v${voice}.${spec?spec.l:param}=${data.map(x=>'0x'+hex(x)).join(' ')}`);
+  }
+}
+// Group 80 (decimal=0x50) Remote Switch: F0 43 1n 03 50 pp dd F7
+function sendRemote(param, on){
+  send([0xF0, YAMAHA, 0x10|dev(), 0x03, 0x50, param & 0x7F, on ? 0x7F : 0x00, 0xF7]);
+  if($('logParam').checked) log(`TX Remote #${param} ${REMOTE_NAMES[param]} ${on?'ON':'OFF'}`);
+}
+// Group 82 (decimal=0x52) Voice Perf: F0 43 1n 03 52 pp vv dd F7
+function sendPerf(param, voice, data){
+  send([0xF0, YAMAHA, 0x10|dev(), 0x03, 0x52, param & 0x7F, voice & 0x7F, data & 0x7F, 0xF7]);
+  if($('logParam').checked){ const s=VOICE_PERF.find(x=>x.p===param); log(`TX Perf v${voice}.${s?s.l:param}=${data}`); }
+}
+// Group 83 (decimal=0x53) System Setup: F0 43 1n 03 53 pp dd [dd] F7
+function sendSys(param, ...data){
+  send([0xF0, YAMAHA, 0x10|dev(), 0x03, 0x53, param & 0x7F, ...data.map(x=>x&0x7F), 0xF7]);
+  if($('logParam').checked){ const s=SYS_SETUP.find(x=>x.p===param); log(`TX Sys.${s?s.l:param}=${data.join(',')}`); }
+}
+
+// === Setup bulk parser (Note# of each Voice) ===
+// Setup DATA is nibble-encoded: 1 logical byte = high nibble + low nibble (2 MIDI bytes)
+// Logical layout (System Setup Bulk data):
+//   0:Quantize 1:Swing 2:Click 3:ClickOn 4:SongRpt 5:Sync 6:FootSw 7:ChMsg
+//   8:RecCh(Voice) 9:RecCh(Pitch,2byte)  -> 11 logical bytes total
+//   10:Note# of each Voice (100byte) <- starts at logical offset 11
+let noteAssign = null;  // 100 voice note numbers fetched from the unit
+// Each nibble is ASCII hex: 0-9 -> '0'-'9'(0x30-39), 10-15 -> 'A'-'F'(0x41-46)
+function hexNibble(b){
+  if(b >= 0x30 && b <= 0x39) return b - 0x30;
+  if(b >= 0x41 && b <= 0x46) return b - 0x41 + 10;
+  if(b >= 0x61 && b <= 0x66) return b - 0x61 + 10;
+  return 0;
+}
+function unpackNibbles(d, start, count){
+  const out = [];
+  for(let i=0;i<count;i++){
+    const hi = hexNibble(d[start + 2*i]);
+    const lo = hexNibble(d[start + 2*i + 1]);
+    out.push((hi<<4)|lo);
+  }
+  return out;
+}
+function parseSetupNotes(d){
+  const dataStart = 16;          // F0,43,sub,0B,bcMSB,bcLSB + "LM  8515SY"(10) = 16
+  const noteLogicalOffset = 11;  // param 0-9 = 11 logical bytes
+  const arr = unpackNibbles(d, dataStart + 2*noteLogicalOffset, 100);
+  // Validity check: accept if all values within 0..127
+  if(arr.every(v => v <= 127)){
+    noteAssign = arr;
+    log(`Setup: Note#Successful extraction—Head12: [${arr.slice(0,12).join(',')}]`);
+    log(`  voice80-99: [${arr.slice(80,100).join(',')}]`);
+    renderVoices();
+    if(typeof renderKbd==='function') renderKbd();
+  } else {
+    log(`Setup: Note# extraction out of range (check nibble order) — Head [${arr.slice(0,12).join(',')}]`);
+  }
+  // Key data: from logical offset 528 (= 11+100+100+16+100+100+100+1), 6×24=144 bytes
+  // First byte of each 6-byte key block assumed to be Voice number
+  const keyData = unpackNibbles(d, dataStart + 2*528, 144);
+  const ka = [];
+  for(let i=0;i<24;i++) ka.push(keyData[i*6]);
+  if(ka.every(v => v <= 99)){
+    keyVoiceAssign = ka;
+    log(`Setup: Key Assign (A-X): [${ka.map(pad2).join(',')}]`);
+    renderInstPads();
+  }
+}
+
+// === Voice Bulk parser ===
+// 1 Voice bulk layout (after header "LM  8515V" + voice#, at d[16..40] = 25 bytes raw):
+// off param size  meaning
+//  0   0    2     pitch
+//  2   1    1     decay
+//  3   2    1     bend rate
+//  4   3    1     bend range (signed)
+//  5   4    1     level
+//  6   5    1     pan
+//  7   6    1     LFO freq
+//  8   7    1     LFO PMD
+//  9   8    1     LFO AMD
+// 10   9    1     poly
+// 11  10    1     simul
+// 12  11    1     delay
+// 13  12    2     2nd pitch
+// 15  13    1     2nd level (signed)
+// 16  14    1     2nd pan   (signed)
+// 17  15    2     3rd pitch
+// 19  16    1     3rd level (signed)
+// 20  17    1     3rd pan   (signed)
+// 21  18    2     4th pitch
+// 23  19    1     4th level (signed)
+// 24  20    1     4th pan   (signed)
+function decS7(b){ return (b & 0x40) ? (b - 0x80) : b; }
+// Main pitch (param 0): hi = octave count (0-5), lo = 10-cent sub (0-119), bias -3600 cents
+function decMainPitch(hi, lo){ return hi * 1200 + lo * 10 - 3600; }
+// Sub pitch (2nd/3rd/4th): sign in bit6 of hi, magnitude = (hi & 0x3F)*120 + lo (1-cent units)
+function decSubPitch(hi, lo){
+  const sign = (hi & 0x40) ? -1 : 1;
+  const mag = (hi & 0x3F) * 120 + lo;
+  return sign * mag;
+}
+const VOICE_LAYOUT = [
+  {p:0,  off:0,  sz:2, kind:'pitchM'},  // main PITCH
+  {p:4,  off:2,  sz:1, kind:'u'},       // LEVEL
+  {p:5,  off:3,  sz:1, kind:'u_m1'},    // PAN (byte = val-1)
+  {p:1,  off:4,  sz:1, kind:'u_m1'},    // DECAY (byte = val-1)
+  {p:2,  off:5,  sz:1, kind:'u'},       // BEND RATE
+  {p:3,  off:6,  sz:1, kind:'s'},       // BEND RANGE
+  {p:6,  off:7,  sz:1, kind:'u'},       // LFO FREQ
+  {p:7,  off:8,  sz:1, kind:'u'},       // LFO PMD
+  {p:8,  off:9,  sz:1, kind:'u'},       // LFO AMD
+  {p:9,  off:10, sz:1, kind:'u_m1'},    // POLY (byte = val-1)
+  {p:10, off:11, sz:1, kind:'u_m2'},    // SIMUL (byte = val-2)
+  {p:11, off:12, sz:1, kind:'u'},       // DELAY
+  {p:12, off:13, sz:2, kind:'pitchS'},  // 2nd PITCH
+  {p:13, off:15, sz:1, kind:'s'},       // 2nd LEVEL
+  {p:14, off:16, sz:1, kind:'s'},       // 2nd PAN
+  {p:15, off:17, sz:2, kind:'pitchS'},  // 3rd PITCH
+  {p:16, off:19, sz:1, kind:'s'},
+  {p:17, off:20, sz:1, kind:'s'},
+  {p:18, off:21, sz:2, kind:'pitchS'},  // 4th PITCH
+  {p:19, off:23, sz:1, kind:'s'},
+  {p:20, off:24, sz:1, kind:'s'},
+];
+function parseVoiceBulkToEditor(d){
+  // DATA starts at d[16] (F0,43,sub,0B,bcMSB,bcLSB,L,M,sp,sp,8,5,1,5,V,vNo = 16 bytes)
+  const data = d.slice(16, 16+25);
+  for(const item of VOICE_LAYOUT){
+    let v;
+    if(item.kind==='pitchM')      v = decMainPitch(data[item.off], data[item.off+1]);
+    else if(item.kind==='pitchS') v = decSubPitch(data[item.off], data[item.off+1]);
+    else if(item.kind==='s')      v = decS7(data[item.off]);
+    else if(item.kind==='u_m1')   v = data[item.off] + 1;
+    else if(item.kind==='u_m2')   v = data[item.off] + 2;
+    else                          v = data[item.off];
+    const ew = voiceWidgets.find(x=>x.spec.p===item.p);
+    if(ew) ew.w.set(v);
+  }
+}
+
+// === Value encoding ===
+function encS7(v){ return v<0 ? (128+v) & 0x7F : v & 0x7F; }  // 2's complement 7-bit
+function encPitch(cents){
+  // 0n000bbb / 0ppppppp; n=sign, b=|cents|/1200 (octave), p=(|cents|%1200)/10
+  const sign = cents<0 ? 1 : 0;
+  const a = Math.abs(cents);
+  const b = Math.floor(a/1200) & 0x07;
+  const p = Math.floor((a%1200)/10) & 0x7F;
+  return [(sign<<6)|b, p];
+}
+function encTempo(bpm){
+  // 1st byte 0~2 (100's place: 100→1, 200→2), 2nd byte 0~99
+  return [Math.floor(bpm/100) & 0x7F, bpm%100];
+}
+// param-change pitch decode (inverse encPitch): 0n000bbb / 0ppppppp
+function decParamPitch(hi, lo){
+  const sign = (hi & 0x40) ? -1 : 1;
+  return sign * ((hi & 0x07) * 1200 + lo * 10);
+}
+
+// === LCD1602 emulation =====================================================
+const LFO_HZ = [2.4,5.6,6.0,6.4,6.9,9.8,48.8,78.1];
+const pad2 = n => String(n).padStart(2,'0');
+const sgn  = v => (v>=0?'+':'')+v;
+function setLCD(l1, l2){
+  $('lcd0').textContent = (l1+'                ').slice(0,16);
+  $('lcd1').textContent = (l2+'                ').slice(0,16);
+}
+function lcdVoiceTop(voice){ return `Voice:${pad2(voice)}-${VOICES[voice]||''}`; }
+function veLine2(p, v){
+  switch(p){
+    case 0:  return `Pitch =${v}c`;
+    case 1:  return `Decay Rate=${v}`;
+    case 2:  return `Bend Rate =${v}`;
+    case 3:  return `Bend Range=${sgn(v)}`;
+    case 4:  return `VoiceLevel=${v}`;
+    case 5:  return `Pan =${v}`;
+    case 6:  return `LFO freq.=${LFO_HZ[v]}`;
+    case 7:  return `LFO PMD =${v}`;
+    case 8:  return `LFO AMD =${v}`;
+    case 9:  return `Poly Num =${v}`;
+    case 10: return `Simul Num =${v}`;
+    case 11: return `Delay time=${v}`;
+    case 12: return `2nd pitch=${sgn(v)}`;
+    case 13: return `2nd level=${sgn(v)}`;
+    case 14: return `2nd pan =${sgn(v)}`;
+    case 15: return `3rd pitch=${sgn(v)}`;
+    case 16: return `3rd level=${sgn(v)}`;
+    case 17: return `3rd pan =${sgn(v)}`;
+    case 18: return `4th pitch=${sgn(v)}`;
+    case 19: return `4th level=${sgn(v)}`;
+    case 20: return `4th pan =${sgn(v)}`;
+    default: return '';
+  }
+}
+function lcdVoiceEdit(p, voice, v){ setLCD(lcdVoiceTop(voice), veLine2(p, v)); }
+function lcdVoiceSelect(voice){
+  const n = (noteAssign && noteAssign[voice]!=null) ? noteAssign[voice] : NOTE_NUMBERS[voice];
+  setLCD(lcdVoiceTop(voice), `Note# =${n!=null?n:'--'}`);
+}
+function lcdPerf(p, voice, v){
+  let l2;
+  switch(p){
+    case 0: l2=`Transmit Ch=${v}`; break;
+    case 1: l2=`Note# =${v}`; break;
+    case 2: l2=`P.BendRng =${v}`; break;
+    case 3: l2=`Accent1 =${sgn(v)}`; break;
+    case 4: l2=`Accent2 =${sgn(v)}`; break;
+    default: l2='';
+  }
+  setLCD(lcdVoiceTop(voice), l2);
+}
+function lcdSys(p, v){
+  let l2;
+  switch(p){
+    case 0:  l2=`Quantize=${QUANT_OPTS[v]}`; break;
+    case 1:  l2=`Swing =${v}`; break;
+    case 2:  l2=`Click =${QUANT_OPTS[v]}`; break;
+    case 3:  l2=`Click =${v?'on':'off'}`; break;
+    case 4:  l2=`SongRepeat=${v?'on':'off'}`; break;
+    case 5:  l2=`Clock=${v?'MIDI':'Internal'}`; break;
+    case 6:  l2=`Foot Sw =${v}`; break;
+    case 7:  l2=`Ch Msg =${v?'on':'off'}`; break;
+    case 8:  l2=`Rx Ch =${v}`; break;
+    case 25: l2=`Effect =${v?'on':'off'}`; break;
+    case 26: l2=`Damp =${v?'on':'off'}`; break;
+    case 27: l2=`Tempo =${v}`; break;
+    case 28: l2=`Device# =${v===0?'off':v}`; break;
+    default: l2='';
+  }
+  setLCD('System Setup', l2);
+}
+function lcdRemote(p){ setLCD('Remote Switch', '>'+(REMOTE_NAMES[p]||('#'+p))); }
+
+// === Knob widget (compact) ===
+function arcPath(cx,cy,r,a1,a2){
+  const r1=a1*Math.PI/180, r2=a2*Math.PI/180;
+  const x1=cx+r*Math.sin(r1), y1=cy-r*Math.cos(r1);
+  const x2=cx+r*Math.sin(r2), y2=cy-r*Math.cos(r2);
+  const large = Math.abs(a2-a1)>180 ? 1:0;
+  const sweep = a2>a1 ? 1:0;
+  return `M ${x1} ${y1} A ${r} ${r} 0 ${large} ${sweep} ${x2} ${y2}`;
+}
+function makeKnob(spec, onChange){
+  const wrap = document.createElement('div'); wrap.className='knob';
+  const lbl = document.createElement('div'); lbl.className='lbl'; lbl.textContent=spec.l; wrap.appendChild(lbl);
+
+  if(spec.type==='enum'){
+    const sel=document.createElement('select');
+    spec.opts.forEach((o,i)=>{ const op=document.createElement('option'); op.value=i; op.textContent=o; sel.appendChild(op); });
+    sel.style.width='50px'; sel.style.fontSize='9px'; sel.style.padding='1px';
+    wrap.appendChild(sel);
+    sel.onchange = ()=> onChange(parseInt(sel.value,10));
+    return { el:wrap, set:v=>{ sel.value=v; }, get:()=>parseInt(sel.value,10) };
+  }
+
+  const min = spec.min ?? 0, max = spec.max ?? 127;
+  const isBi = min<0;
+  const step = spec.step || 1;
+  const ns='http://www.w3.org/2000/svg';
+  const SZ=30,C=15,R=12,RI=8,RO=11;
+  const svg=document.createElementNS(ns,'svg'); svg.setAttribute('width',SZ); svg.setAttribute('height',SZ); svg.setAttribute('viewBox',`0 0 ${SZ} ${SZ}`);
+  const bg=document.createElementNS(ns,'circle'); bg.setAttribute('cx',C); bg.setAttribute('cy',C); bg.setAttribute('r',C-2); bg.setAttribute('fill','#15151a'); bg.setAttribute('stroke','#444'); svg.appendChild(bg);
+  const trk=document.createElementNS(ns,'path'); trk.setAttribute('fill','none'); trk.setAttribute('stroke','#333'); trk.setAttribute('stroke-width','2'); trk.setAttribute('d',arcPath(C,C,R,-135,135)); svg.appendChild(trk);
+  const arc=document.createElementNS(ns,'path'); arc.setAttribute('fill','none'); arc.setAttribute('stroke','#6af'); arc.setAttribute('stroke-width','2.5'); arc.setAttribute('stroke-linecap','round'); svg.appendChild(arc);
+  const ind=document.createElementNS(ns,'line'); ind.setAttribute('stroke','#fff'); ind.setAttribute('stroke-width','1.5'); ind.setAttribute('stroke-linecap','round'); svg.appendChild(ind);
+  wrap.appendChild(svg);
+  const val=document.createElement('div'); val.className='val'; wrap.appendChild(val);
+
+  let value = isBi ? 0 : min;
+  function update(){
+    const norm = (value-min)/(max-min);
+    const ang = -135 + norm*270;
+    const rad = ang*Math.PI/180;
+    ind.setAttribute('x1', C+Math.sin(rad)*RI); ind.setAttribute('y1', C-Math.cos(rad)*RI);
+    ind.setAttribute('x2', C+Math.sin(rad)*RO); ind.setAttribute('y2', C-Math.cos(rad)*RO);
+    if(isBi){
+      const cAng = -135 + ((0-min)/(max-min))*270;
+      const lo=Math.min(cAng,ang), hi=Math.max(cAng,ang);
+      arc.setAttribute('d',arcPath(C,C,R,lo,hi));
+    } else {
+      arc.setAttribute('d',arcPath(C,C,R,-135,ang));
+    }
+    val.textContent = value;
+  }
+  function setV(v, fire){
+    v = Math.round(v/step)*step;
+    v = Math.max(min, Math.min(max, v));
+    if(v===value) return;
+    value=v; update();
+    if(fire) onChange(value);
+  }
+  let dragY=null, dragV=0;
+  const onMove = e=>{ if(dragY==null) return; const dy=dragY-e.clientY; const sp=e.shiftKey?step*5:step; setV(dragV + dy*sp, true); };
+  const onUp = ()=>{ if(dragY!=null){ dragY=null; svg.style.outline=''; } };
+  svg.addEventListener('pointerdown', e=>{ dragY=e.clientY; dragV=value; svg.style.outline='1px solid #6af'; e.preventDefault();
+    window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp, {once:true}); });
+  svg.addEventListener('wheel', e=>{ e.preventDefault(); setV(value + (e.deltaY<0?step:-step)*(e.shiftKey?5:1), true); }, {passive:false});
+  svg.addEventListener('dblclick', ()=> setV(isBi?0:min, true));
+  update();
+  return { el:wrap, set:v=>setV(v,false), get:()=>value };
+}
+
+// === Render editors ===
+function renderVoiceEdit(){
+  const ed = $('voiceEd'); ed.innerHTML=''; voiceWidgets = [];
+  const box=document.createElement('div'); box.className='grp';
+  const h=document.createElement('h3'); h.textContent='Voice Edit'; box.appendChild(h);
+  const kw=document.createElement('div'); kw.className='knobs'; box.appendChild(kw);
+  for(const s of VOICE_EDIT){
+    const w = makeKnob(s, v=>{
+      if(s.type==='pitch') sendVoiceEdit(s.p, curVoice, ...encPitch(v));
+      else if(s.type==='s') sendVoiceEdit(s.p, curVoice, encS7(v));
+      else sendVoiceEdit(s.p, curVoice, v);
+      lcdVoiceEdit(s.p, curVoice, v);
+    });
+    kw.appendChild(w.el);
+    voiceWidgets.push({spec:s, w});
+  }
+  ed.appendChild(box);
+}
+// Number-input widget (spinner)
+function makeNumberWidget(spec, onChange){
+  const wrap = document.createElement('div'); wrap.className='numw';
+  const lbl = document.createElement('label'); lbl.textContent = spec.l + ': ';
+  if(spec.type==='enum' || spec.type==='dev'){
+    const sel=document.createElement('select');
+    spec.opts.forEach((o,i)=>{ const op=document.createElement('option'); op.value=i; op.textContent=o; sel.appendChild(op); });
+    sel.onchange = ()=> onChange(parseInt(sel.value,10));
+    lbl.appendChild(sel); wrap.appendChild(lbl);
+    return { el:wrap, set:v=>{ sel.value=v; }, get:()=>parseInt(sel.value,10) };
+  }
+  const inp = document.createElement('input'); inp.type='number';
+  inp.min = spec.min; inp.max = spec.max; inp.step = spec.step || 1;
+  inp.value = spec.min<0 ? 0 : spec.min;
+  inp.onchange = ()=>{ let v = parseInt(inp.value,10); if(isNaN(v)) v = spec.min;
+    v = Math.max(spec.min, Math.min(spec.max, v)); inp.value = v; onChange(v); };
+  lbl.appendChild(inp); wrap.appendChild(lbl);
+  return { el:wrap, set:v=>{ inp.value=v; }, get:()=>parseInt(inp.value,10) };
+}
+function renderPerfEdit(){
+  const ed = $('perfEd'); ed.innerHTML=''; perfWidgets=[];
+  const box=document.createElement('div'); box.className='grp';
+  const h=document.createElement('h3'); h.textContent='Voice Performance'; box.appendChild(h);
+  const kw=document.createElement('div'); box.appendChild(kw);
+  for(const s of VOICE_PERF){
+    const w = makeNumberWidget(s, v=>{
+      const data = s.type==='s' ? encS7(v) : (s.type==='ch' ? v-1 : v);
+      sendPerf(s.p, curVoice, data);
+      lcdPerf(s.p, curVoice, v);
+    });
+    kw.appendChild(w.el); perfWidgets.push({spec:s, w});
+  }
+  ed.appendChild(box);
+}
+function renderSysEdit(){
+  const ed = $('sysEd'); ed.innerHTML=''; sysWidgets=[];
+  const box=document.createElement('div'); box.className='grp';
+  const h=document.createElement('h3'); h.textContent='System Setup'; box.appendChild(h);
+  const kw=document.createElement('div'); box.appendChild(kw);
+  for(const s of SYS_SETUP){
+    const w = makeNumberWidget(s, v=>{
+      if(s.type==='tempo') sendSys(s.p, ...encTempo(v));
+      else if(s.type==='ch') sendSys(s.p, v-1);
+      else if(s.type==='dev') sendSys(s.p, v===0 ? 127 : v-1);  // off=127, 1-16→0-15
+      else sendSys(s.p, v);
+      lcdSys(s.p, v);
+    });
+    kw.appendChild(w.el); sysWidgets.push({spec:s, w});
+  }
+  ed.appendChild(box);
+}
+function renderRemote(){
+  const g = $('remoteBtns'); g.innerHTML='';
+  REMOTE_NAMES.forEach((name,i)=>{
+    const b=document.createElement('button'); b.textContent=`${i}: ${name}`;
+    b.title='Click=push(ON+OFF), Shift+Click=ON only, Ctrl+Click=OFF only';
+    if(i===36){ b.style.background='#f89a9a'; b.style.color='#222'; }      // Start
+    else if(i===35){ b.style.background='#4883bb'; b.style.color='#fff'; } // Stop/Continue
+    else if(i===6){ b.style.background='#4f985a'; b.style.color='#fff'; }  // Voice Edit
+    else if(i===23 || i===30 || i===31){ b.style.background='#e0a020'; b.style.color='#222'; }  // MIDI / UTILITY / JOB
+    b.onclick = e=>{
+      if(e.shiftKey){ sendRemote(i,true); }
+      else if(e.ctrlKey){ sendRemote(i,false); }
+      else { sendRemote(i,true); setTimeout(()=>sendRemote(i,false), 60); }
+      lcdRemote(i);
+    };
+    g.appendChild(b);
+  });
+}
+let reqVoiceTimer = 0;
+function reqVoiceDebounced(no){
+  clearTimeout(reqVoiceTimer);
+  reqVoiceTimer = setTimeout(()=> reqVoice(no), 180);  // debounce rapid clicks
+}
+function renderVoices(){
+  const g=$('voices'); g.innerHTML='';
+  VOICES.forEach((n,i)=>{
+    const d=document.createElement('div'); d.className='voice'; if(i===curVoice) d.classList.add('cur');
+    d.textContent = String(i).padStart(2,'0')+' '+n;
+    d.onclick = ()=>{ curVoice=i; renderVoices(); updateVoiceName(); updateKaTarget();
+      const nn = (noteAssign && noteAssign[i]!=null) ? noteAssign[i] : NOTE_NUMBERS[i];
+      if(nn!=null) $('testNote').value = nn;
+      setKbSelectedFromCurVoice(); updateNaTarget();
+      lcdVoiceSelect(i);
+      reqVoiceDebounced(i); };  // fetch current values on each selection (debounced)
+    g.appendChild(d);
+  });
+}
+function updateVoiceName(){ $('voiceName').textContent = `Editing target Voice: ${String(curVoice).padStart(2,'0')} ${VOICES[curVoice]}`; }
+
+// === File save / load ===
+function download(bytes, name){
+  const blob = new Blob([bytes], {type:'application/octet-stream'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+}
+$('saveAll').onclick = ()=>{
+  if(!receivedSyx.length){ log('No Received Data'); return; }
+  const total = receivedSyx.reduce((s,a)=>s+a.length,0);
+  const out = new Uint8Array(total); let o=0;
+  for(const m of receivedSyx){ out.set(m,o); o+=m.length; }
+  download(out, `RX7_dump_${new Date().toISOString().replace(/[:.]/g,'-')}.syx`);
+};
+function splitSysex(buf){
+  const out=[]; let i=0;
+  while(i<buf.length){
+    if(buf[i]!==0xF0){ i++; continue; }
+    let j=i+1; while(j<buf.length && buf[j]!==0xF7) j++;
+    if(j<buf.length){ out.push(buf.slice(i,j+1)); i=j+1; } else break;
+  }
+  return out;
+}
+$('file').onchange = async ev=>{
+  loadedSyx=[];
+  for(const f of ev.target.files){
+    const buf = new Uint8Array(await f.arrayBuffer());
+    const msgs = splitSysex(buf);
+    for(const m of msgs){
+      loadedSyx.push(m);
+      // classify
+      if(m[1]===YAMAHA && (m[2]&0xF0)===0x00){
+        const hdr = String.fromCharCode(...m.slice(6,16));
+        if(hdr.startsWith('LM  8515P')){ const pn=m[15]&0x7F; patterns[pn]=m; }
+        else if(hdr.startsWith('LM  8515V')){ const vn=m[15]&0x7F; voiceDumps[vn]=m; }
+        else if(hdr.startsWith('LM  8515SY')){ lastSetup=m; }
+        else if(hdr.startsWith('LM  8515')){ lastSV=m; }
+      }
+    }
+    log(`Loaded ${f.name}: ${msgs.length} sysex`);
+  }
+  $('loadedInfo').textContent=` total ${loadedSyx.length} SysEx`;
+};
+$('sendAll').onclick = async ()=>{
+  for(const m of loadedSyx){ send(m); await new Promise(r=>setTimeout(r,150)); }
+  log('Send loaded done');
+};
+
+// === Pattern dump (load / save) ===
+function renderPatGrid(){
+  const g=$('patGrid'); g.innerHTML='';
+  let held=0;
+  for(let i=0;i<100;i++){
+    const c=document.createElement('div'); c.textContent=pad2(i);
+    if(patterns[i]){ c.className='pcell held'; held++; c.title=`Pattern ${i} — click to send to RX7`;
+      c.onclick=()=>{ send(patterns[i]); log(`Sent Pattern ${i}`); }; }
+    else c.className='pcell';
+    g.appendChild(c);
+  }
+  $('patInfo').textContent = held ? `${held} held` : '';
+}
+let patReqBusy=false;
+$('rqPatRange').onclick = async ()=>{
+  if(patReqBusy) return;
+  let a=parseInt($('patFrom').value,10)||0, b=parseInt($('patTo').value,10)||0;
+  a=Math.max(0,Math.min(99,a)); b=Math.max(0,Math.min(99,b)); if(b<a){ const t=a;a=b;b=t; }
+  patReqBusy=true; $('rqPatRange').disabled=true;
+  for(let i=a;i<=b;i++){ reqPattern(i); await new Promise(r=>setTimeout(r,250)); }
+  patReqBusy=false; $('rqPatRange').disabled=false;
+  log(`Pattern request ${a}-${b} done`);
+};
+$('patSave').onclick = ()=>{
+  const parts = patterns.filter(p=>p);
+  if(!parts.length){ log('No pattern data'); return; }
+  const total = parts.reduce((s,a)=>s+a.length,0);
+  const out=new Uint8Array(total); let o=0; for(const p of parts){ out.set(p,o); o+=p.length; }
+  download(out, `RX7_Patterns_${new Date().toISOString().slice(0,10)}.syx`);
+};
+$('patFile').onchange = async ev=>{
+  let n=0;
+  for(const f of ev.target.files){
+    const msgs = splitSysex(new Uint8Array(await f.arrayBuffer()));
+    for(const m of msgs){
+      if(m[1]===YAMAHA && (m[2]&0xF0)===0x00){
+        const hdr=String.fromCharCode(...m.slice(6,16));
+        if(hdr.startsWith('LM  8515P')){ patterns[m[15]&0x7F]=m; n++; }
+      }
+    }
+  }
+  renderPatGrid(); log(`Loaded ${n} pattern(s) from file`);
+};
+$('patSend').onclick = async ()=>{
+  const parts = patterns.map((p,i)=>p?{i,p}:null).filter(x=>x);
+  if(!parts.length){ log('No pattern to send'); return; }
+  for(const {i,p} of parts){ send(p); log(`Sent Pattern ${i}`); await new Promise(r=>setTimeout(r,200)); }
+  log('Send patterns done');
+};
+$('patClear').onclick = ()=>{ patterns.fill(null); renderPatGrid(); log('Pattern buffer cleared'); };
+
+// === Voice Init / Edit Recall (RX7 JOBs via Remote Switch sequence) ===
+// Remote Switch index: 6=VoiceEdit 31=Job 34=+1Yes / numeric key idx:
+const NUMKEY = [33,24,25,26,16,17,18,8,9,10];  // 0-9
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+async function remoteSeq(seq, gap=130, hold=45){
+  for(const i of seq){ sendRemote(i,true); await sleep(hold); sendRemote(i,false); await sleep(gap); }
+}
+$('voiceStore').onclick = async ()=>{
+  log('Voice Store (JOB07)');
+  // EditVoice→Job07→+1Yes(Store?)→+1Yes(sure?)
+  await remoteSeq([6, 31,NUMKEY[0],NUMKEY[7], 34,34]);
+  log('Voice Store done');
+};
+$('voiceInit').onclick = async ()=>{
+  const v=curVoice;
+  log(`Voice Init (JOB08) → voice ${pad2(v)}`);
+  // EditVoice→Job01(VoiceSelect)→vv→Job08→+1Yes(Init?)→+1Yes(sure?)
+  await remoteSeq([6, 31,NUMKEY[0],NUMKEY[1], NUMKEY[(v/10)|0],NUMKEY[v%10], 31,NUMKEY[0],NUMKEY[8], 34,34]);
+  log('Voice Init done');
+};
+$('editRecall').onclick = async ()=>{
+  log('Edit Recall (JOB09)');
+  // EditVoice→Job09→+1Yes(Recall?)→+1Yes(sure?)
+  await remoteSeq([6, 31,NUMKEY[0],NUMKEY[9], 34,34]);
+  log('Edit Recall done');
+};
+
+// === Key Assign / Multi-timbre Section =====================================
+// Instrument key Remote Switch indices: A=37, B=38, ..., X=60
+const INST_KEYS = ['A','B','C','D','E','F','G','H','I','J','K','L',
+                   'M','N','O','P','Q','R','S','T','U','V','W','X'];
+let keyVoiceAssign = new Array(24).fill(null);  // Voice number assigned to each instrument key (0..23)
+let selectedPad = 0;                            // currently targeted instrument key
+
+function renderInstPads(){
+  const g=$('instPads'); if(!g) return;
+  g.innerHTML='';
+  INST_KEYS.forEach((k,i)=>{
+    const d=document.createElement('div'); d.className='ipad'+(i===selectedPad?' sel':'');
+    const v = keyVoiceAssign[i];
+    d.innerHTML = `<div class="ipl">${k}</div><div class="ipv">${v!=null?(pad2(v)+' '+(VOICES[v]||'')):'-'}</div>`;
+    d.title = `Click to target key ${k}`;
+    d.onclick = ()=>{ selectedPad=i; renderInstPads(); updateKaTarget(); };
+    g.appendChild(d);
+  });
+}
+function updateKaTarget(){
+  const el=$('kaTarget'); if(!el) return;
+  el.innerHTML = `Target Key: <b>${INST_KEYS[selectedPad]}</b> &nbsp;←&nbsp; Voice ${pad2(curVoice)} ${VOICES[curVoice]||''}`;
+}
+async function assignVoiceToKey(keyIdx, voice){
+  log(`Voice Assign (JOB01): key ${INST_KEYS[keyIdx]} ← voice ${pad2(voice)} ${VOICES[voice]||''}`);
+  // Damp(28) mutes instrument key sound -> assign -> toggle Damp back
+  // Assumes Damp starts OFF
+  sendRemote(28,true); await sleep(15); sendRemote(28,false);  // tap DAMP → ON
+  await sleep(30);
+  // KEY ASSIGN(7) → JOB(31) → 0 → 1 → instrumentKey(37+i) → numkey(tens) → numkey(ones)
+  await remoteSeq([7, 31, NUMKEY[0], NUMKEY[1], 37+keyIdx, NUMKEY[(voice/10)|0], NUMKEY[voice%10]], 60, 25);
+  await sleep(30);
+  sendRemote(28,true); await sleep(15); sendRemote(28,false);  // tap DAMP → OFF
+  keyVoiceAssign[keyIdx] = voice;
+  renderInstPads();
+}
+$('kaAssign').onclick = ()=> assignVoiceToKey(selectedPad, curVoice);
+$('kaPlay').onclick = ()=>{
+  if(!output){ log('Output not selected'); return; }
+  // If pad has assignment use that voice, otherwise use curVoice (play via MIDI note number)
+  const v = (keyVoiceAssign[selectedPad]!=null) ? keyVoiceAssign[selectedPad] : curVoice;
+  const note = (noteAssign && noteAssign[v]!=null) ? noteAssign[v] : NOTE_NUMBERS[v];
+  if(note==null){ log('Play: note number unknown'); return; }
+  const vel = parseInt($('testVel').value,10)||100;
+  output.send([0x90, note&0x7F, vel&0x7F]);
+  setTimeout(()=>output.send([0x80, note&0x7F, 0]), 200);
+  log(`Play: voice ${pad2(v)} ${VOICES[v]||''} note ${note} (key ${INST_KEYS[selectedPad]})`);
+};
+$('kaMultiVoice').onclick = async ()=>{
+  log(`Multi Voice (JOB03): curVoice ${pad2(curVoice)} → upper row A-L`);
+  // First assign curVoice to key A, then Multi Voice key-tap to spread to A-L
+  await assignVoiceToKey(0, curVoice);
+  await sleep(80);
+  await remoteSeq([7, 31, NUMKEY[0], NUMKEY[3], 37]);  // KeyAssign→JOB03→Key A
+  for(let i=0;i<12;i++) keyVoiceAssign[i] = curVoice;
+  renderInstPads();
+  log('Multi Voice done');
+};
+$('kaMultiCancel').onclick = async ()=>{
+  log('Multi Voice cancel (JOB03 → No)');
+  // KEY ASSIGN → JOB → 0 → 3 → -1/No
+  await remoteSeq([7, 31, NUMKEY[0], NUMKEY[3], 32], 60, 25);
+  log('Multi Voice cancelled');
+};
+
+// Multi Step: KEY ASSIGN → JOB 04 → param key (1-4) → reset to min via NO×N → ramp via YES×N → START
+// Pitch uses 10-cent fine mode (hold [0] + YES/NO for 10-cent step), others are 1-unit
+const MS_MAX = {1:200, 2:10, 3:5, 4:10};
+const MS_LABEL = {1:'PITCH', 2:'LEVEL', 3:'PAN', 4:'DECAY'};
+async function applyMultiStep(param, value){
+  const max = MS_MAX[param];
+  value = Math.max(-max, Math.min(max, value|0));
+  log(`Multi Step ${MS_LABEL[param]} = ${value} (takes a moment...)`);
+  // KEY ASSIGN → JOB → 0 → 4 → param key
+  await remoteSeq([7, 31, NUMKEY[0], NUMKEY[4], NUMKEY[param]], 50, 20);
+  await sleep(40);
+  const tick = async (key) => { sendRemote(key,true); await sleep(10); sendRemote(key,false); await sleep(22); };
+  if(param===1){
+    // PITCH: 10-cent fine mode (hold 0, press YES/NO)
+    const steps = Math.round(value/10);
+    const maxSteps = Math.round(max/10);  // 20
+    sendRemote(NUMKEY[0], true); await sleep(20);
+    for(let i=0;i<maxSteps;i++) await tick(32);              // reset NO×20 → -200
+    for(let i=0;i<steps+maxSteps;i++) await tick(34);        // YES×(steps+20) → target
+    sendRemote(NUMKEY[0], false); await sleep(30);
+  } else {
+    for(let i=0;i<max;i++) await tick(32);                   // reset NO×max
+    for(let i=0;i<value+max;i++) await tick(34);             // YES×(value+max)
+  }
+  await sleep(40);
+  sendRemote(36,true); await sleep(20); sendRemote(36,false); // START = Apply
+  log(`Multi Step ${MS_LABEL[param]} done`);
+}
+$('msApply1').onclick = ()=> applyMultiStep(1, parseInt($('msPitch').value,10)||0);
+$('msApply2').onclick = ()=> applyMultiStep(2, parseInt($('msLevel').value,10)||0);
+$('msApply3').onclick = ()=> applyMultiStep(3, parseInt($('msPan').value,10)||0);
+$('msApply4').onclick = ()=> applyMultiStep(4, parseInt($('msDecay').value,10)||0);
+
+// === Mini piano keyboard for Note# Assign (MIDI JOB04) ====================
+// Modify cached Setup bulk in place and re-send. Much faster than Remote Switch navigation.
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const isBlackKey = n => [1,3,6,8,10].includes(n%12);
+const noteName  = n => NOTE_NAMES[n%12] + (Math.floor(n/12)-1);
+const KB_WHITE  = 35;     // visible white keys (5 octaves)
+let kbBase     = 36;      // first MIDI note shown (C2)
+let kbSelected = 60;      // currently selected MIDI note (C4)
+
+function voicesAtNote(n){
+  if(!noteAssign) return [];
+  const out=[]; for(let v=0;v<100;v++) if(noteAssign[v]===n) out.push(v);
+  return out;
+}
+function keyTitle(n){
+  const vs = voicesAtNote(n);
+  const base = `${noteName(n)} MIDI ${n}`;
+  if(!vs.length) return base;
+  return base + ' — assigned: ' + vs.slice(0,6).map(v=>pad2(v)+' '+VOICES[v]).join(', ') + (vs.length>6?` …+${vs.length-6}`:'');
+}
+function renderKbd(){
+  const g = $('kbd'); g.innerHTML='';
+  const wrap = document.createElement('div'); wrap.className='kbd-wrap';
+  const whiteNotes = [];
+  for(let n=kbBase; whiteNotes.length<KB_WHITE && n<=127; n++) if(!isBlackKey(n)) whiteNotes.push(n);
+  whiteNotes.forEach(wn => {
+    const k=document.createElement('div');
+    k.className = 'wk' + (voicesAtNote(wn).length?' has':'') + (wn===kbSelected?' sel':'');
+    k.title = keyTitle(wn);
+    const lbl=document.createElement('div'); lbl.className='wkLbl'; lbl.textContent=noteName(wn);
+    k.appendChild(lbl);
+    k.onclick = ()=>{ kbSelected=wn; renderKbd(); updateNaTarget(); };
+    wrap.appendChild(k);
+  });
+  whiteNotes.forEach((wn,i) => {
+    const bn = wn+1;
+    if(bn>127 || !isBlackKey(bn) || i===whiteNotes.length-1) return;
+    const b=document.createElement('div');
+    b.className = 'bk' + (voicesAtNote(bn).length?' has':'') + (bn===kbSelected?' sel':'');
+    b.style.left = ((i+1)*18 - 6) + 'px';
+    b.title = keyTitle(bn);
+    b.onclick = (e)=>{ e.stopPropagation(); kbSelected=bn; renderKbd(); updateNaTarget(); };
+    wrap.appendChild(b);
+  });
+  g.appendChild(wrap);
+  const last = whiteNotes[whiteNotes.length-1] ?? kbBase;
+  $('kbRange').textContent = `${noteName(kbBase)}-${noteName(last)}`;
+}
+function updateNaTarget(){
+  $('naTarget').textContent = `Voice ${pad2(curVoice)} ${VOICES[curVoice]||''}  →  Note ${noteName(kbSelected)} (${kbSelected})`;
+}
+function setKbSelectedFromCurVoice(){
+  const n = (noteAssign && noteAssign[curVoice]!=null) ? noteAssign[curVoice] : NOTE_NUMBERS[curVoice];
+  if(n==null) return;
+  kbSelected = n;
+  // Ensure selected note is visible; snap kbBase to octave boundary
+  if(kbSelected < kbBase || kbSelected >= kbBase + 60){
+    kbBase = Math.max(0, Math.min(127-60, Math.floor(kbSelected/12)*12 - 24));
+  }
+  renderKbd();
+}
+$('kbUp').onclick   = ()=>{ if(kbBase+60<=127){ kbBase+=12; renderKbd(); } };
+$('kbDown').onclick = ()=>{ if(kbBase-12>=0){ kbBase-=12; renderKbd(); } };
+
+// Yamaha bulk checksum (RX7): 2's complement of byte sum from header (d[6]) through last data byte
+function bulkChecksum(d){
+  let s=0; for(let i=6; i<=d.length-3; i++) s += d[i];
+  return (0x80 - (s & 0x7F)) & 0x7F;
+}
+function asciiHex(nib){ return nib<10 ? 0x30+nib : 0x41+nib-10; }
+
+async function assignNoteToVoice(voice, note){
+  if(!lastSetup){
+    log('Note# Assign: please click "Refresh Setup" first (need cached Setup bulk).');
+    return;
+  }
+  // Setup bulk layout: DATA starts at d[16], each logical byte = 2 ASCII hex chars
+  // Note# table at logical offset 11 → byte for voice V at d[16 + 2*(11+V)]
+  const pos = 16 + 2*(11 + voice);
+  const buf = new Uint8Array(lastSetup);
+  buf[pos]   = asciiHex((note>>4) & 0x0F);
+  buf[pos+1] = asciiHex(note & 0x0F);
+  buf[buf.length-2] = bulkChecksum(buf);
+  send(buf);
+  if(!noteAssign) noteAssign = new Array(100).fill(0);
+  noteAssign[voice] = note;
+  lastSetup = buf;
+  renderVoices();
+  log(`Note# Assign: voice ${pad2(voice)} ${VOICES[voice]||''} → ${noteName(note)} (${note})`);
+}
+$('naAssign').onclick  = ()=> assignNoteToVoice(curVoice, kbSelected);
+$('naRefresh').onclick = ()=> reqSetup();
+
+// === Memory Protect (UTILITY JOB03) =====================================
+$('memProtOff').onclick = async ()=>{
+  log('Memory Protect → OFF (UTILITY JOB03)');
+  // UTILITY(30) → JOB(31) → 0 → 3 → -1/No
+  await remoteSeq([30, 31, NUMKEY[0], NUMKEY[3], 32], 60, 25);
+};
+$('memProtOn').onclick = async ()=>{
+  log('Memory Protect → ON (UTILITY JOB03)');
+  await remoteSeq([30, 31, NUMKEY[0], NUMKEY[3], 34], 60, 25);
+};
+
+// Device# is set manually on the RX7; the GUI Value input here just controls outgoing SysEx nibble.
+$('kaSave').onclick = async ()=>{
+  const slot = parseInt($('kaSlot').value,10);
+  if(slot>4){ log('Save: slot 0-4 only (5-9 are factory ROM). Cancelled.'); return; }
+  log(`Key Data Save (JOB07) → slot ${slot}`);
+  // KEY ASSIGN→JOB→0→7→numkey(slot)→+1/Yes
+  await remoteSeq([7, 31, NUMKEY[0], NUMKEY[7], NUMKEY[slot], 34]);
+  log('Save done');
+};
+$('kaLoad').onclick = async ()=>{
+  const slot = parseInt($('kaSlot').value,10);
+  log(`Key Data Load (JOB08) → slot ${slot}${slot>4?' (factory)':' (user)'}`);
+  // KEY ASSIGN→JOB→0→8→numkey(slot)→+1/Yes
+  await remoteSeq([7, 31, NUMKEY[0], NUMKEY[8], NUMKEY[slot], 34]);
+  log('Load done — click "Refresh from RX7" to update pad display');
+};
+$('enterKeyAssign').onclick = async ()=>{ sendRemote(7,true); await sleep(40); sendRemote(7,false); };
+
+$('midiChOn').onclick = async ()=>{
+  log('MIDI Ch Message ON (JOB01)');
+  await remoteSeq([23, 31, NUMKEY[0], NUMKEY[1], 34]);
+};
+$('midiChOff').onclick = async ()=>{
+  log('MIDI Ch Message OFF (JOB01)');
+  await remoteSeq([23, 31, NUMKEY[0], NUMKEY[1], 32]);
+};
+$('noteInit').onclick = async ()=>{
+  log('Note Initialize (JOB05) — restoring factory note numbers');
+  await remoteSeq([23, 31, NUMKEY[0], NUMKEY[5], 34]);
+  log('Note Init done — click "Request Setup from RX7" to refresh Note# display');
+};
+$('enterMIDI').onclick = async ()=>{ sendRemote(23,true); await sleep(40); sendRemote(23,false); };
+$('kaRefresh').onclick = ()=> reqSetup();
+
+// === Note test ===
+function nOn(){ if(!output) return; const n=parseInt($('testNote').value,10), v=parseInt($('testVel').value,10); output.send([0x90, n&0x7F, v&0x7F]); }
+function nOff(){ if(!output) return; const n=parseInt($('testNote').value,10); output.send([0x80, n&0x7F, 0]); }
+$('noteOn').onclick = nOn;
+$('noteOff').onclick = nOff;
+
+$('clearLog').onclick = ()=> $('log').innerHTML='';
+
+// init
+renderVoices(); updateVoiceName();
+renderVoiceEdit(); renderPerfEdit(); renderSysEdit(); renderRemote();
+renderPatGrid();
+renderInstPads(); updateKaTarget();
+renderKbd(); updateNaTarget();
+setLCD(' YAMAHA  RX7', '  Web Editor');
+initMIDI();
+</script>
+</body>
+</html>
