@@ -791,13 +791,22 @@ const Recorder = {
     }
     this.overdub = !!overdub && !!this.decodedBuffer;
     this.overdubBase = this.overdub ? this.decodedBuffer : null;
-    const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+    const audio = {
+      channelCount: { ideal: 2 },
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+    };
     if (deviceId) audio.deviceId = { exact: deviceId };
     // deviceId指定で失敗したらデフォルトで再試行
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({ audio });
     } catch (e) {
-      if (deviceId) this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (deviceId) {
+        const fallbackAudio = { ...audio };
+        delete fallbackAudio.deviceId;
+        this.stream = await navigator.mediaDevices.getUserMedia({ audio: fallbackAudio });
+      }
       else throw e;
     }
 
