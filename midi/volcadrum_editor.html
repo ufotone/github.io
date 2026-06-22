@@ -545,7 +545,6 @@ input[type=number], input[type=text], textarea {
       </div>
       <div class="row">
         <button id="patchShare">Copy share link</button>
-        <button id="patchSend">Send all to unit</button>
       </div>
       <p class="hint">The share link embeds the whole patch in the URL. Opening the link restores it automatically.</p>
       <textarea id="patchShareUrl" rows="3" style="width:100%" readonly placeholder="The share link appears here"></textarea>
@@ -1360,6 +1359,7 @@ function setup() {
     if (!confirm('Reset all parameters to init values (power-on default). Continue?')) return;
     initState();
     rebuildUI();
+    if (typeof clearAllMotion === 'function') clearAllMotion();
     if (MIDI.out && confirm('Also send INIT values to the unit?\n(MIDI-controllable parameters only. Global settings and sequences are not reset.)')) {
       sendAll();
       state.parts.forEach((_, p) => sendQPI(p));
@@ -1767,10 +1767,6 @@ function setupPatch() {
       () => {}, () => {});
     try { document.execCommand('copy'); } catch (e) {}
     location.hash = 'p=' + url.split('#p=')[1];
-  });
-  document.getElementById('patchSend').addEventListener('click', () => {
-    if (!MIDI.out) { alert('No MIDI output port selected'); return; }
-    sendAll(); state.parts.forEach((_, p) => sendQPI(p));
   });
 }
 
@@ -2202,6 +2198,30 @@ function updateMrecStatus() {
   el.textContent = 'MREC● PART' + (SEQ.recPart + 1) + ' / ' + stepTxt;
 }
 
+function refreshMotionUI() {
+  buildSeqGrid();
+  highlightMotionKnobs();
+  updateMrecStatus();
+}
+
+function clearMotionRange(start, len) {
+  for (let p = 0; p < NUM_PARTS; p++) {
+    for (let s = 0; s < len; s++) {
+      if (SEQ.motion[p]) SEQ.motion[p][start + s] = {};
+    }
+  }
+  if (SEQ.recStep >= start && SEQ.recStep < start + len) SEQ.recStep = -1;
+}
+
+function clearAllMotion() {
+  const total = SEQ.totalSteps();
+  clearMotionRange(0, total);
+  SEQ.mrec = false;
+  SEQ.recPart = -1;
+  SEQ.recStep = -1;
+  refreshMotionUI();
+}
+
 // MOT行のステップ選択 / 同じ選択中ステップ再クリックで一括消去
 function selectMotionStep(p, abs) {
   if (SEQ.recPart === p && SEQ.recStep === abs) {
@@ -2211,23 +2231,19 @@ function selectMotionStep(p, abs) {
     SEQ.recPart = p; SEQ.recStep = abs;
     loadMotionToKnobs(p, abs); // 記録済み値をGUIに反映
   }
-  buildSeqGrid();
-  highlightMotionKnobs();
-  updateMrecStatus();
+  refreshMotionUI();
 }
 
 function recordMotion(p, id, value) {
   if (!SEQ.mrec || SEQ.recPart !== p || SEQ.recStep < 0) return;
   SEQ.motion[p][SEQ.recStep][id] = value;
-  buildSeqGrid();
-  highlightMotionKnobs();
+  refreshMotionUI();
 }
 
 function eraseMotionKnob(p, id) {
   if (SEQ.recPart !== p || SEQ.recStep < 0) return;
   if (SEQ.motion[p][SEQ.recStep]) delete SEQ.motion[p][SEQ.recStep][id];
-  buildSeqGrid();
-  highlightMotionKnobs();
+  refreshMotionUI();
 }
 
 function motionHasData(p, abs) {
@@ -2388,7 +2404,8 @@ function seqClearAll() {
   // 表示中ページをクリア
   const base = SEQ.base();
   SEQ.parts.forEach(pt => { for (let s = 0; s < SEQ.stepLen; s++) pt.on[base + s] = false; });
-  buildSeqGrid();
+  clearMotionRange(base, SEQ.stepLen);
+  refreshMotionUI();
 }
 function seqRandomize() {
   // 表示中ページをランダム化
