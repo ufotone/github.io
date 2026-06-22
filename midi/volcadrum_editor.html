@@ -188,6 +188,14 @@ button:disabled { color: var(--gray); border-color: var(--gray); box-shadow: non
   grid-column: span 2;
   border: 2px dashed var(--gray);
 }
+.recorder-box {
+  grid-column: span 2;
+  border: 2px solid var(--black);
+  padding: 8px;
+}
+.rec-controls { display: flex; flex-direction: column; gap: 4px; }
+.rec-controls #recMeter { width: 100%; height: 24px; }
+.rec-controls .fw-progress { height: 6px; }
 .group-title {
   font-weight: bold;
   background: var(--black); color: var(--white);
@@ -207,7 +215,7 @@ button:disabled { color: var(--gray); border-color: var(--gray); box-shadow: non
 .fw-body { padding: 12px; line-height: 1.5; }
 .fw-body ol { margin: 6px 0 10px 18px; padding: 0; }
 .fw-body li { margin: 2px 0; }
-#fwMeter { border: 1px solid var(--black); display: block; margin: 8px 0; background: var(--white); width: 100%; }
+#fwMeter, #recMeter { border: 1px solid var(--black); display: block; margin: 8px 0; background: var(--white); width: 100%; }
 .fw-progress { border: 1px solid var(--black); height: 12px; background: var(--white); }
 #fwBar { height: 100%; width: 0; background: var(--black); }
 #fwInfo { font-size: 10px; }
@@ -231,6 +239,10 @@ button:disabled { color: var(--gray); border-color: var(--gray); box-shadow: non
 .seq-pages label { font-weight: bold; }
 #pageInput { width: 42px; text-align: center; }
 
+/* STEP長プリセット */
+.step-presets { display: inline-flex; gap: 2px; }
+.step-presets .seq-btn.on { background: var(--black); color: var(--white); }
+#stepLenCustom { width: 44px; text-align: center; }
 /* BEAT グループバー */
 .seq-beatbar {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
@@ -256,7 +268,7 @@ button:disabled { color: var(--gray); border-color: var(--gray); box-shadow: non
 .seq-grid { display: flex; flex-direction: column; gap: 2px; }
 .seq-row {
   display: grid;
-  grid-template-columns: 60px repeat(16, 1fr);
+  grid-template-columns: 60px repeat(var(--seq-steps, 16), 1fr);
   gap: 2px;
   align-items: stretch;
 }
@@ -323,6 +335,7 @@ input[type=number], input[type=text], textarea {
   border: 1px solid var(--black); background: var(--white); color: var(--black);
   padding: 2px 4px; border-radius: 0;
 }
+
 </style>
 </head>
 <body>
@@ -357,7 +370,36 @@ input[type=number], input[type=text], textarea {
           </div>
           <div class="knobs" id="globalWaveguide"></div>
         </div>
-        <div class="reserved-space" title="Reserved space"></div>
+        <div class="recorder-box">
+          <div class="mix-title-row">
+            <span class="group-title">RECORDER (WAV)</span>
+          </div>
+          <div class="rec-controls">
+            <div class="row">
+              <label>Input</label>
+              <select id="recInput" style="flex:1"><option>(default)</option></select>
+              <button id="recRefresh" class="seq-btn">↻</button>
+            </div>
+            <div class="row">
+              <button id="recStart" class="seq-btn">● REC</button>
+              <button id="recOverdub" class="seq-btn" disabled>● OVERDUB</button>
+              <button id="recStop" class="seq-btn" disabled>■ STOP</button>
+              <span id="recTime" class="hint">00:00.0</span>
+              <span id="recStatus" class="hint">idle</span>
+            </div>
+            <canvas id="recMeter" width="300" height="24"></canvas>
+            <div class="row">
+              <button id="recPlay" class="seq-btn" disabled>▶ PLAY</button>
+              <button id="recPlayStop" class="seq-btn" disabled>■</button>
+              <button id="recSave" class="seq-btn" disabled>SAVE WAV</button>
+              <button id="recClear" class="seq-btn" disabled>CLEAR</button>
+              <button id="recLoad" class="seq-btn">LOAD WAV</button>
+              <input type="file" id="recFile" accept="audio/*,.wav" class="hidden">
+            </div>
+            <div class="fw-progress"><div id="recBar"></div></div>
+            <div id="recInfo" class="hint">No recording</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -390,9 +432,21 @@ input[type=number], input[type=text], textarea {
           <input type="number" id="pageInput" min="1" max="16" value="1">
           <button id="pageNext" class="seq-btn">▶</button>
           <span id="pageTotal" class="hint">/ 1</span>
+          <button id="pageCopy" class="seq-btn" title="Copy current page">COPY</button>
+          <button id="pagePaste" class="seq-btn" title="Paste to current page" disabled>PASTE</button>
+          <button id="pageDelete" class="seq-btn" title="Delete current page">DEL</button>
         </span>
       </div>
       <div class="seq-beatbar">
+        <span class="beat-bar-label">STEP</span>
+        <span id="stepLenPresets" class="step-presets">
+          <button class="seq-btn" data-slen="9">9</button>
+          <button class="seq-btn" data-slen="12">12</button>
+          <button class="seq-btn" data-slen="16">16</button>
+          <button class="seq-btn" data-slen="32">32</button>
+        </span>
+        <input type="number" id="stepLenCustom" min="1" max="64" value="16">
+        <span class="seq-sep"></span>
         <span class="beat-bar-label">BEAT</span>
         <span id="beatChips"></span>
         <button id="beatAdd" class="seq-btn">＋ ADD</button>
@@ -563,6 +617,9 @@ const SINGLE_CC = [
   // Part6
   { select:89, level:90, modamt:96, modrate:97, pitch:98, egatt:99, egrel:100, send:108, pan:114 },
 ];
+
+</script>
+<script>
 // Web MIDI ラッパー
 const MIDI = {
   access: null,
@@ -622,6 +679,9 @@ const MIDI = {
     this.out.send([0x80 | ((ch - 1) & 0x0f), note & 0x7f, 0]);
   },
 };
+
+</script>
+<script>
 // ファームウェア WAV 再生 (Web Audio)
 const Firmware = {
   ctx: null,
@@ -690,6 +750,237 @@ const Firmware = {
     if (this.raf) cancelAnimationFrame(this.raf);
   },
 };
+
+</script>
+<script>
+// ===== WebAudio Recorder (WAV) =====
+// MediaRecorder で PC入力(マイク/ライン)を録音 → decodeAudioData → WAV(PCM16) で保存
+const Recorder = {
+  ctx: null,
+  stream: null,
+  micSource: null,
+  analyser: null,
+  mediaRec: null,
+  chunks: [],
+  recording: false,
+  startMs: 0,
+  rafMeter: null,
+  decodedBuffer: null,   // AudioBuffer (録音結果)
+  playSource: null,
+  inputs: [],
+
+  ensureCtx() {
+    if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    return this.ctx;
+  },
+
+  async listInputs() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return [];
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    this.inputs = devs.filter(d => d.kind === 'audioinput');
+    return this.inputs;
+  },
+
+  overdub: false,
+  overdubBase: null,    // オーバーダブ時の既存バッファ
+  overdubSource: null,  // オーバーダブ中に再生する既存音
+
+  async start(deviceId, overdub) {
+    if (this.recording) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('getUserMedia not supported (use https or localhost)');
+    }
+    this.overdub = !!overdub && !!this.decodedBuffer;
+    this.overdubBase = this.overdub ? this.decodedBuffer : null;
+    const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+    if (deviceId) audio.deviceId = { exact: deviceId };
+    // deviceId指定で失敗したらデフォルトで再試行
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio });
+    } catch (e) {
+      if (deviceId) this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      else throw e;
+    }
+
+    this.ensureCtx();
+    await this.ctx.resume();
+    this.micSource = this.ctx.createMediaStreamSource(this.stream);
+    this.analyser = this.ctx.createAnalyser();
+    this.analyser.fftSize = 1024;
+    this.micSource.connect(this.analyser);
+
+    this.chunks = [];
+    this.decodedBuffer = null;
+    let mime = '';
+    if (window.MediaRecorder) {
+      const cand = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg', 'audio/mp4'];
+      mime = cand.find(m => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || '';
+    } else {
+      throw new Error('MediaRecorder not supported');
+    }
+    this.mediaRec = mime ? new MediaRecorder(this.stream, { mimeType: mime }) : new MediaRecorder(this.stream);
+    this.mediaRec.ondataavailable = e => { if (e.data && e.data.size > 0) this.chunks.push(e.data); };
+    this.mediaRec.start();
+    // オーバーダブ: 既存音を同時再生
+    if (this.overdub && this.overdubBase) {
+      const s = this.ctx.createBufferSource();
+      s.buffer = this.overdubBase;
+      s.connect(this.ctx.destination);
+      s.start();
+      this.overdubSource = s;
+    }
+    this.recording = true;
+    this.startMs = performance.now();
+    this.startMeter();
+  },
+
+  startMeter() {
+    const data = new Uint8Array(this.analyser.frequencyBinCount);
+    const tick = () => {
+      if (!this.recording) return;
+      this.analyser.getByteTimeDomainData(data);
+      let peak = 0;
+      for (let i = 0; i < data.length; i++) { const v = Math.abs(data[i] - 128) / 128; if (v > peak) peak = v; }
+      if (typeof onRecMeter === 'function') onRecMeter(peak, performance.now() - this.startMs);
+      this.rafMeter = requestAnimationFrame(tick);
+    };
+    this.rafMeter = requestAnimationFrame(tick);
+  },
+
+  // 停止 → デコード完了で onDone(durationSec) を呼ぶ
+  stop(onDone, onError) {
+    if (!this.recording || !this.mediaRec) return;
+    this.recording = false;
+    if (this.rafMeter) cancelAnimationFrame(this.rafMeter);
+    if (this.overdubSource) { try { this.overdubSource.stop(); } catch (e) {} this.overdubSource = null; }
+    this.mediaRec.onstop = async () => {
+      try {
+        const blob = new Blob(this.chunks, { type: this.mediaRec.mimeType || 'audio/webm' });
+        const arr = await blob.arrayBuffer();
+        const newBuf = await this.ensureCtx().decodeAudioData(arr);
+        if (this.overdub && this.overdubBase) {
+          this.decodedBuffer = this.mix(this.overdubBase, newBuf);
+        } else {
+          this.decodedBuffer = newBuf;
+        }
+        this.overdub = false; this.overdubBase = null;
+        this.cleanupStream();
+        onDone && onDone(this.decodedBuffer.duration);
+      } catch (e) {
+        this.overdub = false; this.overdubBase = null;
+        this.cleanupStream();
+        onError && onError(e);
+      }
+    };
+    this.mediaRec.stop();
+  },
+
+  // 2つのAudioBufferをミックス (同じctx.sampleRate前提)
+  mix(a, b) {
+    const ctx = this.ensureCtx();
+    const ch = Math.max(a.numberOfChannels, b.numberOfChannels);
+    const len = Math.max(a.length, b.length);
+    const out = ctx.createBuffer(ch, len, ctx.sampleRate);
+    for (let c = 0; c < ch; c++) {
+      const od = out.getChannelData(c);
+      const ad = a.getChannelData(Math.min(c, a.numberOfChannels - 1));
+      const bd = b.getChannelData(Math.min(c, b.numberOfChannels - 1));
+      for (let i = 0; i < len; i++) {
+        let v = (i < a.length ? ad[i] : 0) + (i < b.length ? bd[i] : 0);
+        od[i] = Math.max(-1, Math.min(1, v));
+      }
+    }
+    return out;
+  },
+
+  // 録音内容を消去
+  clear() {
+    this.playStop();
+    this.decodedBuffer = null;
+    this.chunks = [];
+    this.overdub = false; this.overdubBase = null;
+  },
+
+  // 外部WAV(等)ファイルを読み込み
+  async loadFile(file) {
+    const arr = await file.arrayBuffer();
+    this.decodedBuffer = await this.ensureCtx().decodeAudioData(arr);
+    return this.decodedBuffer.duration;
+  },
+
+  cleanupStream() {
+    if (this.micSource) { try { this.micSource.disconnect(); } catch (e) {} this.micSource = null; }
+    if (this.stream) { this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
+    this.mediaRec = null;
+  },
+
+  hasRecording() { return !!this.decodedBuffer; },
+  duration() { return this.decodedBuffer ? this.decodedBuffer.duration : 0; },
+  sampleRate() { return this.decodedBuffer ? this.decodedBuffer.sampleRate : 0; },
+  channels() { return this.decodedBuffer ? this.decodedBuffer.numberOfChannels : 0; },
+
+  // AudioBuffer → WAV(PCM16) Blob
+  buildWav() {
+    const ab = this.decodedBuffer;
+    if (!ab) return null;
+    const ch = ab.numberOfChannels, len = ab.length, sr = ab.sampleRate;
+    const chans = [];
+    for (let c = 0; c < ch; c++) chans.push(ab.getChannelData(c));
+    const interleaved = new Int16Array(len * ch);
+    for (let i = 0; i < len; i++) {
+      for (let c = 0; c < ch; c++) {
+        let v = Math.max(-1, Math.min(1, chans[c][i]));
+        interleaved[i * ch + c] = (v < 0 ? v * 0x8000 : v * 0x7fff) | 0;
+      }
+    }
+    const dataBytes = interleaved.byteLength;
+    const buf = new ArrayBuffer(44 + dataBytes);
+    const dv = new DataView(buf);
+    let p = 0;
+    const writeStr = s => { for (const c of s) dv.setUint8(p++, c.charCodeAt(0)); };
+    writeStr('RIFF'); dv.setUint32(p, 36 + dataBytes, true); p += 4; writeStr('WAVE');
+    writeStr('fmt '); dv.setUint32(p, 16, true); p += 4;
+    dv.setUint16(p, 1, true); p += 2; dv.setUint16(p, ch, true); p += 2;
+    dv.setUint32(p, sr, true); p += 4; dv.setUint32(p, sr * ch * 2, true); p += 4;
+    dv.setUint16(p, ch * 2, true); p += 2; dv.setUint16(p, 16, true); p += 2;
+    writeStr('data'); dv.setUint32(p, dataBytes, true); p += 4;
+    new Uint8Array(buf, 44).set(new Uint8Array(interleaved.buffer));
+    return new Blob([buf], { type: 'audio/wav' });
+  },
+
+  play(onProgress, onEnd) {
+    this.playStop();
+    if (!this.decodedBuffer) return;
+    const ctx = this.ensureCtx();
+    ctx.resume();
+    const src = ctx.createBufferSource();
+    src.buffer = this.decodedBuffer;
+    const an = ctx.createAnalyser(); an.fftSize = 1024;
+    src.connect(an); an.connect(ctx.destination);
+    src.start();
+    this.playSource = src;
+    const start = ctx.currentTime, dur = this.decodedBuffer.duration;
+    const data = new Uint8Array(an.frequencyBinCount);
+    const tick = () => {
+      if (!this.playSource) return;
+      const t = ctx.currentTime - start;
+      an.getByteTimeDomainData(data);
+      let peak = 0;
+      for (let i = 0; i < data.length; i++) { const v = Math.abs(data[i] - 128) / 128; if (v > peak) peak = v; }
+      onProgress && onProgress(Math.min(t / dur, 1), peak);
+      if (t < dur) requestAnimationFrame(tick);
+    };
+    src.onended = () => { this.playSource = null; onEnd && onEnd(); };
+    requestAnimationFrame(tick);
+  },
+
+  playStop() {
+    if (this.playSource) { try { this.playSource.onended = null; this.playSource.stop(); } catch (e) {} this.playSource = null; }
+  },
+};
+
+</script>
+<script>
 // ===== 状態 =====
 const state = {
   chMode: 'split',
@@ -1066,10 +1357,9 @@ function setup() {
 
   // Init
   document.getElementById('menuInit').addEventListener('click', () => {
-    if (!confirm('Reset all parameters to init values (power-on default). Continue?')) return;
     initState();
     rebuildUI();
-    if (MIDI.out && confirm('Also send INIT values to the unit?\n(MIDI-controllable parameters only. Global settings and sequences are not reset.)')) {
+    if (MIDI.out) {
       sendAll();
       state.parts.forEach((_, p) => sendQPI(p));
     }
@@ -1092,12 +1382,12 @@ function setup() {
     if (!MIDI.out) { alert('No MIDI output port selected'); return; }
     if (!MIDI.enabled) { alert('MIDI output is OFF. Please turn it ON.'); return; }
     sendAll(); state.parts.forEach((_, p) => sendQPI(p));
-    alert('All parameters sent');
   });
 
   document.getElementById('waveguideRnd').addEventListener('click', randomizeWaveguide);
   setupPatch();
   setupFirmwareUI();
+  setupRecorderUI();
   setupWindows();
   loadFromHash();
 }
@@ -1201,6 +1491,168 @@ function setupFirmwareUI() {
   });
 }
 
+// ===== Recorder UI =====
+function setupRecorderUI() {
+  const inputSel = document.getElementById('recInput');
+  const refreshBtn = document.getElementById('recRefresh');
+  const startBtn = document.getElementById('recStart');
+  const overdubBtn = document.getElementById('recOverdub');
+  const clearBtn = document.getElementById('recClear');
+  const loadBtn = document.getElementById('recLoad');
+  const recFile = document.getElementById('recFile');
+  const stopBtn = document.getElementById('recStop');
+  const timeEl = document.getElementById('recTime');
+  const statusEl = document.getElementById('recStatus');
+  const meter = document.getElementById('recMeter');
+  const mctx = meter.getContext('2d');
+  const playBtn = document.getElementById('recPlay');
+  const playStopBtn = document.getElementById('recPlayStop');
+  const saveBtn = document.getElementById('recSave');
+  const info = document.getElementById('recInfo');
+  const bar = document.getElementById('recBar');
+
+  function fmtTime(ms) {
+    const t = Math.max(0, ms) / 1000;
+    const m = Math.floor(t / 60);
+    const s = (t - m * 60).toFixed(1);
+    return String(m).padStart(2, '0') + ':' + s.padStart(4, '0');
+  }
+  function drawMeter(peak, isInput) {
+    mctx.clearRect(0, 0, meter.width, meter.height);
+    const w = peak * meter.width;
+    mctx.fillStyle = '#000'; mctx.fillRect(0, 8, w, meter.height - 16);
+    mctx.strokeStyle = '#000'; mctx.strokeRect(0, 8, meter.width, meter.height - 16);
+  }
+
+  async function fillInputs() {
+    try {
+      // ラベル取得に許可が必要
+      const list = await Recorder.listInputs();
+      inputSel.innerHTML = '';
+      const def = document.createElement('option');
+      def.value = ''; def.textContent = '(default)';
+      inputSel.appendChild(def);
+      list.forEach(d => {
+        const o = document.createElement('option');
+        o.value = d.deviceId;
+        o.textContent = d.label || ('Input ' + d.deviceId.slice(0, 6));
+        inputSel.appendChild(o);
+      });
+    } catch (e) {
+      info.textContent = 'enumerate error: ' + e.message;
+    }
+  }
+
+  refreshBtn.addEventListener('click', fillInputs);
+
+  // メータ更新コールバック
+  window.onRecMeter = (peak, ms) => {
+    drawMeter(peak, true);
+    timeEl.textContent = fmtTime(ms);
+  };
+
+  // 録音内容の有無に応じてボタン状態を更新
+  function updateRecState() {
+    const has = Recorder.hasRecording();
+    playBtn.disabled = !has;
+    saveBtn.disabled = !has;
+    clearBtn.disabled = !has;
+    overdubBtn.disabled = !has;
+    if (has) {
+      info.textContent = Recorder.duration().toFixed(1) + 's / ' + Recorder.sampleRate() + 'Hz / ' + Recorder.channels() + 'ch';
+    } else {
+      info.textContent = 'No recording';
+    }
+  }
+  // 録音中UI
+  function setRecordingUI(on) {
+    startBtn.disabled = on; overdubBtn.disabled = on || !Recorder.hasRecording();
+    loadBtn.disabled = on; clearBtn.disabled = on || !Recorder.hasRecording();
+    stopBtn.disabled = !on;
+    if (on) { playBtn.disabled = true; saveBtn.disabled = true; }
+  }
+
+  async function beginRecord(overdub) {
+    try {
+      statusEl.textContent = 'requesting mic...';
+      await Recorder.start(inputSel.value || undefined, overdub);
+      statusEl.textContent = overdub ? 'overdubbing ●' : 'recording ●';
+      setRecordingUI(true);
+      if (!overdub) info.textContent = '';
+      fillInputs(); // 許可後にラベル取得
+    } catch (e) {
+      statusEl.textContent = 'error: ' + e.message;
+      setRecordingUI(false);
+      alert('Recording start failed: ' + e.message);
+    }
+  }
+
+  startBtn.addEventListener('click', () => beginRecord(false));
+  overdubBtn.addEventListener('click', () => beginRecord(true));
+
+  stopBtn.addEventListener('click', () => {
+    stopBtn.disabled = true;
+    statusEl.textContent = 'processing...';
+    Recorder.stop(
+      () => { statusEl.textContent = 'stopped'; setRecordingUI(false); updateRecState(); mctx.clearRect(0, 0, meter.width, meter.height); },
+      (err) => { statusEl.textContent = 'decode error'; setRecordingUI(false); updateRecState(); alert('Recording decode failed: ' + err.message); }
+    );
+  });
+
+  clearBtn.addEventListener('click', () => {
+    Recorder.clear();
+    statusEl.textContent = 'cleared';
+    bar.style.width = '0';
+    mctx.clearRect(0, 0, meter.width, meter.height);
+    updateRecState();
+  });
+
+  loadBtn.addEventListener('click', () => recFile.click());
+  recFile.addEventListener('change', async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try {
+      statusEl.textContent = 'loading...';
+      await Recorder.loadFile(f);
+      statusEl.textContent = 'loaded: ' + f.name;
+      updateRecState();
+    } catch (err) { statusEl.textContent = 'load error'; alert('Load failed: ' + err.message); }
+    e.target.value = '';
+  });
+
+  playBtn.addEventListener('click', async () => {
+    playBtn.disabled = true; playStopBtn.disabled = false;
+    try {
+      await Recorder.play(
+        (prog, peak) => { bar.style.width = (prog * 100) + '%'; drawMeter(peak, false); },
+        () => { playBtn.disabled = false; playStopBtn.disabled = true; bar.style.width = '100%'; }
+      );
+    } catch (e) { playBtn.disabled = false; playStopBtn.disabled = true; alert('Play error: ' + e.message); }
+  });
+  playStopBtn.addEventListener('click', () => {
+    Recorder.playStop(); playBtn.disabled = false; playStopBtn.disabled = true;
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const blob = Recorder.buildWav(); if (!blob) return;
+    const filename = 'volca-drum-rec-' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.wav';
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: filename,
+          types: [{ description: 'WAV audio', accept: { 'audio/wav': ['.wav'] } }],
+        });
+        const w = await handle.createWritable();
+        await w.write(blob); await w.close();
+        return;
+      } catch (e) { if (e.name === 'AbortError') return; }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
 // ===== パッチ Save / Load / Share =====
 function serializePatch() {
   return {
@@ -1239,13 +1691,27 @@ function applyPatch(obj, send) {
   if (send && MIDI.out) { sendAll(); state.parts.forEach((_, p) => sendQPI(p)); }
 }
 
-function downloadPatch() {
+async function downloadPatch() {
   const data = serializePatch();
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const json = JSON.stringify(data, null, 2);
+  const filename = (data.name || 'volca-drum-patch').replace(/[^\w\-]+/g, '_') + '_drum.json';
+  // File System Access API (Chrome/Edge): 保存先を選べる
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: 'volca drum patch (JSON)', accept: { 'application/json': ['.json'] } }],
+      });
+      const w = await handle.createWritable();
+      await w.write(json); await w.close();
+      return;
+    } catch (e) { if (e.name === 'AbortError') return; /* キャンセル */ }
+  }
+  // フォールバック (Safari等): ダウンロード
+  const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = (data.name || 'volca-drum-patch').replace(/[^\w\-]+/g, '_') + '_drum.json';
+  a.href = url; a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -1282,7 +1748,6 @@ function setupPatch() {
     try {
       const obj = JSON.parse(await f.text());
       applyPatch(obj, true);  // auto-send all parameters to unit after load
-      alert('Patch loaded and sent to unit: ' + (obj.name || f.name));
     } catch (err) { alert('Load error: ' + err.message); }
     e.target.value = '';
   });
@@ -1299,15 +1764,19 @@ function setupPatch() {
   document.getElementById('patchSend').addEventListener('click', () => {
     if (!MIDI.out) { alert('No MIDI output port selected'); return; }
     sendAll(); state.parts.forEach((_, p) => sendQPI(p));
-    alert('All parameters + QPI sent');
   });
 }
 
 document.addEventListener('DOMContentLoaded', setup);
+
+</script>
+<script>
 // ===== 16ステップ ドラムシーケンサー =====
 // honodori_synth SUBシンセのシーケンサーを参考。volca drum向けに ON + VEL のみ
 // (PAN=MIX側のため除外, NOTE/TIE=メロディ用途のため除外)。
-const STEPS = 16;
+const STEPS_DEFAULT = 16;
+const STEP_PRESETS = [9, 12, 16, 32];
+const STEP_MIN = 1, STEP_MAX = 64;
 // 0〜127を8刻み (+ 最大127) 降順
 const VEL_OPTIONS = (() => {
   const arr = [127];
@@ -1328,9 +1797,10 @@ const PAN_OPTIONS = [127, 112, 96, 80, 64, 48, 32, 16, 0];
 const SEQ = {
   bpm: 120,
   playing: false,
-  pages: 1,           // 総ページ数 (1ページ=16STEP)
+  stepLen: STEPS_DEFAULT, // 1ページのSTEP数 (可変)
+  pages: 1,           // 総ページ数
   page: 1,            // 表示中ページ (1-based)
-  beatGroups: [4, 4, 4, 4],  // 拍グループ (合計=16)
+  beatGroups: [4, 4, 4, 4],  // 拍グループ (合計=stepLen)
   parts: [],          // parts[p] = { on:[], vel:[], notes:[] } 長さ = pages*16
   motion: [],         // motion[p][absStep] = { 'L0.pitch':val, 'M.gain':val, ... } モーションレック
   mrec: false,        // モーション録音モード
@@ -1347,18 +1817,19 @@ const SEQ = {
 
   init() {
     for (let p = 0; p < NUM_PARTS; p++) {
-      this.parts.push({ on: Array(STEPS).fill(false), vel: Array(STEPS).fill(100), notes: Array(STEPS).fill(DEFAULT_NOTE), pan: Array(STEPS).fill(64) });
-      this.motion.push(Array.from({ length: STEPS }, () => ({})));
+      this.parts.push({ on: Array(SEQ.stepLen).fill(false), vel: Array(SEQ.stepLen).fill(100), notes: Array(SEQ.stepLen).fill(DEFAULT_NOTE), pan: Array(SEQ.stepLen).fill(64) });
+      this.motion.push(Array.from({ length: SEQ.stepLen }, () => ({})));
     }
   },
   stepDurMs() { return 60000 / this.bpm / 4; }, // 16分音符
-  totalSteps() { return this.pages * STEPS; },
-  base() { return (this.page - 1) * STEPS; }, // 表示中ページの先頭絶対index
+  totalSteps() { return this.pages * SEQ.stepLen; },
+  base() { return (this.page - 1) * SEQ.stepLen; }, // 表示中ページの先頭絶対index
 };
 
 function buildSeqGrid() {
   const grid = document.getElementById('seqGrid');
   grid.innerHTML = '';
+  grid.style.setProperty('--seq-steps', SEQ.stepLen);
   SEQ.cells = []; SEQ.velSelects = []; SEQ.stepHeads = [];
   const heads = getBeatHeads();
 
@@ -1366,7 +1837,7 @@ function buildSeqGrid() {
   const head = document.createElement('div');
   head.className = 'seq-row';
   head.appendChild(seqLabel(''));
-  for (let s = 0; s < STEPS; s++) {
+  for (let s = 0; s < SEQ.stepLen; s++) {
     const h = document.createElement('div');
     h.className = 'seq-step-head' + (heads.has(s) ? ' beat' : '');
     h.textContent = s + 1;
@@ -1389,7 +1860,7 @@ function buildSeqGrid() {
     dlbl.addEventListener('mousedown', () => MIDI.noteOn(partChannel(p), DEFAULT_NOTE, 110));
     dlbl.addEventListener('mouseup', () => MIDI.noteOff(partChannel(p), DEFAULT_NOTE));
     noteRow.appendChild(dlbl);
-    for (let s = 0; s < STEPS; s++) {
+    for (let s = 0; s < SEQ.stepLen; s++) {
       const idx = SEQ.base() + s;
       const sel = document.createElement('select');
       sel.className = 'seq-vel seq-note' + (heads.has(s) ? ' beat' : '') + (qpiOn ? '' : ' note-disabled');
@@ -1410,7 +1881,7 @@ function buildSeqGrid() {
     onRow.className = 'seq-row';
     const lbl = seqLabel('ON');
     onRow.appendChild(lbl);
-    for (let s = 0; s < STEPS; s++) {
+    for (let s = 0; s < SEQ.stepLen; s++) {
       const idx = SEQ.base() + s;
       const cell = document.createElement('div');
       cell.className = 'seq-cell' + (heads.has(s) ? ' beat' : '') + (SEQ.parts[p].on[idx] ? ' on' : '');
@@ -1427,7 +1898,7 @@ function buildSeqGrid() {
     const velRow = document.createElement('div');
     velRow.className = 'seq-row vel-row';
     velRow.appendChild(seqLabel('VEL'));
-    for (let s = 0; s < STEPS; s++) {
+    for (let s = 0; s < SEQ.stepLen; s++) {
       const idx = SEQ.base() + s;
       const sel = document.createElement('select');
       sel.className = 'seq-vel' + (heads.has(s) ? ' beat' : '');
@@ -1449,7 +1920,7 @@ function buildSeqGrid() {
     const panRow = document.createElement('div');
     panRow.className = 'seq-row vel-row';
     panRow.appendChild(seqLabel('PAN'));
-    for (let s = 0; s < STEPS; s++) {
+    for (let s = 0; s < SEQ.stepLen; s++) {
       const idx = SEQ.base() + s;
       const sel = document.createElement('select');
       sel.className = 'seq-vel' + (heads.has(s) ? ' beat' : '');
@@ -1470,7 +1941,7 @@ function buildSeqGrid() {
     motRow.className = 'seq-row mot-row';
     const motLbl = seqLabel('MOT');
     motRow.appendChild(motLbl);
-    for (let s = 0; s < STEPS; s++) {
+    for (let s = 0; s < SEQ.stepLen; s++) {
       const idx = SEQ.base() + s;
       const cell = document.createElement('div');
       const hasData = motionHasData(p, idx);
@@ -1483,13 +1954,133 @@ function buildSeqGrid() {
   }
 }
 
+// ===== STEP長 (1ページあたりのステップ数) を変更 =====
+function setStepLen(newLen) {
+  newLen = Math.max(STEP_MIN, Math.min(STEP_MAX, newLen | 0));
+  if (newLen === SEQ.stepLen) return;
+  const oldLen = SEQ.stepLen;
+  // 各ページ毎に トリム/拡張: ページ内の先頭newLen個を維持
+  for (let p = 0; p < NUM_PARTS; p++) {
+    const newOn = [], newVel = [], newNotes = [], newPan = [], newMot = [];
+    for (let pg = 0; pg < SEQ.pages; pg++) {
+      const base = pg * oldLen;
+      for (let s = 0; s < newLen; s++) {
+        if (s < oldLen) {
+          newOn.push(SEQ.parts[p].on[base + s]);
+          newVel.push(SEQ.parts[p].vel[base + s]);
+          newNotes.push(SEQ.parts[p].notes[base + s]);
+          newPan.push(SEQ.parts[p].pan[base + s]);
+          newMot.push(SEQ.motion[p][base + s] || {});
+        } else {
+          newOn.push(false); newVel.push(100); newNotes.push(DEFAULT_NOTE); newPan.push(64); newMot.push({});
+        }
+      }
+    }
+    SEQ.parts[p].on = newOn; SEQ.parts[p].vel = newVel;
+    SEQ.parts[p].notes = newNotes; SEQ.parts[p].pan = newPan;
+    SEQ.motion[p] = newMot;
+  }
+  SEQ.stepLen = newLen;
+  // BEAT グループは新しいstepLenを4刻みで再構成 (端数は末尾)
+  const g = []; let rem = newLen;
+  while (rem > 0) { g.push(Math.min(4, rem)); rem -= 4; }
+  SEQ.beatGroups = g;
+  // MREC選択ステップは安全のためクリア
+  SEQ.recStep = -1;
+  if (SEQ.playing) SEQ.current = SEQ.current % SEQ.totalSteps();
+  renderBeatBar();
+  buildSeqGrid();
+  updatePageDisplay();
+  updateStepLenUI();
+  if (typeof updateMrecStatus === 'function') updateMrecStatus();
+  if (typeof highlightMotionKnobs === 'function') highlightMotionKnobs();
+}
+
+function updateStepLenUI() {
+  const wrap = document.getElementById('stepLenPresets');
+  if (wrap) [...wrap.querySelectorAll('button')].forEach(b => {
+    b.classList.toggle('on', +b.dataset.slen === SEQ.stepLen);
+  });
+  const inp = document.getElementById('stepLenCustom');
+  if (inp) inp.value = SEQ.stepLen;
+}
+
 // ===== ページ =====
+let pageClipboard = null; // {parts:[{on,vel,notes,pan}], motion:[]}
+
+function copyPage() {
+  const base = SEQ.base();
+  pageClipboard = {
+    parts: SEQ.parts.map(pt => ({
+      on: pt.on.slice(base, base + SEQ.stepLen),
+      vel: pt.vel.slice(base, base + SEQ.stepLen),
+      notes: pt.notes.slice(base, base + SEQ.stepLen),
+      pan: pt.pan.slice(base, base + SEQ.stepLen),
+    })),
+    motion: SEQ.motion.map(arr => arr.slice(base, base + SEQ.stepLen).map(m => ({ ...m }))),
+  };
+  document.getElementById('pagePaste').disabled = false;
+}
+function pastePage() {
+  if (!pageClipboard) return;
+  const base = SEQ.base();
+  for (let p = 0; p < NUM_PARTS; p++) {
+    const cp = pageClipboard.parts[p];
+    for (let s = 0; s < SEQ.stepLen; s++) {
+      SEQ.parts[p].on[base + s] = cp.on[s];
+      SEQ.parts[p].vel[base + s] = cp.vel[s];
+      SEQ.parts[p].notes[base + s] = cp.notes[s];
+      SEQ.parts[p].pan[base + s] = cp.pan[s];
+      SEQ.motion[p][base + s] = { ...pageClipboard.motion[p][s] };
+    }
+  }
+  buildSeqGrid();
+  if (typeof highlightMotionKnobs === 'function') highlightMotionKnobs();
+}
+function deletePage() {
+  if (SEQ.pages <= 1) {
+    // 最後のページは消さずクリアのみ
+    const base = SEQ.base();
+    for (let p = 0; p < NUM_PARTS; p++) {
+      for (let s = 0; s < SEQ.stepLen; s++) {
+        SEQ.parts[p].on[base + s] = false;
+        SEQ.parts[p].vel[base + s] = 100;
+        SEQ.parts[p].notes[base + s] = DEFAULT_NOTE;
+        SEQ.parts[p].pan[base + s] = 64;
+        SEQ.motion[p][base + s] = {};
+      }
+    }
+    buildSeqGrid();
+    highlightMotionKnobs && highlightMotionKnobs();
+    return;
+  }
+  const base = SEQ.base();
+  for (let p = 0; p < NUM_PARTS; p++) {
+    SEQ.parts[p].on.splice(base, SEQ.stepLen);
+    SEQ.parts[p].vel.splice(base, SEQ.stepLen);
+    SEQ.parts[p].notes.splice(base, SEQ.stepLen);
+    SEQ.parts[p].pan.splice(base, SEQ.stepLen);
+    SEQ.motion[p].splice(base, SEQ.stepLen);
+  }
+  SEQ.pages--;
+  if (SEQ.page > SEQ.pages) SEQ.page = SEQ.pages;
+  // MREC選択ステップも調整
+  if (SEQ.recStep >= 0) {
+    if (SEQ.recStep >= base && SEQ.recStep < base + SEQ.stepLen) SEQ.recStep = -1;
+    else if (SEQ.recStep >= base + SEQ.stepLen) SEQ.recStep -= SEQ.stepLen;
+  }
+  buildSeqGrid();
+  updatePageDisplay();
+  highlightMotionKnobs && highlightMotionKnobs();
+  updateMrecStatus && updateMrecStatus();
+}
+
 function ensurePages(n) {
   if (n <= SEQ.pages) return;
   for (const pt of SEQ.parts) {
-    while (pt.on.length < n * STEPS) { pt.on.push(false); pt.vel.push(100); pt.notes.push(DEFAULT_NOTE); pt.pan.push(64); }
+    while (pt.on.length < n * SEQ.stepLen) { pt.on.push(false); pt.vel.push(100); pt.notes.push(DEFAULT_NOTE); pt.pan.push(64); }
   }
-  for (const m of SEQ.motion) { while (m.length < n * STEPS) m.push({}); }
+  for (const m of SEQ.motion) { while (m.length < n * SEQ.stepLen) m.push({}); }
   SEQ.pages = n;
 }
 function setPage(n) {
@@ -1510,12 +2101,12 @@ function updatePageDisplay() {
 function normalizeBeat() {
   const g = SEQ.beatGroups;
   let total = g.reduce((a, b) => a + b, 0);
-  while (total > STEPS && g.length > 0) {
-    const diff = total - STEPS, last = g[g.length - 1];
+  while (total > SEQ.stepLen && g.length > 0) {
+    const diff = total - SEQ.stepLen, last = g[g.length - 1];
     if (last <= diff) { g.pop(); total -= last; }
-    else { g[g.length - 1] -= diff; total = STEPS; }
+    else { g[g.length - 1] -= diff; total = SEQ.stepLen; }
   }
-  if (total < STEPS) g.push(STEPS - total);
+  if (total < SEQ.stepLen) g.push(SEQ.stepLen - total);
 }
 // グループ境界(step 0除く)の集合
 function getBeatHeads() {
@@ -1549,13 +2140,13 @@ function renderBeatBar() {
     const plus = document.createElement('button');
     plus.className = 'beat-pm'; plus.textContent = '+';
     plus.onclick = () => {
-      if (SEQ.beatGroups.reduce((a, b) => a + b, 0) < STEPS) { SEQ.beatGroups[gi]++; normalizeBeat(); refreshBeat(); }
+      if (SEQ.beatGroups.reduce((a, b) => a + b, 0) < SEQ.stepLen) { SEQ.beatGroups[gi]++; normalizeBeat(); refreshBeat(); }
     };
     wrap.append(minus, num, plus);
     chips.appendChild(wrap);
   });
   const total = SEQ.beatGroups.reduce((a, b) => a + b, 0);
-  if (totalEl) totalEl.textContent = total + '/' + STEPS;
+  if (totalEl) totalEl.textContent = total + '/' + SEQ.stepLen;
 }
 
 function refreshBeat() { renderBeatBar(); buildSeqGrid(); }
@@ -1600,7 +2191,7 @@ function updateMrecStatus() {
   const el = document.getElementById('mrecStatus'); if (!el) return;
   if (!SEQ.mrec) { el.textContent = 'MREC: OFF'; el.classList.remove('on'); return; }
   el.classList.add('on');
-  const stepTxt = SEQ.recStep >= 0 ? ('P' + (Math.floor(SEQ.recStep / STEPS) + 1) + ' ST' + (SEQ.recStep % STEPS + 1)) : 'select a step';
+  const stepTxt = SEQ.recStep >= 0 ? ('P' + (Math.floor(SEQ.recStep / SEQ.stepLen) + 1) + ' ST' + (SEQ.recStep % SEQ.stepLen + 1)) : 'select a step';
   el.textContent = 'MREC● PART' + (SEQ.recPart + 1) + ' / ' + stepTxt;
 }
 
@@ -1741,8 +2332,8 @@ function seqPlayheadLoop() {
     cur = SEQ.scheduled.shift().step;
   }
   if (cur >= 0) {
-    const page = Math.floor(cur / STEPS) + 1;
-    const local = cur % STEPS;
+    const page = Math.floor(cur / SEQ.stepLen) + 1;
+    const local = cur % SEQ.stepLen;
     // 再生がページをまたいだら表示ページを追従
     if (page !== SEQ.page) { SEQ.page = page; buildSeqGrid(); updatePageDisplay(); }
     highlightStep(local);
@@ -1789,14 +2380,14 @@ function seqStop() {
 function seqClearAll() {
   // 表示中ページをクリア
   const base = SEQ.base();
-  SEQ.parts.forEach(pt => { for (let s = 0; s < STEPS; s++) pt.on[base + s] = false; });
+  SEQ.parts.forEach(pt => { for (let s = 0; s < SEQ.stepLen; s++) pt.on[base + s] = false; });
   buildSeqGrid();
 }
 function seqRandomize() {
   // 表示中ページをランダム化
   const base = SEQ.base();
   SEQ.parts.forEach(pt => {
-    for (let s = 0; s < STEPS; s++) {
+    for (let s = 0; s < SEQ.stepLen; s++) {
       pt.on[base + s] = Math.random() < 0.3;
       pt.vel[base + s] = VEL_OPTIONS[Math.floor(Math.random() * VEL_OPTIONS.length)];
     }
@@ -1810,6 +2401,7 @@ function serializeSeq() {
     v: 1,
     app: 'volca-drum-seq',
     bpm: SEQ.bpm,
+    stepLen: SEQ.stepLen,
     pages: SEQ.pages,
     beatGroups: SEQ.beatGroups.slice(),
     parts: SEQ.parts.map(pt => ({
@@ -1822,11 +2414,12 @@ function serializeSeq() {
 function applySeq(obj) {
   if (!obj || !obj.parts) throw new Error('Invalid sequence data');
   SEQ.bpm = obj.bpm || 120;
+  SEQ.stepLen = Math.max(STEP_MIN, Math.min(STEP_MAX, obj.stepLen || STEPS_DEFAULT));
   SEQ.pages = Math.max(1, Math.min(16, obj.pages || 1));
   SEQ.page = 1;
   SEQ.beatGroups = (obj.beatGroups && obj.beatGroups.length) ? obj.beatGroups.slice() : [4, 4, 4, 4];
   normalizeBeat();
-  const len = SEQ.pages * STEPS;
+  const len = SEQ.pages * SEQ.stepLen;
   for (let p = 0; p < NUM_PARTS; p++) {
     const sp = obj.parts[p] || {};
     const fill = (src, def) => { const a = (src || []).slice(0, len); while (a.length < len) a.push(def); return a; };
@@ -1844,13 +2437,27 @@ function applySeq(obj) {
   updatePageDisplay();
   if (typeof rebuildUI === 'function') rebuildUI(); // MRECボタン/ハイライト更新
   updateMrecStatus();
+  updateStepLenUI();
 }
 
-function downloadSeq() {
-  const blob = new Blob([JSON.stringify(serializeSeq(), null, 2)], { type: 'application/json' });
+async function downloadSeq() {
+  const json = JSON.stringify(serializeSeq(), null, 2);
+  const filename = 'volca-drum_seq.json';
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: 'volca drum sequence (JSON)', accept: { 'application/json': ['.json'] } }],
+      });
+      const w = await handle.createWritable();
+      await w.write(json); await w.close();
+      return;
+    } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = 'volca-drum_seq.json';
+  a.href = url; a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -1867,18 +2474,32 @@ function setupSeq() {
     const v = parseInt(e.target.value, 10);
     if (!isNaN(v)) setPage(v); else updatePageDisplay();
   });
+  document.getElementById('pageCopy').addEventListener('click', copyPage);
+  document.getElementById('pagePaste').addEventListener('click', pastePage);
+  document.getElementById('pageDelete').addEventListener('click', () => {
+    deletePage();
+  });
   document.getElementById('beatAdd').addEventListener('click', () => {
     const total = SEQ.beatGroups.reduce((a, b) => a + b, 0);
-    if (total < STEPS) { SEQ.beatGroups.push(STEPS - total); refreshBeat(); }
+    if (total < SEQ.stepLen) { SEQ.beatGroups.push(SEQ.stepLen - total); refreshBeat(); }
   });
   document.getElementById('beatReset').addEventListener('click', () => {
     SEQ.beatGroups = [4, 4, 4, 4]; refreshBeat();
   });
+  // STEP長
+  document.getElementById('stepLenPresets').addEventListener('click', e => {
+    const b = e.target.closest('button[data-slen]'); if (b) setStepLen(parseInt(b.dataset.slen, 10));
+  });
+  document.getElementById('stepLenCustom').addEventListener('change', e => {
+    const v = parseInt(e.target.value, 10);
+    if (!isNaN(v)) setStepLen(v); else updateStepLenUI();
+  });
+  updateStepLenUI();
   document.getElementById('seqSave').addEventListener('click', downloadSeq);
   document.getElementById('seqLoad').addEventListener('click', () => document.getElementById('seqFile').click());
   document.getElementById('seqFile').addEventListener('change', async e => {
     const f = e.target.files[0]; if (!f) return;
-    try { applySeq(JSON.parse(await f.text())); alert('Sequence loaded: ' + f.name); }
+    try { applySeq(JSON.parse(await f.text())); }
     catch (err) { alert('Load error: ' + err.message); }
     e.target.value = '';
   });
@@ -1898,6 +2519,8 @@ function setupSeq() {
 }
 
 document.addEventListener('DOMContentLoaded', setupSeq);
+
 </script>
 </body>
 </html>
+
