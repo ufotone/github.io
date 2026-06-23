@@ -381,7 +381,7 @@ input[type=number], input[type=text], textarea {
         <div class="global-box">
           <div class="mix-title-row">
             <span class="group-title">WAVE GUIDE</span>
-            <button class="rnd-btn" id="waveguideRnd" title="Randomize WAVE GUIDE">RANDOM</button>
+            <button class="rnd-btn" id="waveguideRnd" title="Randomize WAVE GUIDE">RND</button>
           </div>
           <div class="knobs" id="globalWaveguide"></div>
         </div>
@@ -409,7 +409,7 @@ input[type=number], input[type=text], textarea {
               <label class="rec-sync"><input type="checkbox" id="recSync" checked> SYNC seq</label>
               <button id="recSave" class="seq-btn" disabled>SAVE WAV</button>
               <button id="recEdit" class="seq-btn" disabled>EDIT</button>
-              <button id="recClear" class="seq-btn" disabled>CLEAR</button>
+              <button id="recClear" class="seq-btn" disabled>CLR</button>
               <button id="recLoad" class="seq-btn">LOAD WAV</button>
               <input type="file" id="recFile" accept="audio/*,.wav" class="hidden">
             </div>
@@ -435,8 +435,8 @@ input[type=number], input[type=text], textarea {
         <label>TEMPO</label>
         <input type="number" id="seqBpm" min="20" max="300" value="120" style="width:56px"> BPM
         <span class="seq-sep"></span>
-        <button id="seqRandom" class="seq-btn">RANDOM</button>
-        <button id="seqClear" class="seq-btn">CLEAR</button>
+        <button id="seqRandom" class="seq-btn">RND</button>
+        <button id="seqClear" class="seq-btn">CLR</button>
         <span class="seq-sep"></span>
         <button id="seqSave" class="seq-btn">SAVE</button>
         <button id="seqLoad" class="seq-btn">LOAD</button>
@@ -451,6 +451,7 @@ input[type=number], input[type=text], textarea {
           <span id="pageTotal" class="hint">/ 1</span>
           <button id="pageCopy" class="seq-btn" title="Copy current page">COPY</button>
           <button id="pagePaste" class="seq-btn" title="Paste to current page" disabled>PASTE</button>
+          <button id="pageIns" class="seq-btn" title="Insert copied page after current" disabled>INS</button>
           <button id="pageDelete" class="seq-btn" title="Delete current page">DEL</button>
         </span>
       </div>
@@ -1520,7 +1521,7 @@ function buildParts() {
     headBtns.className = 'head-btns';
     const rndBtn = document.createElement('button');
     rndBtn.className = 'rnd-btn';
-    rndBtn.textContent = 'RANDOM';
+    rndBtn.textContent = 'RND';
     rndBtn.title = 'Randomize this part';
     rndBtn.addEventListener('click', () => randomizePart(p));
     const mrecBtn = document.createElement('button');
@@ -2402,6 +2403,7 @@ function copyPage() {
     motion: SEQ.motion.map(arr => arr.slice(base, base + SEQ.stepLen).map(m => ({ ...m }))),
   };
   document.getElementById('pagePaste').disabled = false;
+  const insBtn = document.getElementById('pageIns'); if (insBtn) insBtn.disabled = false;
 }
 function pastePage() {
   if (!pageClipboard) return;
@@ -2418,6 +2420,31 @@ function pastePage() {
   }
   buildSeqGrid();
   if (typeof highlightMotionKnobs === 'function') highlightMotionKnobs();
+}
+// COPYしたページを現在ページの次に挿入
+function insertPage() {
+  if (!pageClipboard) return;
+  if (SEQ.pages >= 16) return;
+  const L = SEQ.stepLen;
+  // クリップボードのSTEP長が現在と違う場合は不可
+  if (!pageClipboard.parts[0] || pageClipboard.parts[0].on.length !== L) return;
+  const at = SEQ.page * L; // 現在ページの直後
+  for (let p = 0; p < NUM_PARTS; p++) {
+    const cp = pageClipboard.parts[p];
+    SEQ.parts[p].on.splice(at, 0, ...cp.on);
+    SEQ.parts[p].vel.splice(at, 0, ...cp.vel);
+    SEQ.parts[p].notes.splice(at, 0, ...cp.notes);
+    SEQ.parts[p].pan.splice(at, 0, ...cp.pan);
+    SEQ.motion[p].splice(at, 0, ...pageClipboard.motion[p].map(m => ({ ...m })));
+  }
+  SEQ.pages++;
+  // MREC選択ステップ調整 (挿入位置以降は後ろにずれる)
+  if (SEQ.recStep >= at) SEQ.recStep += L;
+  SEQ.page++; // 挿入したページを表示
+  buildSeqGrid();
+  updatePageDisplay();
+  if (typeof highlightMotionKnobs === 'function') highlightMotionKnobs();
+  if (typeof updateMrecStatus === 'function') updateMrecStatus();
 }
 function deletePage() {
   if (SEQ.pages <= 1) {
@@ -2883,6 +2910,7 @@ function setupSeq() {
   });
   document.getElementById('pageCopy').addEventListener('click', copyPage);
   document.getElementById('pagePaste').addEventListener('click', pastePage);
+  document.getElementById('pageIns').addEventListener('click', insertPage);
   document.getElementById('pageDelete').addEventListener('click', () => {
     deletePage();
   });
