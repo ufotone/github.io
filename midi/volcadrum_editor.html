@@ -604,6 +604,19 @@ input[type=number], input[type=text], textarea {
       </div>
       <p class="hint">The share link embeds the whole patch in the URL. Opening the link restores it automatically.</p>
       <textarea id="patchShareUrl" rows="3" style="width:100%" readonly placeholder="The share link appears here"></textarea>
+
+      <div class="group-title">Load single PART</div>
+      <div class="row">
+        <label>From PART</label>
+        <select id="partLoadFrom"></select>
+        <label>→ to PART</label>
+        <select id="partLoadTo"></select>
+      </div>
+      <div class="row">
+        <button id="partLoadBtn">Load PART from file</button>
+        <input type="file" id="partLoadFile" accept="application/json,.json" class="hidden">
+        <span class="hint">Copies only the chosen part's values. Others unchanged.</span>
+      </div>
     </div>
   </div>
 
@@ -2064,6 +2077,24 @@ function applyPatch(obj, send) {
   if (send && MIDI.out) { sendAll(); state.parts.forEach((_, p) => sendQPI(p)); }
 }
 
+// パッチ内の1パート分だけを指定パートへ読み込む
+function applyPartFromPatch(obj, srcIdx, dstIdx, send) {
+  if (!obj || !obj.parts || !obj.parts[srcIdx]) throw new Error('Invalid patch / no such part');
+  if (!state.parts[dstIdx]) return;
+  const sp = obj.parts[srcIdx];
+  if (sp.layers) sp.layers.forEach((sl, l) => {
+    if (!state.parts[dstIdx].layers[l]) return;
+    LAYER_PARAMS.forEach(par => { if (sl[par.key] != null) state.parts[dstIdx].layers[l][par.key] = sl[par.key]; });
+    if (sl.select != null && sl.source == null && sl.modtype == null && sl.ampeg == null) {
+      decodeLegacySelect(sl.select, state.parts[dstIdx].layers[l]);
+    }
+  });
+  PART_PARAMS.forEach(par => { if (sp[par.key] != null) state.parts[dstIdx][par.key] = sp[par.key]; });
+  state.parts[dstIdx].qpi = !!sp.qpi;
+  rebuildUI();
+  if (send && MIDI.out) { sendPart(dstIdx); sendQPI(dstIdx); }
+}
+
 function decodeLegacySelect(value, layer) {
   const raw = Math.max(0, Math.min(127, Math.round((value + 0.5) * 127 / 8)));
   let best = { diff: Infinity, source: 0, modtype: 0, ampeg: 0 };
@@ -2150,6 +2181,24 @@ function setupPatch() {
       () => {}, () => {});
     try { document.execCommand('copy'); } catch (e) {}
     location.hash = 'p=' + url.split('#p=')[1];
+  });
+
+  // ===== PART単位ロード =====
+  const fromSel = document.getElementById('partLoadFrom');
+  const toSel = document.getElementById('partLoadTo');
+  for (let i = 0; i < NUM_PARTS; i++) {
+    const o1 = document.createElement('option'); o1.value = i; o1.textContent = 'PART ' + (i + 1); fromSel.appendChild(o1);
+    const o2 = document.createElement('option'); o2.value = i; o2.textContent = 'PART ' + (i + 1); toSel.appendChild(o2);
+  }
+  document.getElementById('partLoadBtn').addEventListener('click', () => document.getElementById('partLoadFile').click());
+  document.getElementById('partLoadFile').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try {
+      const obj = JSON.parse(await f.text());
+      applyPartFromPatch(obj, parseInt(fromSel.value, 10), parseInt(toSel.value, 10), true);
+    } catch (err) { console.warn('Part load error:', err); }
+    e.target.value = '';
   });
 }
 
