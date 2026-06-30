@@ -1474,6 +1474,9 @@ function makeKnob(opts) {
   }
 
   // ドラッグで操作
+  // レンジが小さいパラメータ(SELECT/MOD TYPE/AMP EG等)は1ステップに必要なピクセル数を増やして繊細に
+  const range = max - min;
+  const pxPerStep = Math.min(28, Math.max(3, Math.round(150 / range)));
   let dragging = false, startY = 0, startVal = 0;
   dial.addEventListener('mousedown', e => {
     dragging = true; startY = e.clientY; startVal = opts.getValue(); lastSent = startVal;
@@ -1481,7 +1484,7 @@ function makeKnob(opts) {
   });
   window.addEventListener('mousemove', e => {
     if (!dragging) return;
-    const dv = Math.round((startY - e.clientY) / 3);
+    const dv = Math.round((startY - e.clientY) / pxPerStep);
     let nv = Math.max(min, Math.min(max, startVal + dv));
     commit(nv);
   });
@@ -1498,13 +1501,14 @@ function makeKnob(opts) {
     commit(nv);
   });
 
-  // 右クリックでモーション消去
-  if (opts.motion) {
-    dial.addEventListener('contextmenu', e => {
-      e.preventDefault();
-      if (typeof eraseMotionKnob === 'function') eraseMotionKnob(opts.motion.part, opts.motion.id);
-    });
-  }
+  // 右クリックで初期値(INIT値)にリセット (+ モーション記録があれば消去)
+  dial.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    const iv = opts.initValue != null ? opts.initValue : (opts.def != null ? opts.def : Math.round((min + max) / 2));
+    render(iv); lastSent = iv;
+    if (opts.onInput) opts.onInput(iv);
+    if (opts.motion && typeof eraseMotionKnob === 'function') eraseMotionKnob(opts.motion.part, opts.motion.id);
+  });
 
   wrap.append(label, dial, val);
   wrap._render = render;
@@ -1577,6 +1581,7 @@ function buildParts() {
           name: par.name,
           value: state.parts[p].layers[l][par.key],
           min: par.min, max: par.max, labels: par.labels, def: par.def,
+          initValue: par.init ? par.init[l] : (par.def != null ? par.def : (par.max != null ? 0 : 64)),
           getValue: () => state.parts[p].layers[l][par.key],
           onInput: v => { state.parts[p].layers[l][par.key] = v; sendLayerParam(p, l, par); },
           setState: v => { state.parts[p].layers[l][par.key] = v; },
@@ -1620,6 +1625,7 @@ function buildParts() {
     PART_PARAMS.forEach(par => {
       common.appendChild(makeKnob({
         name: par.name, value: state.parts[p][par.key], def: par.def,
+        initValue: par.init != null ? par.init : (par.def != null ? par.def : 64),
         getValue: () => state.parts[p][par.key],
         onInput: v => { state.parts[p][par.key] = v; sendPartParam(p, par); },
         setState: v => { state.parts[p][par.key] = v; },
@@ -1636,6 +1642,7 @@ function buildGlobal() {
   wg.innerHTML = '';
   WAVEGUIDE_PARAMS.forEach(par => wg.appendChild(makeKnob({
     name: par.name, value: state.global[par.key], min: par.min, max: par.max, labels: par.labels, def: par.def,
+    initValue: par.init != null ? par.init : (par.def != null ? par.def : (par.max != null ? 0 : 64)),
     getValue: () => state.global[par.key],
     onInput: v => { state.global[par.key] = v; sendGlobal(par); },
   })));
